@@ -1,0 +1,31 @@
+# Entornos Virtuales
+.venv/
+venv/
+env/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Flask
+instance/
+.webassets-cache
+
+# Archivos del Sistema Operativo
+.DS_Store
+Thumbs.db
+
+# IDEs y Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Archivos temporales de exportación (opcional, por si testeas localmente)
+*.csv
+*.xlsx
+# Excepto los que estén en assets o de prueba si decides hacer una carpeta tests/

@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cat_flip — Studio ETL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&family=Geist:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ── TOKENS ────────────────────────────────────────────── */
+  :root {
+    --base:    #f6f8f9;
+    --base2:   #eef7f7;
+    --surface: rgba(255,255,255,0.72);
+    --surface2:rgba(255,255,255,0.52);
+    --glass:   rgba(238,247,247,0.60);
+    --teal:    #267c7c;
+    --teal2:   #1e6565;
+    --teal-bg: rgba(38,124,124,0.08);
+    --teal-bd: rgba(38,124,124,0.22);
+    --orange:  #e26d0d;
+    --orange-bg:rgba(226,109,13,0.10);
+    --orange-bd:rgba(226,109,13,0.30);
+    --color-mutation: #e26d0d;
+    --logo-disc: var(--teal);
+    --logo-cat:  #ffffff;
+    --green:   #2d9e6b;
+    --red:     #d94f4f;
+    --yellow:  #c08a1a;
+    --text:    #1a2b2b;
+    --text2:   #4e6b6b;
+    --border:  rgba(38,124,124,0.15);
+    --border2: rgba(38,124,124,0.08);
+    --shadow:  0 2px 16px rgba(38,124,124,0.10);
+    --shadow2: 0 8px 32px rgba(38,124,124,0.12);
+    --radius:  12px;
+    --radius2: 8px;
+    --row-alt: rgba(238, 247, 247, 0.40);  /* filas pares de la tabla */
+    --row-hover: rgba(38, 124, 124, 0.1); /* <- Hover añadido */
+    --font-ui:   'Geist', 'Segoe UI', system-ui, sans-serif;
+    --font-head: 'Hanken Grotesk', 'Segoe UI', sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+
+  /* ── TEMA OSCURO ───────────────────────────────────────── */
+  [data-theme="dark"] {
+    --base:    #0f1117;
+    --base2:   #161b26;
+    --surface: rgba(26,29,39,0.92);
+    --surface2:rgba(22,27,38,0.80);
+    --glass:   rgba(22,27,38,0.75);
+    --teal:    #3db8b8;
+    --teal2:   #57d0d0;
+    --teal-bg: rgba(61,184,184,0.10);
+    --teal-bd: rgba(61,184,184,0.22);
+    --orange:  #f08030;
+    --orange-bg:rgba(240,128,48,0.12);
+    --orange-bd:rgba(240,128,48,0.32);
+    --color-mutation: #f08030;
+    --logo-disc: var(--teal);
+    --logo-cat:  var(--base);
+    --green:   #22c55e;
+    --red:     #ef4444;
+    --yellow:  #f59e0b;
+    --text:    #e2e8f0;
+    --text2:   #7fa8a8;
+    --border:  rgba(61,184,184,0.18);
+    --border2: rgba(61,184,184,0.08);
+    --shadow:  0 2px 16px rgba(0,0,0,0.35);
+    --shadow2: 0 8px 32px rgba(0,0,0,0.45);
+    --row-alt: rgba(255, 255, 255, 0.03); /* <- Ajuste modo oscuro */
+    --row-hover: rgba(255, 255, 255, 0.08); /* <- Hover modo oscuro */
+  }
+
+  /* ── RESET & BASE ──────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { height: 100%; }
+  body {
+    font-family: var(--font-ui);
+    background: var(--base);
+    background-image:
+      radial-gradient(ellipse 80% 50% at 20% 0%, rgba(38,124,124,0.07) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 80% 100%, rgba(238,247,247,0.9) 0%, transparent 60%);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    transition: background 0.3s ease, color 0.3s ease;
+  }
+  [data-theme="dark"] body {
+    background-image:
+      radial-gradient(ellipse 80% 50% at 20% 0%, rgba(61,184,184,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 80% 100%, rgba(15,17,23,0.9) 0%, transparent 60%);
+  }
+
+  /* ── THEME TOGGLE BUTTON ───────────────────────────────── */
+  .theme-toggle {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 0.22rem 0.6rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    display: flex; align-items: center; gap: 0.35rem;
+    color: var(--text2);
+    transition: all 0.2s ease;
+    white-space: nowrap;
+  }
+  .theme-toggle:hover {
+    border-color: var(--teal);
+    color: var(--teal);
+    background: var(--teal-bg);
+  }
+  .theme-toggle .toggle-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    font-family: var(--font-ui);
+  }
+
+  /* ── TOP RIBBON ────────────────────────────────────────── */
+  header {
+    display: flex; align-items: center; gap: 1rem;
+    padding: 0 1.25rem;
+    height: 52px;
+    background: var(--surface);
+    backdrop-filter: blur(16px) saturate(1.6);
+    -webkit-backdrop-filter: blur(16px) saturate(1.6);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    position: sticky; top: 0; z-index: 200;
+  }
+  .logo {
+    display: flex; align-items: center; gap: 0.55rem;
+    font-family: var(--font-head);
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--teal);
+    white-space: nowrap;
+  }
+  .logo-svg {
+    width: 28px;
+    height: 28px;
+    display: block;
+    flex-shrink: 0;
+  }
+  .logo-circle {
+    fill: var(--logo-disc, currentColor);
+    transition: fill 0.25s ease;
+  }
+  .logo-cat {
+    fill: var(--logo-cat, #ffffff);
+    transition: fill 0.25s ease;
+  }
+  .logo-sub {
+    font-family: var(--font-ui);
+    font-weight: 400;
+    font-size: 0.72rem;
+    color: var(--text2);
+    border-left: 1px solid var(--border);
+    padding-left: 0.65rem;
+    margin-left: 0.1rem;
+  }
+  .header-spacer { flex: 1; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    background: var(--teal-bg);
+    border: 1px solid var(--teal-bd);
+    padding: 0.2rem 0.65rem;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--teal);
+    white-space: nowrap;
+    max-width: 260px;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .header-metrics {
+    display: flex; gap: 0.5rem; align-items: center;
+  }
+  .metric-pill {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 0.22rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    color: var(--text2);
+  }
+  .metric-pill strong { color: var(--text); font-weight: 600; }
+
+  /* ── APP LAYOUT ────────────────────────────────────────── */
+  .layout {
+    display: grid;
+    grid-template-columns: 256px 1fr 240px;
+    height: calc(100vh - 52px);
+  }
+
+  /* ── PANEL SHARED STYLES ───────────────────────────────── */
+  .panel {
+    background: var(--glass);
+    backdrop-filter: blur(12px) saturate(1.4);
+    -webkit-backdrop-filter: blur(12px) saturate(1.4);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .panel-left  { border-right: 1px solid var(--border); }
+  .panel-right { border-left: 1px solid var(--border); }
+
+  .panel-section { padding: 1rem; border-bottom: 1px solid var(--border2); }
+  .panel-section:last-child { border-bottom: none; }
+
+  .section-title {
+    font-family: var(--font-head);
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--teal);
+    margin-bottom: 0.75rem;
+    display: flex; align-items: center; gap: 0.4rem;
+  }
+  .section-title svg {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex-shrink: 0;
+  }
+
+  /* ── UPLOAD AREA ───────────────────────────────────────── */
+  .upload-area {
+    border: 1.5px dashed var(--teal-bd);
+    border-radius: var(--radius);
+    padding: 1.1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: var(--surface2);
+  }
+  .upload-area:hover, .upload-area.drag-over {
+    border-color: var(--teal);
+    background: var(--teal-bg);
+    box-shadow: 0 0 0 3px rgba(38,124,124,0.08);
+  }
+  .upload-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.4rem;
+  }
+  .upload-icon svg {
+    width: 32px;
+    height: 32px;
+    stroke: var(--teal);
+    stroke-width: 1.75;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .upload-area p { font-size: 0.78rem; color: var(--text2); line-height: 1.5; }
+  .upload-area strong { color: var(--teal); }
+  #file-input { display: none; }
+  #sheet-selector { display: none; margin-top: 0.6rem; }
+
+  /* ── FORM ELEMENTS ─────────────────────────────────────── */
+  select, input[type=text], input[type=number] {
+    width: 100%;
+    padding: 0.42rem 0.65rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius2);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 0.82rem;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  select:focus, input[type=text]:focus, input[type=number]:focus {
+    outline: none;
+    border-color: var(--teal);
+    box-shadow: 0 0 0 3px rgba(38,124,124,0.10);
+  }
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%234e6b6b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.6rem center;
+    padding-right: 2rem;
+  }
+
+  /* ── OP GRID — TRANSFORMACIONES ────────────────────────── */
+  .cat-label {
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--text2);
+    margin: 0.75rem 0 0.35rem;
+    padding-left: 0.1rem;
+  }
+  .cat-label:first-child { margin-top: 0; }
+  .op-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem; }
+  .op-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius2);
+    padding: 0.5rem 0.35rem;
+    color: var(--text2);
+    font-family: var(--font-ui);
+    font-size: 0.72rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 0.25rem;
+    line-height: 1.2;
+  }
+  .op-btn:hover:not(:disabled) {
+    background: var(--teal-bg);
+    border-color: var(--teal);
+    color: var(--teal);
+    box-shadow: 0 2px 8px rgba(38,124,124,0.12);
+    transform: translateY(-1px);
+  }
+  .op-btn .op-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    color: inherit;
+  }
+  .op-btn .op-icon svg {
+    width: 17px;
+    height: 17px;
+    stroke: currentColor;
+    stroke-width: 1.85;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .op-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* ── BUTTONS ───────────────────────────────────────────── */
+  .btn {
+    padding: 0.42rem 0.85rem;
+    border-radius: var(--radius2);
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s ease;
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    white-space: nowrap;
+  }
+  .btn svg {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex-shrink: 0;
+  }
+  .btn-primary {
+    background: var(--teal);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(38,124,124,0.25);
+  }
+  .btn-primary:hover { background: var(--teal2); box-shadow: 0 4px 14px rgba(38,124,124,0.30); }
+  .btn-secondary {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .btn-secondary:hover { border-color: var(--teal); color: var(--teal); background: var(--teal-bg); }
+  .btn-danger {
+    background: var(--orange-bg);
+    border: 1px solid var(--orange-bd);
+    color: var(--orange);
+  }
+  .btn-danger:hover { background: rgba(226,109,13,0.18); }
+  .btn-green {
+    background: var(--green);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(45,158,107,0.20);
+  }
+  .btn-green:hover { background: #237a56; }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
+  .actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+  /* ── CENTRAL CANVAS ────────────────────────────────────── */
+  .canvas { display: flex; flex-direction: column; overflow: hidden; background: transparent; }
+
+  .tab-bar {
+    display: flex;
+    background: var(--surface);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 0.5rem;
+    flex-shrink: 0;
+  }
+  .tab {
+    padding: 0.55rem 1rem;
+    font-family: var(--font-head);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    color: var(--text2);
+    transition: all 0.15s;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+  .tab svg {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+    stroke-width: 1.85;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .tab.active { color: var(--teal); border-bottom-color: var(--teal); }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  .content-area { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+  .tab-content { display: none; flex: 1; overflow: auto; }
+  .tab-content.active { display: flex; flex-direction: column; }
+
+  /* ── DATA GRID ─────────────────────────────────────────── */
+  .table-wrap { flex: 1; overflow: auto; }
+  table { border-collapse: collapse; width: 100%; font-family: var(--font-mono); font-size: 0.75rem; }
+  thead th {
+    background: var(--base2);
+    color: var(--teal);
+    font-family: var(--font-head);
+    font-weight: 600;
+    font-size: 0.72rem;
+    padding: 0.55rem 0.85rem;
+    text-align: left;
+    border-bottom: 2px solid var(--teal-bd);
+    position: sticky; top: 0;
+    white-space: nowrap;
+    backdrop-filter: blur(8px);
+  }
+  tbody tr { transition: background 0.1s; }
+  tbody tr:hover { background: var(--row-hover); }
+  tbody tr:nth-child(even) { background: var(--row-alt); }
+  tbody tr:nth-child(even):hover { background: var(--row-hover); }
+  tbody td {
+    padding: 0.38rem 0.85rem;
+    border-bottom: 1px solid var(--border2);
+    max-width: 220px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--text);
+  }
+  tbody td:first-child {
+    color: var(--text2);
+    font-size: 0.68rem;
+    font-weight: 500;
+    border-right: 1px solid var(--border2);
+    user-select: none;
+  }
+  .truncated-msg {
+    padding: 0.45rem 1rem;
+    font-size: 0.75rem;
+    color: var(--yellow);
+    background: rgba(192,138,26,0.08);
+    border-top: 1px solid rgba(192,138,26,0.18);
+    text-align: center;
+  }
+
+  /* ── EMPTY STATE ───────────────────────────────────────── */
+  .empty-state {
+    flex: 1;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: var(--text2);
+    gap: 0.85rem;
+    padding: 2rem;
+  }
+  .empty-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .empty-icon .empty-logo {
+    width: 56px;
+    height: 56px;
+  }
+  .empty-state h2 { font-family: var(--font-head); font-size: 1.1rem; color: var(--teal); font-weight: 700; }
+  .empty-state p { font-size: 0.82rem; text-align: center; max-width: 300px; line-height: 1.6; }
+  .empty-state strong { color: var(--teal); }
+
+  /* ── STATS GRID ────────────────────────────────────────── */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(195px, 1fr)); gap: 0.75rem; padding: 1rem; }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.85rem;
+    box-shadow: var(--shadow);
+    transition: box-shadow 0.15s, transform 0.15s;
+  }
+  .stat-card:hover { box-shadow: var(--shadow2); transform: translateY(-1px); }
+  .stat-card h4 {
+    font-family: var(--font-head);
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--teal);
+    margin-bottom: 0.55rem;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .stat-row { display: flex; justify-content: space-between; font-size: 0.73rem; padding: 0.18rem 0; }
+  .stat-row span:first-child { color: var(--text2); }
+  .stat-row span:last-child { font-weight: 600; font-family: var(--font-mono); }
+
+  /* ── CODE PANEL ────────────────────────────────────────── */
+  .code-area { flex: 1; overflow: auto; padding: 1rem; }
+  pre {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.1rem;
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    line-height: 1.7;
+    color: var(--teal2);
+    white-space: pre-wrap;
+    word-break: break-word;
+    box-shadow: var(--shadow);
+  }
+  .code-actions {
+    padding: 0.6rem 1rem;
+    display: flex; gap: 0.5rem;
+    background: var(--surface);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  /* ── RIGHT PANEL — PIPELINE ────────────────────────────── */
+  .pipeline-empty {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 0.5rem; padding: 1.5rem;
+    color: var(--text2); font-size: 0.78rem; text-align: center;
+    flex: 1;
+  }
+  .pipeline-empty svg {
+    width: 32px;
+    height: 32px;
+    stroke: var(--text2);
+    stroke-width: 1.75;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.65;
+    margin-bottom: 0.25rem;
+  }
+  .pipeline-step {
+    display: flex; align-items: flex-start; gap: 0.55rem;
+    padding: 0.6rem 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius2);
+    margin-bottom: 0.4rem;
+    transition: box-shadow 0.15s;
+    cursor: default;
+  }
+  .pipeline-step:hover { box-shadow: var(--shadow); }
+  .step-num {
+    background: var(--teal-bg);
+    border: 1px solid var(--teal-bd);
+    color: var(--teal);
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 700;
+    border-radius: 50%;
+    width: 18px; height: 18px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .step-info { flex: 1; min-width: 0; }
+  .step-name { font-size: 0.75rem; font-weight: 600; color: var(--text); }
+  .step-detail { font-size: 0.67rem; color: var(--text2); font-family: var(--font-mono); margin-top: 0.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ── MODAL ─────────────────────────────────────────────── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(26,43,43,0.35);
+    backdrop-filter: blur(6px) saturate(1.2);
+    -webkit-backdrop-filter: blur(6px) saturate(1.2);
+    z-index: 1000;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(20px) saturate(1.6);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.5rem;
+    width: 430px; max-width: 95vw;
+    box-shadow: 0 24px 64px rgba(38,124,124,0.18), 0 2px 12px rgba(0,0,0,0.08);
+    animation: modalIn 0.18s ease;
+  }
+  @keyframes modalIn { from { transform: scale(0.96) translateY(8px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
+  .modal h2 {
+    font-family: var(--font-head);
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--teal);
+    margin-bottom: 1rem;
+  }
+  .modal label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text2);
+    margin-bottom: 0.25rem;
+    margin-top: 0.75rem;
+  }
+  .modal input[type=text], .modal input[type=number], .modal select {
+    width: 100%;
+    padding: 0.48rem 0.7rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius2);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 0.83rem;
+  }
+  .modal input[type=text]:focus, .modal input[type=number]:focus, .modal select:focus {
+    outline: none;
+    border-color: var(--teal);
+    box-shadow: 0 0 0 3px rgba(38,124,124,0.10);
+  }
+  .modal .col-check {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem;
+    max-height: 155px; overflow-y: auto;
+    padding: 0.5rem; background: var(--base2);
+    border: 1px solid var(--border); border-radius: var(--radius2);
+  }
+  .modal .col-check label {
+    font-size: 0.75rem; color: var(--text);
+    display: flex; align-items: center; gap: 0.3rem;
+    margin: 0; cursor: pointer; font-weight: 400;
+  }
+  .modal .col-check input[type=checkbox] { accent-color: var(--teal); }
+  .modal-footer { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1.25rem; }
+
+  /* ── TOAST ─────────────────────────────────────────────── */
+  #toast-container {
+    position: fixed; bottom: 1.25rem; right: 1.25rem;
+    z-index: 9999; display: flex; flex-direction: column; gap: 0.45rem;
+  }
+  .toast {
+    padding: 0.6rem 0.9rem;
+    border-radius: var(--radius2);
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: flex; align-items: center; gap: 0.45rem;
+    animation: toastIn 0.22s ease;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.12);
+    max-width: 300px;
+    backdrop-filter: blur(12px);
+  }
+  @keyframes toastIn { from { transform: translateX(60px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  .toast.success { background: rgba(45,158,107,0.12); border: 1px solid rgba(45,158,107,0.30); color: var(--green); }
+  .toast.error   { background: rgba(217,79,79,0.12);  border: 1px solid rgba(217,79,79,0.30);  color: var(--red); }
+  .toast.info    { background: var(--teal-bg);         border: 1px solid var(--teal-bd);         color: var(--teal); }
+
+  /* ── LOADING ───────────────────────────────────────────── */
+  .loading-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(246,248,249,0.55);
+    backdrop-filter: blur(4px);
+    z-index: 500; align-items: center; justify-content: center;
+  }
+  .loading-overlay.open { display: flex; }
+  .spinner {
+    width: 36px; height: 36px;
+    border: 2.5px solid var(--border);
+    border-top-color: var(--teal);
+    border-radius: 50%;
+    animation: spin 0.65s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── SCROLLBAR ─────────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--teal-bd); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--teal); }
+  /* ── ICONS ─────────────────────────────────────────────── */
+  .icon-svg {
+    display: inline-block;
+    vertical-align: middle;
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+    stroke-width: 1.85;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+</style>
+</head>
+<body>
+
+<!-- ══ TOP RIBBON ══════════════════════════════════════════════════════════ -->
+<header>
+  <div class="logo">
+    <svg class="logo-svg" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+      <g transform="matrix(1,0,0,1,-2001.834001,-2225.317355)">
+        <g>
+          <g transform="matrix(0.23305,0,0,0.23305,1630.143102,2129.445765)">
+            <circle class="logo-circle" cx="1979.911" cy="796.389" r="385.011"/>
+          </g>
+          <g id="Gato" transform="matrix(0.302993,-0.147024,0.147024,0.302993,1872.95909,2299.818244)">
+            <path class="logo-cat" d="M507.103,289.218C507.164,288.439 505.131,269.43 491.857,260.017C478.987,250.891 478.062,252.233 466.317,241.709C431.584,210.589 426.222,212.598 413.509,212.062C407.329,211.801 395.353,208.378 402.205,195.339C403.746,192.406 393.372,186.063 397.925,176.713C400.976,170.446 406.647,174.037 407.471,167.496C408.346,160.55 418.5,156.722 426.234,161.885C431.301,165.267 431.466,159.681 437.509,160.371C452.231,162.051 448.305,180.194 449.953,183.291C460.374,202.868 495.905,216.015 521.188,232.966C535.952,242.866 537.367,254.089 541.434,253.188C581.953,244.211 590.122,259.774 612.942,233.883C625.625,219.492 632.929,208.197 671.475,206.122C684.717,205.41 686.921,204.194 700.298,179.396C701.999,176.243 698.133,153 718.514,152.865C745.839,152.683 746.959,187.504 730.416,192.226C718.289,195.687 719.228,197.891 698.915,227.784C693.486,235.775 692.572,234.928 684.346,238.088C663.434,246.12 673.285,277.381 654.216,298.253C646.282,306.938 661.775,297.992 706.416,320.666C742.013,338.747 785.856,373.355 769.394,380.215C756.879,385.431 721.123,350.229 660.586,332.221C659.359,331.856 653.397,329.261 654.444,332.508C664.254,362.939 661.718,365.515 682.133,380.975C692.337,388.703 704.839,415.573 713.577,418.233C742.088,426.913 719.793,468.476 693.757,453.09C683.047,446.761 689.298,435.244 687.412,430.533C677.667,406.188 668.078,401.97 665.366,400.778C648.533,393.374 639.365,393.958 625.955,378.114C597.785,344.828 595.541,345.588 577.503,344.451C574.841,344.283 557.049,341.325 552.584,355.525C551.237,359.811 553.412,364.609 550.505,364.32C549.014,364.171 535.702,362.845 531.843,365.893C525.645,370.788 544.638,360.702 559.503,374.497C573.333,387.332 563.801,407.734 565.934,412.282C567.56,415.749 581.239,439.611 573.482,440.255C564.308,441.018 550.245,429.087 546.633,430.841C535.598,436.201 535.454,435.666 523.469,438.343C515.804,440.055 513.568,456.842 504.137,464.03C498.334,468.453 496.036,460.054 494.438,453.518C490.162,436.026 494.962,434.71 490.036,427.837C475.149,407.068 486.297,395.945 475.527,392.426C452.986,385.06 434.576,398.106 413.419,416.406C405.409,423.334 409.472,426.392 401.872,433.861C397.95,437.715 405.989,452.626 386.559,457.725C363.072,463.888 345.994,429.686 373.624,416.765C379.319,414.102 382.404,418.094 387.898,407.701C389.091,405.446 392.761,405.629 402.101,392.215C436.625,342.626 446.187,352.27 460.405,337.409C464.432,333.201 464.533,331.544 465.893,333.186C465.977,333.288 465.717,346.192 467.355,349.665C467.533,350.042 469.096,350.79 468.98,348.732C466.812,310.283 485.922,286.562 494.42,276.433C497.918,272.263 498.744,276.043 501.127,279.742C505.91,287.165 504.211,289.143 507.103,289.218Z"/>
+          </g>
+        </g>
+      </g>
+    </svg>
+    <span>Cat_flip</span>
+    <span class="logo-sub">Studio ETL</span>
+  </div>
+  <div class="header-metrics" id="header-metrics" style="display:none">
+    <div class="metric-pill">Filas: <strong id="info-rows">–</strong></div>
+    <div class="metric-pill">Cols: <strong id="info-cols">–</strong></div>
+  </div>
+  <div class="header-spacer"></div>
+  <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Cambiar tema">
+    <span id="theme-icon">🌙</span>
+    <span class="toggle-label" id="theme-label">Oscuro</span>
+  </button>
+  <span id="filename-badge" class="badge" style="display:none">📄 </span>
+</header>
+
+<!-- ══ APP LAYOUT ══════════════════════════════════════════════════════════ -->
+<div class="layout">
+
+  <!-- ─ LEFT PANEL: Caja de Transformaciones ─────────────────────────────── -->
+  <aside class="panel panel-left">
+
+    <!-- Cargar archivo -->
+    <div class="panel-section">
+      <div class="section-title">
+        <svg class="icon-svg" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+        <span>Fuente de datos</span>
+      </div>
+      <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
+        <div class="upload-icon">
+          <svg viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 12v6"/><path d="m15 15-3-3-3 3"/></svg>
+        </div>
+        <p><strong>Clic</strong> o arrastra un archivo</p>
+        <p style="margin-top:0.2rem;font-size:0.68rem">.CSV · .XLSX · .XLS</p>
+      </div>
+      <input type="file" id="file-input" accept=".csv,.xlsx,.xls">
+      <div id="sheet-selector">
+        <label style="font-size:0.73rem;color:var(--text2);display:block;margin-top:0.5rem;margin-bottom:0.25rem">Seleccionar hoja:</label>
+        <select id="sheet-select"></select>
+        <button class="btn btn-primary" style="width:100%;margin-top:0.5rem;justify-content:center" onclick="loadSheet()">Cargar hoja</button>
+      </div>
+    </div>
+
+    <!-- Transformaciones — Estructural -->
+    <div class="panel-section" style="flex:1">
+      <div class="section-title">
+        <svg class="icon-svg" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        <span>Transformaciones</span>
+      </div>
+
+      <div class="cat-label">Estructural</div>
+      <div class="op-grid">
+        <button class="op-btn" onclick="openModal('pivot')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg></span>Pivot</button>
+        <button class="op-btn" onclick="openModal('unpivot')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg></span>Unpivot</button>
+        <button class="op-btn" onclick="openModal('split_column')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></svg></span>Separar col.</button>
+        <button class="op-btn" onclick="openModal('split_to_rows')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/></svg></span>Separar filas</button>
+        <button class="op-btn" onclick="openModal('set_header')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="M6 12h12"/><path d="M6 20V4"/><path d="M18 20V4"/></svg></span>Def. encabezado</button>
+      </div>
+
+      <div class="cat-label">Limpieza &amp; Filtrado</div>
+      <div class="op-grid">
+        <button class="op-btn" onclick="openModal('drop_nulls')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg></span>Elim. nulos</button>
+        <button class="op-btn" onclick="openModal('drop_duplicates')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg></span>Elim. dupl.</button>
+        <button class="op-btn" onclick="openModal('drop_rows')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="M11 12H3"/><path d="M16 6H3"/><path d="M16 18H3"/><path d="m19 10-4 4"/><path d="m15 10 4 4"/></svg></span>Elim. filas</button>
+        <button class="op-btn" onclick="openModal('trim')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg></span>Trim espacios</button>
+        <button class="op-btn" onclick="openModal('clean_newlines')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg></span>Limpiar saltos</button>
+      </div>
+
+      <div class="cat-label">Texto &amp; Tipos</div>
+      <div class="op-grid">
+        <button class="op-btn" onclick="openModal('change_case')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="m3 15 4-8 4 8"/><path d="M4 13h6"/><circle cx="18" cy="12" r="3"/><path d="M21 9v6"/></svg></span>May/Min</button>
+        <button class="op-btn" onclick="openModal('replace')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></span>Reemplazar</button>
+        <button class="op-btn" onclick="openModal('rename_column')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></span>Renombrar</button>
+        <button class="op-btn" onclick="openModal('drop_column')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span>Elim. col.</button>
+        <button class="op-btn" onclick="openModal('change_type')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg></span>Tipo dato</button>
+      </div>
+
+      <div class="cat-label">Reglas &amp; Operaciones</div>
+      <div class="op-grid">
+        <button class="op-btn" onclick="openModal('filter')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></span>Filtrar</button>
+        <button class="op-btn" onclick="openModal('sort')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="M11 4h10"/><path d="M11 8h7"/><path d="M11 12h4"/></svg></span>Ordenar</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ─ CENTRAL CANVAS ────────────────────────────────────────────────────── -->
+  <main class="canvas">
+    <div class="tab-bar" id="tab-bar">
+      <div class="tab active" onclick="switchTab('data')"><svg viewBox="0 0 24 24"><path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg><span>Data Grid</span></div>
+      <div class="tab" onclick="switchTab('stats')"><svg viewBox="0 0 24 24"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg><span>Diagnóstico</span></div>
+      <div class="tab" onclick="switchTab('code')"><svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg><span>Python</span></div>
+    </div>
+    <div class="content-area">
+      <!-- Empty state -->
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon">
+          <svg class="logo-svg empty-logo" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+            <g transform="matrix(1,0,0,1,-2001.834001,-2225.317355)">
+              <g>
+                <g transform="matrix(0.23305,0,0,0.23305,1630.143102,2129.445765)">
+                  <circle class="logo-circle" cx="1979.911" cy="796.389" r="385.011"/>
+                </g>
+                <g id="Gato" transform="matrix(0.302993,-0.147024,0.147024,0.302993,1872.95909,2299.818244)">
+                  <path class="logo-cat" d="M507.103,289.218C507.164,288.439 505.131,269.43 491.857,260.017C478.987,250.891 478.062,252.233 466.317,241.709C431.584,210.589 426.222,212.598 413.509,212.062C407.329,211.801 395.353,208.378 402.205,195.339C403.746,192.406 393.372,186.063 397.925,176.713C400.976,170.446 406.647,174.037 407.471,167.496C408.346,160.55 418.5,156.722 426.234,161.885C431.301,165.267 431.466,159.681 437.509,160.371C452.231,162.051 448.305,180.194 449.953,183.291C460.374,202.868 495.905,216.015 521.188,232.966C535.952,242.866 537.367,254.089 541.434,253.188C581.953,244.211 590.122,259.774 612.942,233.883C625.625,219.492 632.929,208.197 671.475,206.122C684.717,205.41 686.921,204.194 700.298,179.396C701.999,176.243 698.133,153 718.514,152.865C745.839,152.683 746.959,187.504 730.416,192.226C718.289,195.687 719.228,197.891 698.915,227.784C693.486,235.775 692.572,234.928 684.346,238.088C663.434,246.12 673.285,277.381 654.216,298.253C646.282,306.938 661.775,297.992 706.416,320.666C742.013,338.747 785.856,373.355 769.394,380.215C756.879,385.431 721.123,350.229 660.586,332.221C659.359,331.856 653.397,329.261 654.444,332.508C664.254,362.939 661.718,365.515 682.133,380.975C692.337,388.703 704.839,415.573 713.577,418.233C742.088,426.913 719.793,468.476 693.757,453.09C683.047,446.761 689.298,435.244 687.412,430.533C677.667,406.188 668.078,401.97 665.366,400.778C648.533,393.374 639.365,393.958 625.955,378.114C597.785,344.828 595.541,345.588 577.503,344.451C574.841,344.283 557.049,341.325 552.584,355.525C551.237,359.811 553.412,364.609 550.505,364.32C549.014,364.171 535.702,362.845 531.843,365.893C525.645,370.788 544.638,360.702 559.503,374.497C573.333,387.332 563.801,407.734 565.934,412.282C567.56,415.749 581.239,439.611 573.482,440.255C564.308,441.018 550.245,429.087 546.633,430.841C535.598,436.201 535.454,435.666 523.469,438.343C515.804,440.055 513.568,456.842 504.137,464.03C498.334,468.453 496.036,460.054 494.438,453.518C490.162,436.026 494.962,434.71 490.036,427.837C475.149,407.068 486.297,395.945 475.527,392.426C452.986,385.06 434.576,398.106 413.419,416.406C405.409,423.334 409.472,426.392 401.872,433.861C397.95,437.715 405.989,452.626 386.559,457.725C363.072,463.888 345.994,429.686 373.624,416.765C379.319,414.102 382.404,418.094 387.898,407.701C389.091,405.446 392.761,405.629 402.101,392.215C436.625,342.626 446.187,352.27 460.405,337.409C464.432,333.201 464.533,331.544 465.893,333.186C465.977,333.288 465.717,346.192 467.355,349.665C467.533,350.042 469.096,350.79 468.98,348.732C466.812,310.283 485.922,286.562 494.42,276.433C497.918,272.263 498.744,276.043 501.127,279.742C505.91,287.165 504.211,289.143 507.103,289.218Z"/>
+                </g>
+              </g>
+            </g>
+          </svg>
+        </div>
+        <h2>Cat_flip Studio ETL</h2>
+        <p>Carga un archivo <strong>CSV</strong>, <strong>XLSX</strong> o <strong>XLS</strong> desde el panel izquierdo para empezar tu pipeline.</p>
+      </div>
+      <!-- Data Grid -->
+      <div class="tab-content active" id="tab-data">
+        <div class="table-wrap" id="table-wrap"></div>
+        <div id="truncated-msg" class="truncated-msg" style="display:none">
+          <svg class="icon-svg" viewBox="0 0 24 24" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+          <span>Mostrando las primeras 500 filas. El dataset completo vive en memoria.</span>
+        </div>
+      </div>
+      <!-- Stats -->
+      <div class="tab-content" id="tab-stats">
+        <div class="stats-grid" id="stats-grid"></div>
+      </div>
+      <!-- Code -->
+      <div class="tab-content" id="tab-code">
+        <div class="code-area">
+          <pre id="code-pre"># El código Python generado aparecerá aquí conforme apliques transformaciones</pre>
+        </div>
+        <div class="code-actions">
+          <button class="btn btn-secondary" onclick="copyCode()">
+            <svg class="icon-svg" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+            <span>Copiar código</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ─ RIGHT PANEL: Pipeline & Exportación ──────────────────────────────── -->
+  <aside class="panel panel-right">
+
+    <!-- Acciones globales -->
+    <div class="panel-section">
+      <div class="section-title">
+        <svg class="icon-svg" viewBox="0 0 24 24"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></svg>
+        <span>Control de flujo</span>
+      </div>
+      <div class="actions" style="flex-direction:column; gap:0.4rem">
+        <button class="btn btn-secondary" onclick="undo()" id="btn-undo" disabled style="width:100%;justify-content:center">
+          <svg class="icon-svg" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>
+          <span>Deshacer paso</span>
+        </button>
+        <div style="display:flex;gap:0.4rem;width:100%">
+          <button class="btn btn-danger" onclick="exportData('csv')" id="btn-csv" disabled style="flex:1;justify-content:center">
+            <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+            <span>CSV</span>
+          </button>
+          <button class="btn btn-green" onclick="exportData('xlsx')" id="btn-xlsx" disabled style="flex:1;justify-content:center">
+            <svg class="icon-svg" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h2"/><path d="M14 13h2"/><path d="M8 17h2"/><path d="M14 17h2"/></svg>
+            <span>Excel</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recipe / Historial de pasos -->
+    <div class="panel-section" style="flex:1;display:flex;flex-direction:column;">
+      <div class="section-title">
+        <svg class="icon-svg" viewBox="0 0 24 24"><rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg>
+        <span>Pipeline — Receta</span>
+      </div>
+      <div id="pipeline-list" style="flex:1">
+        <div class="pipeline-empty" id="pipeline-empty">
+          <svg viewBox="0 0 24 24"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+          <span>Los pasos aplicados aparecerán aquí como tarjetas de receta.</span>
+        </div>
+      </div>
+    </div>
+
+  </aside>
+</div>
+
+<!-- ══ MODAL ══════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h2 id="modal-title">Operación</h2>
+    <div id="modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmModal()">
+        <svg class="icon-svg" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        <span>Aplicar</span>
+      </button>
+    </div>
+  </div>
+</div>
+<div class="loading-overlay" id="loading"><div class="spinner"></div></div>
+<div id="toast-container"></div>
+
+<!-- ══ SCRIPT ══════════════════════════════════════════════════════════════ -->
+<script>
+// ── TEMA ────────────────────────────────────────────────────────────────
+(function() {
+  const saved = localStorage.getItem('catflip-theme') || 'light';
+  if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+})();
+
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  if (isDark) {
+    html.removeAttribute('data-theme');
+    localStorage.setItem('catflip-theme', 'light');
+    document.getElementById('theme-icon').textContent  = '🌙';
+    document.getElementById('theme-label').textContent = 'Oscuro';
+  } else {
+    html.setAttribute('data-theme', 'dark');
+    localStorage.setItem('catflip-theme', 'dark');
+    document.getElementById('theme-icon').textContent  = '☀️';
+    document.getElementById('theme-label').textContent = 'Claro';
+  }
+}
+
+// Sincronizar label al cargar (si se cargó oscuro desde localStorage)
+document.addEventListener('DOMContentLoaded', () => {
+  if (document.documentElement.getAttribute('data-theme') === 'dark') {
+    document.getElementById('theme-icon').textContent  = '☀️';
+    document.getElementById('theme-label').textContent = 'Claro';
+  }
+});
+
+// ── ESTADO ──────────────────────────────────────────────────────────────
+let currentColumns = [];
+let currentOp = null;
+let currentSheetFile = null;
+let pipelineSteps = [];
+
+function showLoading() { document.getElementById('loading').classList.add('open'); }
+function hideLoading() { document.getElementById('loading').classList.remove('open'); }
+
+function toast(msg, type='success') {
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  const icons = {success:'✅',error:'❌',info:'ℹ️'};
+  t.innerHTML = '<span>' + (icons[type]||'ℹ️') + '</span><span>' + msg + '</span>';
+  document.getElementById('toast-container').appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+function enableOps() {
+  document.querySelectorAll('.op-btn').forEach(b => b.disabled = false);
+  ['btn-undo','btn-csv','btn-xlsx'].forEach(id => document.getElementById(id).disabled = false);
+}
+
+function switchTab(name) {
+  const names = ['data','stats','code'];
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', names[i]===name));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if (name === 'stats') loadStats();
+}
+
+// ── Pipeline recipe ─────────────────────────────────────────────────────
+function addPipelineStep(op, params) {
+  pipelineSteps.push({ op, params });
+  renderPipeline();
+}
+
+function renderPipeline() {
+  const list = document.getElementById('pipeline-list');
+  const empty = document.getElementById('pipeline-empty');
+  if (pipelineSteps.length === 0) {
+    empty.style.display = 'flex';
+    return;
+  }
+  empty.style.display = 'none';
+  // Remove existing step cards (keep empty div)
+  [...list.querySelectorAll('.pipeline-step')].forEach(el => el.remove());
+  pipelineSteps.forEach((s, i) => {
+    const card = document.createElement('div');
+    card.className = 'pipeline-step';
+    const detail = Object.entries(s.params).map(([k,v]) => `${k}: ${Array.isArray(v)?v.join(','):v}`).join(' · ');
+    card.innerHTML = `<div class="step-num">${i+1}</div><div class="step-info"><div class="step-name">${s.op.replace(/_/g,' ')}</div><div class="step-detail" title="${detail}">${detail}</div></div>`;
+    list.appendChild(card);
+  });
+}
+
+// ── FILE UPLOAD ─────────────────────────────────────────────────────────
+const uploadArea = document.getElementById('upload-area');
+uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+uploadArea.addEventListener('drop', e => {
+  e.preventDefault(); uploadArea.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+document.getElementById('file-input').addEventListener('change', e => {
+  if (e.target.files[0]) handleFile(e.target.files[0]);
+});
+
+async function handleFile(file) {
+  const name = file.name.toLowerCase();
+  if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+    showLoading();
+    const fd = new FormData(); fd.append('file', file);
+    currentSheetFile = file;
+    const res = await fetch('/get_sheets', {method:'POST', body:fd});
+    hideLoading();
+    const data = await res.json();
+    if (data.sheets && data.sheets.length > 1) {
+      const sel = document.getElementById('sheet-select');
+      sel.innerHTML = data.sheets.map((s,i) => '<option value="'+i+'">'+s+'</option>').join('');
+      document.getElementById('sheet-selector').style.display = 'block';
+      return;
+    }
+  }
+  document.getElementById('sheet-selector').style.display = 'none';
+  uploadFile(file, 0);
+}
+
+async function loadSheet() {
+  uploadFile(currentSheetFile, document.getElementById('sheet-select').value);
+}
+
+async function uploadFile(file, sheet) {
+  showLoading();
+  const fd = new FormData(); fd.append('file', file); fd.append('sheet', sheet);
+  try {
+    const res = await fetch('/upload', {method:'POST', body:fd});
+    const data = await res.json();
+    hideLoading();
+    if (data.error) { toast(data.error, 'error'); return; }
+    renderTable(data.data);
+    updateCode(data.code);
+    pipelineSteps = [];
+    renderPipeline();
+    const badge = document.getElementById('filename-badge');
+    badge.textContent = '📄 ' + file.name;
+    badge.style.display = '';
+    document.getElementById('header-metrics').style.display = 'flex';
+    document.getElementById('empty-state').style.display = 'none';
+    enableOps();
+    toast('Archivo cargado: ' + data.data.shape[0] + ' filas × ' + data.data.shape[1] + ' columnas');
+  } catch(e) { hideLoading(); toast('Error al cargar el archivo', 'error'); }
+}
+
+function renderTable(data) {
+  currentColumns = data.columns;
+  document.getElementById('info-rows').textContent = data.shape[0].toLocaleString();
+  document.getElementById('info-cols').textContent = data.shape[1];
+  let html = '<table><thead><tr><th>#</th>';
+  data.columns.forEach(c => { html += '<th title="'+c+'">'+c+'</th>'; });
+  html += '</tr></thead><tbody>';
+  data.data.forEach((row,i) => {
+    html += '<tr><td>'+(i+1)+'</td>';
+    row.forEach(cell => { html += '<td title="'+cell+'">'+cell+'</td>'; });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('table-wrap').innerHTML = html;
+  document.getElementById('truncated-msg').style.display = data.truncated ? 'block' : 'none';
+}
+
+function updateCode(code) { document.getElementById('code-pre').textContent = code; }
+
+async function loadStats() {
+  const res = await fetch('/stats');
+  const data = await res.json();
+  if (data.error) return;
+  const grid = document.getElementById('stats-grid');
+  grid.innerHTML = '';
+  data.columns.forEach(col => {
+    const s = data.stats[col] || {};
+    let rows = '<div class="stat-row"><span>Tipo</span><span>'+(s.dtype||'–')+'</span></div>';
+    rows += '<div class="stat-row"><span>Nulos</span><span style="color:'+(s.nulls>0?'var(--yellow)':'var(--green)')+'">'+  (s.nulls!==undefined?s.nulls:'–')+'</span></div>';
+    rows += '<div class="stat-row"><span>Únicos</span><span>'+(s.unique!==undefined?s.unique:'–')+'</span></div>';
+    if (s.min !== undefined && s.min !== null) {
+      rows += '<div class="stat-row"><span>Min</span><span>'+s.min+'</span></div>';
+      rows += '<div class="stat-row"><span>Max</span><span>'+s.max+'</span></div>';
+      rows += '<div class="stat-row"><span>Media</span><span>'+s.mean+'</span></div>';
+    }
+    grid.innerHTML += '<div class="stat-card"><h4 title="'+col+'">'+col+'</h4>'+rows+'</div>';
+  });
+}
+
+// ── MODAL ───────────────────────────────────────────────────────────────
+function colOptions(multi) {
+  if (multi) return currentColumns.map(c => '<label><input type="checkbox" value="'+c+'" checked> '+c+'</label>').join('');
+  return currentColumns.map(c => '<option value="'+c+'">'+c+'</option>').join('');
+}
+
+function toggleAllChecks(containerId, checked) {
+  document.querySelectorAll('#' + containerId + ' input[type=checkbox]').forEach(cb => cb.checked = checked);
+}
+
+function selectAllHtml(containerId) {
+  return '<label style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.35rem;font-size:0.78rem;font-weight:600;cursor:pointer">'
+       + '<input type="checkbox" checked onchange="toggleAllChecks(\''+containerId+'\',this.checked)"> Seleccionar todo</label>';
+}
+
+const modalDefs = {
+  unpivot: {
+    title: '↕️ Unpivot (Anular dinamización)',
+    body: () => '<label>Columnas ID (se mantienen fijas):</label>'+selectAllHtml('id-cols-check')+'<div class="col-check" id="id-cols-check">'+colOptions(true)+'</div><label>Nombre columna variable:</label><input type="text" id="var-name" value="Variable"><label>Nombre columna valor:</label><input type="text" id="val-name" value="Valor">',
+    params: () => ({ id_cols: [...document.querySelectorAll('#id-cols-check input:checked')].map(i=>i.value), var_name: document.getElementById('var-name').value, value_name: document.getElementById('val-name').value })
+  },
+  pivot: {
+    title: '↔️ Pivot (Dinamizar)',
+    body: () => '<label>Columna índice (filas):</label><select id="pivot-index">'+colOptions()+'</select><label>Columna a pivotar (encabezados):</label><select id="pivot-cols">'+colOptions()+'</select><label>Columna de valores:</label><select id="pivot-vals">'+colOptions()+'</select>',
+    params: () => ({ index: document.getElementById('pivot-index').value, columns: document.getElementById('pivot-cols').value, values: document.getElementById('pivot-vals').value })
+  },
+  split_column: {
+    title: '✂️ Separar columna',
+    body: () => '<label>Columna a separar:</label><select id="split-col">'+colOptions()+'</select><label>Delimitador:</label><input type="text" id="split-delim" value=","><label>Prefijo para nuevas columnas:</label><input type="text" id="split-prefix" value="Parte"><p style="font-size:0.75rem;color:var(--text2);margin-top:-0.3rem;margin-bottom:0.5rem">Se crearán columnas <em>Prefijo_1</em>, <em>Prefijo_2</em>, etc., según los fragmentos resultantes.</p><label>¿Cuántas veces separar?</label><select id="split-mode" onchange="document.getElementById(\'split-n-wrap\').style.display=this.value===\'n\'?\'block\':\'none\'"><option value="all">Siempre (todas las ocurrencias)</option><option value="n">N veces</option></select><div id="split-n-wrap" style="display:none;margin-top:0.4rem"><input type="number" id="split-n" value="1" min="1"></div>',
+    params: () => { const mode = document.getElementById('split-mode').value; return { column: document.getElementById('split-col').value, delimiter: document.getElementById('split-delim').value, col_prefix: document.getElementById('split-prefix').value || document.getElementById('split-col').value, max_split: mode === 'n' ? parseInt(document.getElementById('split-n').value) || 1 : 0 }; }
+  },
+  filter: {
+    title: '🔍 Filtrar filas',
+    body: () => '<label>Columna:</label><select id="filter-col">'+colOptions()+'</select><label>Condición:</label><select id="filter-op"><option value="==">== igual a</option><option value="!=">!= distinto de</option><option value="contiene">contiene</option><option value="no contiene">no contiene</option><option value=">">&gt; mayor que</option><option value="<">&lt; menor que</option></select><label>Valor:</label><input type="text" id="filter-val" placeholder="Escribe el valor...">',
+    params: () => ({ column: document.getElementById('filter-col').value, operator: document.getElementById('filter-op').value, value: document.getElementById('filter-val').value })
+  },
+  drop_nulls: {
+    title: '🧹 Eliminar filas con nulos',
+    body: () => '<label>Columnas (vacío = todas):</label>'+selectAllHtml('nulls-check')+'<div class="col-check" id="nulls-check">'+colOptions(true)+'</div><label>Eliminar fila si:</label><select id="nulls-how"><option value="any">ANY — alguna columna es nula</option><option value="all">ALL — todas las columnas son nulas</option></select>',
+    params: () => { const c=[...document.querySelectorAll('#nulls-check input:checked')].map(i=>i.value); return { columns: c.length===currentColumns.length?null:c, how: document.getElementById('nulls-how').value }; }
+  },
+  drop_duplicates: {
+    title: '🗑️ Eliminar duplicados',
+    body: () => '<label>Basado en columnas:</label>'+selectAllHtml('dup-check')+'<div class="col-check" id="dup-check">'+colOptions(true)+'</div>',
+    params: () => { const c=[...document.querySelectorAll('#dup-check input:checked')].map(i=>i.value); return { columns: c.length===currentColumns.length?null:c }; }
+  },
+  rename_column: {
+    title: '✏️ Renombrar columna',
+    body: () => '<label>Columna a renombrar:</label><select id="rename-old">'+colOptions()+'</select><label>Nuevo nombre:</label><input type="text" id="rename-new" placeholder="Nuevo nombre...">',
+    params: () => ({ old_name: document.getElementById('rename-old').value, new_name: document.getElementById('rename-new').value })
+  },
+  drop_column: {
+    title: '❌ Eliminar columna',
+    body: () => '<label>Columna a eliminar:</label><select id="drop-col">'+colOptions()+'</select><p style="font-size:0.75rem;color:var(--orange);margin-top:0.5rem">⚠️ Puedes deshacer con ↩️ Deshacer paso</p>',
+    params: () => ({ column: document.getElementById('drop-col').value })
+  },
+  trim: {
+    title: '🧽 Eliminar espacios extra',
+    body: () => '<label>Columnas:</label>'+selectAllHtml('trim-check')+'<div class="col-check" id="trim-check">'+colOptions(true)+'</div>',
+    params: () => ({ columns: [...document.querySelectorAll('#trim-check input:checked')].map(i=>i.value) })
+  },
+  change_case: {
+    title: '🔡 Formateo de texto',
+    body: () => '<label>Columna:</label><select id="case-col">'+colOptions()+'</select><label>Transformar a:</label><select id="case-type"><option value="lower">minúsculas (lower)</option><option value="upper">MAYÚSCULAS (upper)</option><option value="title">Título Caso (title)</option><option value="capitalize">Primera letra (capitalize)</option></select>',
+    params: () => ({ column: document.getElementById('case-col').value, case: document.getElementById('case-type').value })
+  },
+  clean_newlines: {
+    title: '↵ Limpiar saltos de línea',
+    body: () => '<label>Columnas:</label>'+selectAllHtml('nl-check')+'<div class="col-check" id="nl-check">'+colOptions(true)+'</div><p style="font-size:0.75rem;color:var(--text2);margin-top:0.5rem">Reemplaza \\n, \\r\\n y \\r por un espacio y aplica trim.</p>',
+    params: () => { const c=[...document.querySelectorAll('#nl-check input:checked')].map(i=>i.value); return { columns: c.length===currentColumns.length ? null : c }; }
+  },
+  replace: {
+    title: '🔄 Reemplazar valores',
+    body: () => '<label>Columna:</label><select id="rep-col">'+colOptions()+'</select><label>Valor a reemplazar:</label><input type="text" id="rep-old" placeholder="Texto original..."><label>Reemplazar por:</label><input type="text" id="rep-new" placeholder="Texto nuevo...">',
+    params: () => ({ column: document.getElementById('rep-col').value, old_value: document.getElementById('rep-old').value, new_value: document.getElementById('rep-new').value })
+  },
+  change_type: {
+    title: '🏷️ Cambiar tipo de dato',
+    body: () => '<label>Columna:</label><select id="type-col">'+colOptions()+'</select><label>Nuevo tipo:</label><select id="type-dtype"><option value="str">Texto (str)</option><option value="int">Número entero (int)</option><option value="float">Número decimal (float)</option><option value="datetime">Fecha/hora (datetime)</option></select>',
+    params: () => ({ column: document.getElementById('type-col').value, dtype: document.getElementById('type-dtype').value })
+  },
+  sort: {
+    title: '📶 Ordenar',
+    body: () => '<label>Columna:</label><select id="sort-col">'+colOptions()+'</select><label>Orden:</label><select id="sort-asc"><option value="true">Ascendente (A→Z)</option><option value="false">Descendente (Z→A)</option></select>',
+    params: () => ({ column: document.getElementById('sort-col').value, ascending: document.getElementById('sort-asc').value==='true' })
+  },
+  split_to_rows: {
+    title: '↧ Separar por filas',
+    body: () => '<label>Columna a separar:</label><select id="str-col">'+colOptions()+'</select><label>Delimitador:</label><input type="text" id="str-delim" value=","><p style="font-size:0.75rem;color:var(--text2);margin-top:0.5rem">Cada valor separado por el delimitador se convertirá en una fila nueva.</p>',
+    params: () => ({ column: document.getElementById('str-col').value, delimiter: document.getElementById('str-delim').value, strip: true })
+  },
+  drop_rows: {
+    title: '✂️ Eliminar filas por posición',
+    body: () => '<label>¿Desde dónde?</label><select id="dr-pos"><option value="top">Desde el inicio (primeras filas)</option><option value="bottom">Desde el final (últimas filas)</option></select><label>¿Cuántas filas eliminar?</label><input type="number" id="dr-n" value="1" min="1">',
+    params: () => ({ position: document.getElementById('dr-pos').value, n: parseInt(document.getElementById('dr-n').value) || 1 })
+  },
+  set_header: {
+    title: '📌 Definir fila como encabezado',
+    body: () => '<label>Índice de la fila (0 = primera fila):</label><input type="number" id="sh-idx" value="0" min="0"><p style="font-size:0.75rem;color:var(--text2);margin-top:0.5rem">Los valores de esa fila se usarán como nombres de columna y la fila será eliminada.</p>',
+    params: () => ({ row_index: parseInt(document.getElementById('sh-idx').value) || 0 })
+  },
+};
+
+function openModal(op) {
+  if (!currentColumns.length) return;
+  currentOp = op;
+  const def = modalDefs[op];
+  document.getElementById('modal-title').textContent = def.title;
+  document.getElementById('modal-body').innerHTML = def.body();
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); currentOp=null; }
+
+async function confirmModal() {
+  if (!currentOp) return;
+  const op = currentOp;
+  const params = modalDefs[op].params();
+  closeModal();
+  showLoading();
+  try {
+    const res = await fetch('/operation', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({operation: op, params}) });
+    const data = await res.json();
+    hideLoading();
+    if (data.error) { toast(data.error, 'error'); return; }
+    renderTable(data.data);
+    updateCode(data.code);
+    addPipelineStep(op, params);
+    toast('✅ ' + op.replace(/_/g,' ') + ' aplicado');
+  } catch(e) { hideLoading(); toast('Error al aplicar operación', 'error'); }
+}
+
+async function undo() {
+  showLoading();
+  const res = await fetch('/undo', {method:'POST'});
+  const data = await res.json();
+  hideLoading();
+  if (data.error) { toast(data.error, 'info'); return; }
+  renderTable(data.data); updateCode(data.code);
+  if (pipelineSteps.length > 0) { pipelineSteps.pop(); renderPipeline(); }
+  toast('Paso deshecho', 'info');
+}
+
+async function exportData(fmt) {
+  showLoading();
+  const filename = prompt('Nombre del archivo (sin extensión):', 'resultado') || 'resultado';
+  try {
+    const res = await fetch('/export', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({format:fmt, filename}) });
+    hideLoading();
+    if (!res.ok) { toast('Error al exportar', 'error'); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download=filename+'.'+fmt; a.click();
+    URL.revokeObjectURL(url);
+    toast('Exportado como ' + filename + '.' + fmt);
+  } catch(e) { hideLoading(); toast('Error al exportar', 'error'); }
+}
+
+function copyCode() {
+  navigator.clipboard.writeText(document.getElementById('code-pre').textContent)
+    .then(() => toast('Código copiado al portapapeles', 'info'));
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key==='Escape') closeModal();
+  if ((e.ctrlKey||e.metaKey) && e.key==='z') { e.preventDefault(); undo(); }
+  if (e.key==='Enter' && document.getElementById('modal-overlay').classList.contains('open')) confirmModal();
+});
+</script>
+</body>
+</html>
