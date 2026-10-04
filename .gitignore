@@ -25,7 +25,19 @@ Thumbs.db
 *.swp
 *.swo
 
-# Archivos temporales de exportación (opcional, por si testeas localmente)
+# Archivos temporales de exportación y datos
 *.csv
 *.xlsx
-# Excepto los que estén en assets o de prueba si decides hacer una carpeta tests/
+
+# ---------------------------------------------------
+# Archivos específicos de Cat_flip que NO deben subir
+# ---------------------------------------------------
+
+# Respaldos y copias locales
+*-respaldo.*
+*.bak
+*~
+
+# Documentación interna y contexto para IAs
+especificacion_del_proyecto_bitacora.md
+contexto_del_proyecto.md
