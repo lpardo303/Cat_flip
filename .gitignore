@@ -10,6 +10,10 @@ __pycache__/
 *$py.class
 *.so
 .Python
+*.egg-info/
+dist/
+build/
+.eggs/
 
 # Flask
 instance/
@@ -17,17 +21,26 @@ instance/
 
 # Archivos del Sistema Operativo
 .DS_Store
+.DS_Store?
 Thumbs.db
+ehthumbs.db
+Desktop.ini
 
 # IDEs y Editores
 .vscode/
 .idea/
 *.swp
 *.swo
+*.sublime-project
+*.sublime-workspace
 
 # Archivos temporales de exportación y datos
 *.csv
 *.xlsx
+*.xls
+
+# Windows
+*.lnk
 
 # ---------------------------------------------------
 # Archivos específicos de Cat_flip que NO deben subir
