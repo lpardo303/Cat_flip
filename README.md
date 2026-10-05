@@ -1,8 +1,8 @@
 # 🐈 Cat_flip - Studio ETL
 
-> Plataforma local de transformación de datos para Linux, construida con Python (Flask + pandas) y una interfaz web moderna.
+> Plataforma local de transformación de datos para Linux y Windows, construida con Python (Flask + pandas) y una interfaz web moderna.
 
-**Cat_flip** es una alternativa ligera, diáfana y rápida a herramientas ETL pesadas (como Power Query), diseñada para ingenieros de datos y analistas. Permite construir pipelines empresariales mediante una interfaz visual intuitiva, generando código backend en tiempo real a medida que se aplican las transformaciones.
+**Cat_flip** es una alternativa ligera, diáfana y rápida a herramientas ETL pesadas (como Power Query), diseñada para ingenieros de datos y analistas que quieren procesar datos sin escribir código. Permite construir pipelines empresariales mediante una interfaz visual intuitiva, generando código Python/Pandas en tiempo real a medida que se aplican las transformaciones.
 
 ## ✨ Características Principales
 
@@ -14,7 +14,7 @@
 
 ## 🚀 Instalación y Uso
 
-Asegúrate de tener Python 3.10+ instalado en tu sistema.
+Asegúrate de tener **Python 3.10+** instalado en tu sistema.
 
 1. **Clona el repositorio:**
    ```bash
@@ -23,10 +23,18 @@ Asegúrate de tener Python 3.10+ instalado en tu sistema.
    ```
 
 2. **Crea y activa un entorno virtual:**
+
+   **Linux / macOS:**
    ```bash
    python -m venv .venv
-   source .venv/bin/activate  # En Bash/Zsh
-   # o bien: source .venv/bin/activate.fish  # En Fish shell
+   source .venv/bin/activate        # Bash/Zsh
+   source .venv/bin/activate.fish   # Fish shell
+   ```
+
+   **Windows:**
+   ```bat
+   python -m venv .venv
+   .venv\Scripts\activate
    ```
 
 3. **Instala las dependencias:**
@@ -35,18 +43,40 @@ Asegúrate de tener Python 3.10+ instalado en tu sistema.
    ```
 
 4. **Ejecuta la aplicación:**
+
+   **Linux (Bash/Zsh):**
+   ```bash
+   ./launch.sh
+   ```
+   **Linux (Fish):**
+   ```fish
+   ./launch.fish
+   ```
+   **Windows (doble clic o cmd):**
+   ```bat
+   launch.bat
+   ```
+   **Windows (PowerShell):**
+   ```powershell
+   .\launch.ps1
+   ```
+   O directamente en cualquier sistema:
    ```bash
    python app.py
-   # O usa los scripts lanzadores incluidos: ./launch.sh o ./launch.fish
    ```
 
 5. **Abre tu navegador:** Visita `http://127.0.0.1:5050`
 
-## 🛠️️ Arquitectura
+> **Nota Windows — PowerShell:** Si al ejecutar `launch.ps1` aparece un error de política de ejecución, corre este comando una sola vez en PowerShell como administrador:
+> ```powershell
+> Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+> ```
+
+## 🛠️ Arquitectura
 
 * **Backend:** `Flask` expone los endpoints REST. `Pandas` funciona como el motor de cálculo en memoria.
 * **Frontend:** Vanilla JS, HTML5 y CSS3. Cero dependencias pesadas en el cliente. Interfaz reactiva comunicada vía `fetch()`.
 
 ## 📄 Licencia
 
-Este proyecto se distribuye bajo la licencia MIT. Eres libre de utilizarlo, modificarlo y distribuirlo.
+Este proyecto se distribuye bajo la licencia [MIT](LICENSE). Eres libre de utilizarlo, modificarlo y distribuirlo.
