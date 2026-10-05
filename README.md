@@ -18,7 +18,7 @@ Asegúrate de tener Python 3.10+ instalado en tu sistema.
 
 1. **Clona el repositorio:**
    ```bash
-   git clone https://github.com/TU_USUARIO/Cat_flip.git
+   git clone https://github.com/lpardo303/Cat_flip.git
    cd Cat_flip
    ```
 
