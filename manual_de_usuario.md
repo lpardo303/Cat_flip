@@ -72,6 +72,12 @@ Lógica condicional y ordenamiento.
 
 * **Deshacer (Undo):** Revierte la última operación aplicada, restaurando el dataset al paso anterior de tu receta.
 * **Estadísticas (Diagnóstico):** En la pestaña central, puedes ver perfiles de cada columna (conteo de nulos, valores únicos, mínimos, máximos). Se actualiza tras cada transformación.
+* **Barra de Calidad de Datos (Data Quality Bar):** Micro-barra de 3px visible en la parte inferior de cada cabecera del Data Grid. Muestra visualmente la proporción de datos válidos (no nulos) frente a nulos en cada columna, con color semántico:
+  - 🟢 **Verde** — calidad ≥ 90% (columna casi completa)
+  - 🟡 **Amarillo** — calidad entre 60% y 89% (atención recomendada)
+  - 🔴 **Rojo** — calidad < 60% (columna con muchos nulos)
+  
+  Al pasar el cursor sobre la cabecera, el tooltip muestra el conteo exacto de nulos y el porcentaje de datos válidos (ej. `Precio — 12 nulos (88.5% válido)`). Las columnas sin ningún nulo no muestran fondo de barra para no distraer visualmente.
 * **Visor de Código:** Revisa el script de Python en tiempo real generado por tus acciones visuales.
 * **Exportar datos:** Desde el panel derecho, descarga tus datos limpios en formato CSV o Excel XLSX.
 * **Exportar pipeline como script Python (`.py`):** Descarga todo el pipeline acumulado como un archivo Python ejecutable e independiente. El script incluye el código de cada transformación aplicada en orden, listo para ejecutarse con `python nombre_script.py`, integrarse en un flujo de automatización (cron, Airflow) o reproducirse en cualquier entorno con pandas instalado. El botón aparece en el panel derecho, separado de las opciones de exportación de datos, identificado con color violeta.

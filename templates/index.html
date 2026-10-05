@@ -458,12 +458,13 @@
     font-family: var(--font-head);
     font-weight: 600;
     font-size: 0.72rem;
-    padding: 0.55rem 0.85rem;
+    padding: 0.55rem 0.85rem 0.7rem; /* padding-bottom extra para la barra */
     text-align: left;
     border-bottom: 2px solid var(--teal-bd);
     position: sticky; top: 0;
     white-space: nowrap;
     backdrop-filter: blur(8px);
+    overflow: visible; /* permite que la barra absoluta sea visible */
   }
   tbody tr { transition: background 0.1s; }
   tbody tr:hover { background: var(--row-hover); }
@@ -514,6 +515,24 @@
   .type-badge.STR  { background: var(--surface2);   border-color: var(--border);     color: var(--text2); }
   .type-badge.DATE { background: var(--orange-bg);  border-color: var(--orange-bd);  color: var(--orange); }
   .type-badge.BOOL { background: rgba(45,158,107,0.10); border-color: rgba(45,158,107,0.28); color: var(--green); }
+
+  /* ── DATA QUALITY BAR (cabeceras Data Grid) ───────────── */
+  .quality-bar-wrap {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: rgba(192,138,26,0.22); /* base: amarillo apagado = zona de nulos */
+    border-radius: 0 0 2px 2px;
+    overflow: hidden;
+  }
+  .quality-bar-fill {
+    height: 100%;
+    background: var(--green);
+    border-radius: 0 0 2px 2px;
+    transition: width 0.4s ease;
+  }
+  /* Si la calidad es perfecta (100%) la barra desaparece sutilmente */
+  .quality-bar-wrap.perfect { background: transparent; }
 
   /* ── EMPTY STATE ───────────────────────────────────────── */
   .empty-state {
@@ -1116,6 +1135,7 @@ async function uploadFile(file, sheet) {
     document.getElementById('header-metrics').style.display = 'flex';
     document.getElementById('empty-state').style.display = 'none';
     enableOps();
+    loadStats(); // refrescar diagnóstico en segundo plano
     toast('Archivo cargado: ' + data.data.shape[0] + ' filas × ' + data.data.shape[1] + ' columnas');
   } catch(e) { hideLoading(); toast('Error al cargar el archivo', 'error'); }
 }
@@ -1123,12 +1143,30 @@ async function uploadFile(file, sheet) {
 function renderTable(data) {
   currentColumns = data.columns;
   currentDtypes  = data.dtypes || {};
+  const nulls     = data.nulls || {};
+  const totalRows = data.total_rows || data.shape[0] || 0;
+
   document.getElementById('info-rows').textContent = data.shape[0].toLocaleString();
   document.getElementById('info-cols').textContent = data.shape[1];
+
   let html = '<table><thead><tr><th>#</th>';
   data.columns.forEach(c => {
-    const dtype = currentDtypes[c] || 'STR';
-    html += `<th title="${c}">${c}<span class="type-badge ${dtype}" onclick="openModalForCol('change_type','${c.replace(/'/g,"\\'")}')" title="Tipo: ${dtype} — clic para cambiar">${dtype}</span></th>`;
+    const dtype    = currentDtypes[c] || 'STR';
+    const nullCount = nulls[c] || 0;
+    const quality  = totalRows > 0 ? ((totalRows - nullCount) / totalRows) : 1;
+    const pct      = (quality * 100).toFixed(1);
+    const isPerfect = nullCount === 0;
+    const barColor  = quality >= 0.9 ? 'var(--green)' : quality >= 0.6 ? 'var(--yellow)' : 'var(--red)';
+    const tooltip   = isPerfect
+      ? `${c} — Sin nulos (100% válido)`
+      : `${c} — ${nullCount} nulo${nullCount>1?'s':''} (${pct}% válido)`;
+
+    html += `<th title="${tooltip}">
+      ${c}<span class="type-badge ${dtype}" onclick="openModalForCol('change_type','${c.replace(/'/g,"\\'")}')" title="Tipo: ${dtype} — clic para cambiar">${dtype}</span>
+      <div class="quality-bar-wrap${isPerfect?' perfect':''}">
+        <div class="quality-bar-fill" style="width:${pct}%;background:${barColor}"></div>
+      </div>
+    </th>`;
   });
   html += '</tr></thead><tbody>';
   data.data.forEach((row,i) => {
@@ -1144,10 +1182,13 @@ function renderTable(data) {
 function updateCode(code) { document.getElementById('code-pre').textContent = code; }
 
 async function loadStats() {
+  const grid = document.getElementById('stats-grid');
   const res = await fetch('/stats');
   const data = await res.json();
-  if (data.error) return;
-  const grid = document.getElementById('stats-grid');
+  if (data.error) {
+    grid.innerHTML = '<div style="padding:2rem;color:var(--text2);font-size:0.82rem;text-align:center">Carga un archivo para ver el diagnóstico.</div>';
+    return;
+  }
   grid.innerHTML = '';
   data.columns.forEach(col => {
     const s = data.stats[col] || {};
@@ -1306,6 +1347,7 @@ async function confirmModal() {
     renderTable(data.data);
     updateCode(data.code);
     addPipelineStep(op, params);
+    loadStats(); // refrescar diagnóstico en segundo plano
     toast('✅ ' + op.replace(/_/g,' ') + ' aplicado');
   } catch(e) { hideLoading(); toast('Error al aplicar operación', 'error'); }
 }
@@ -1318,6 +1360,7 @@ async function undo() {
   if (data.error) { toast(data.error, 'info'); return; }
   renderTable(data.data); updateCode(data.code);
   if (pipelineSteps.length > 0) { pipelineSteps.pop(); renderPipeline(); }
+  loadStats(); // refrescar diagnóstico en segundo plano
   toast('Paso deshecho', 'info');
 }
 
