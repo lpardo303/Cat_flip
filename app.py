@@ -354,7 +354,34 @@ def export():
         download_name=f"{filename}.{ext}"
     )
 
-@app.route("/stats", methods=["GET"])
+@app.route("/export_script", methods=["POST"])
+def export_script():
+    global code_log
+    if not code_log:
+        return jsonify({"error": "No hay pasos en el pipeline para exportar."}), 400
+
+    data = request.json
+    filename = data.get("filename", "pipeline_catflip")
+
+    # Encabezado del script generado
+    header = (
+        "# ============================================================\n"
+        "# Script generado por Cat_flip — Studio ETL\n"
+        "# https://github.com/lpardo303/Cat_flip\n"
+        "# ============================================================\n\n"
+    )
+    script_content = header + "\n\n".join(code_log)
+
+    buf = io.BytesIO(script_content.encode("utf-8"))
+    buf.seek(0)
+    return send_file(
+        buf,
+        mimetype="text/x-python",
+        as_attachment=True,
+        download_name=f"{filename}.py"
+    )
+
+
 def stats():
     global current_df
     if current_df is None:

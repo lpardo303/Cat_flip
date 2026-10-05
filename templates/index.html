@@ -392,6 +392,18 @@
     box-shadow: 0 2px 8px rgba(45,158,107,0.20);
   }
   .btn-green:hover { background: #237a56; }
+  .btn-purple {
+    background: rgba(124,58,237,0.10);
+    border: 1px solid rgba(124,58,237,0.28);
+    color: #7c3aed;
+  }
+  .btn-purple:hover { background: rgba(124,58,237,0.18); }
+  [data-theme="dark"] .btn-purple {
+    background: rgba(167,139,250,0.12);
+    border-color: rgba(167,139,250,0.30);
+    color: #a78bfa;
+  }
+  [data-theme="dark"] .btn-purple:hover { background: rgba(167,139,250,0.20); }
   .btn:disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
   .actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 
@@ -919,6 +931,11 @@
             <span>Excel</span>
           </button>
         </div>
+        <div style="height:1px;background:var(--border2);margin:0.35rem 0"></div>
+        <button class="btn btn-purple" onclick="exportScript()" id="btn-script" disabled style="width:100%;justify-content:center">
+          <svg class="icon-svg" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          <span>Exportar pipeline .py</span>
+        </button>
       </div>
     </div>
 
@@ -1009,7 +1026,7 @@ function toast(msg, type='success') {
 
 function enableOps() {
   document.querySelectorAll('.op-btn').forEach(b => b.disabled = false);
-  ['btn-undo','btn-csv','btn-xlsx'].forEach(id => document.getElementById(id).disabled = false);
+  ['btn-undo','btn-csv','btn-xlsx','btn-script'].forEach(id => document.getElementById(id).disabled = false);
 }
 
 function switchTab(name) {
@@ -1317,6 +1334,21 @@ async function exportData(fmt) {
     URL.revokeObjectURL(url);
     toast('Exportado como ' + filename + '.' + fmt);
   } catch(e) { hideLoading(); toast('Error al exportar', 'error'); }
+}
+
+async function exportScript() {
+  const filename = prompt('Nombre del script (sin extensión):', 'pipeline_catflip') || 'pipeline_catflip';
+  showLoading();
+  try {
+    const res = await fetch('/export_script', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename}) });
+    hideLoading();
+    if (!res.ok) { const err = await res.json(); toast(err.error || 'Error al exportar script', 'error'); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download=filename+'.py'; a.click();
+    URL.revokeObjectURL(url);
+    toast('Script exportado: ' + filename + '.py', 'info');
+  } catch(e) { hideLoading(); toast('Error al exportar script', 'error'); }
 }
 
 function copyCode() {

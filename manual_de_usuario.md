@@ -73,4 +73,28 @@ Lógica condicional y ordenamiento.
 * **Deshacer (Undo):** Revierte la última operación aplicada, restaurando el dataset al paso anterior de tu receta.
 * **Estadísticas (Diagnóstico):** En la pestaña central, puedes ver perfiles de cada columna (conteo de nulos, valores únicos, mínimos, máximos). Se actualiza tras cada transformación.
 * **Visor de Código:** Revisa el script de Python en tiempo real generado por tus acciones visuales.
-* **Exportar:** Desde el panel derecho, descarga tus datos limpios en formato CSV o Excel XLSX.
+* **Exportar datos:** Desde el panel derecho, descarga tus datos limpios en formato CSV o Excel XLSX.
+* **Exportar pipeline como script Python (`.py`):** Descarga todo el pipeline acumulado como un archivo Python ejecutable e independiente. El script incluye el código de cada transformación aplicada en orden, listo para ejecutarse con `python nombre_script.py`, integrarse en un flujo de automatización (cron, Airflow) o reproducirse en cualquier entorno con pandas instalado. El botón aparece en el panel derecho, separado de las opciones de exportación de datos, identificado con color violeta.
+
+  **Ejemplo de script generado:**
+  ```python
+  # ============================================================
+  # Script generado por Cat_flip — Studio ETL
+  # https://github.com/lpardo303/Cat_flip
+  # ============================================================
+
+  import pandas as pd
+
+  # Cargar archivo
+  df = pd.read_csv('ventas.csv', sep=',')
+
+  # unpivot
+  df = df.melt(
+      id_vars=['Region', 'Producto'],
+      var_name='Mes',
+      value_name='Valor'
+  )
+
+  # sort
+  df = df.sort_values(by='Valor', ascending=False)
+  ```
