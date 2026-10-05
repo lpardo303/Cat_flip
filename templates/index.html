@@ -480,6 +480,29 @@
     text-align: center;
   }
 
+  /* ── TYPE BADGES (cabeceras Data Grid) ────────────────── */
+  .type-badge {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 0.08rem 0.36rem;
+    border-radius: 4px;
+    margin-left: 0.4rem;
+    vertical-align: middle;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: opacity 0.15s, transform 0.15s;
+    line-height: 1.5;
+  }
+  .type-badge:hover { opacity: 0.75; transform: translateY(-1px); }
+  .type-badge.INT  { background: var(--teal-bg);    border-color: var(--teal-bd);    color: var(--teal); }
+  .type-badge.FLOAT{ background: var(--teal-bg);    border-color: var(--teal-bd);    color: var(--teal); }
+  .type-badge.STR  { background: var(--surface2);   border-color: var(--border);     color: var(--text2); }
+  .type-badge.DATE { background: var(--orange-bg);  border-color: var(--orange-bd);  color: var(--orange); }
+  .type-badge.BOOL { background: rgba(45,158,107,0.10); border-color: rgba(45,158,107,0.28); color: var(--green); }
+
   /* ── EMPTY STATE ───────────────────────────────────────── */
   .empty-state {
     flex: 1;
@@ -967,6 +990,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ── ESTADO ──────────────────────────────────────────────────────────────
 let currentColumns = [];
+let currentDtypes = {};
 let currentOp = null;
 let currentSheetFile = null;
 let pipelineSteps = [];
@@ -1081,10 +1105,14 @@ async function uploadFile(file, sheet) {
 
 function renderTable(data) {
   currentColumns = data.columns;
+  currentDtypes  = data.dtypes || {};
   document.getElementById('info-rows').textContent = data.shape[0].toLocaleString();
   document.getElementById('info-cols').textContent = data.shape[1];
   let html = '<table><thead><tr><th>#</th>';
-  data.columns.forEach(c => { html += '<th title="'+c+'">'+c+'</th>'; });
+  data.columns.forEach(c => {
+    const dtype = currentDtypes[c] || 'STR';
+    html += `<th title="${c}">${c}<span class="type-badge ${dtype}" onclick="openModalForCol('change_type','${c.replace(/'/g,"\\'")}')" title="Tipo: ${dtype} — clic para cambiar">${dtype}</span></th>`;
+  });
   html += '</tr></thead><tbody>';
   data.data.forEach((row,i) => {
     html += '<tr><td>'+(i+1)+'</td>';
@@ -1228,6 +1256,22 @@ function openModal(op) {
   document.getElementById('modal-title').textContent = def.title;
   document.getElementById('modal-body').innerHTML = def.body();
   document.getElementById('modal-overlay').classList.add('open');
+}
+
+// Abre un modal pre-seleccionando una columna específica (usado por los badges de tipo)
+function openModalForCol(op, col) {
+  openModal(op);
+  // Espera un tick para que el DOM del modal esté listo antes de forzar la selección
+  setTimeout(() => {
+    const sel = document.getElementById('type-col');
+    if (sel) sel.value = col;
+    // Pre-seleccionar el tipo actual en el select de dtype
+    const dtypeMap = { INT: 'int', FLOAT: 'float', STR: 'str', DATE: 'datetime', BOOL: 'str' };
+    const dtypeSel = document.getElementById('type-dtype');
+    if (dtypeSel && currentDtypes[col]) {
+      dtypeSel.value = dtypeMap[currentDtypes[col]] || 'str';
+    }
+  }, 0);
 }
 function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); currentOp=null; }
 

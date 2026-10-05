@@ -15,8 +15,23 @@ code_log = []  # Log de código generado
 def df_to_json(df, max_rows=500):
     """Convierte DataFrame a JSON seguro para el frontend."""
     preview = df.head(max_rows)
+
+    # Clasificar cada columna en una categoría semántica para los badges del UI
+    def classify_dtype(series):
+        dt = series.dtype
+        if pd.api.types.is_bool_dtype(dt):
+            return "BOOL"
+        if pd.api.types.is_datetime64_any_dtype(dt):
+            return "DATE"
+        if pd.api.types.is_integer_dtype(dt):
+            return "INT"
+        if pd.api.types.is_float_dtype(dt):
+            return "FLOAT"
+        return "STR"
+
     return {
         "columns": list(df.columns),
+        "dtypes": {col: classify_dtype(df[col]) for col in df.columns},
         "data": preview.fillna("").astype(str).values.tolist(),
         "shape": [len(df), len(df.columns)],
         "truncated": len(df) > max_rows
