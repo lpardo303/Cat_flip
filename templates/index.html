@@ -381,29 +381,29 @@
   }
   .btn-secondary:hover { border-color: var(--teal); color: var(--teal); background: var(--teal-bg); }
   .btn-danger {
-    background: var(--orange-bg);
-    border: 1px solid var(--orange-bd);
+    background: var(--surface);
+    border: none;
     color: var(--orange);
   }
-  .btn-danger:hover { background: rgba(226,109,13,0.18); }
+  .btn-danger:hover { background: var(--orange-bg); }
   .btn-green {
-    background: var(--green);
-    color: #fff;
-    box-shadow: 0 2px 8px rgba(45,158,107,0.20);
+    background: var(--surface);
+    border: none;
+    color: var(--green);
+    box-shadow: none;
   }
-  .btn-green:hover { background: #237a56; }
+  .btn-green:hover { background: rgba(45,158,107,0.10); }
   .btn-purple {
-    background: rgba(124,58,237,0.10);
-    border: 1px solid rgba(124,58,237,0.28);
+    background: var(--surface);
+    border: none;
     color: #7c3aed;
   }
-  .btn-purple:hover { background: rgba(124,58,237,0.18); }
+  .btn-purple:hover { background: rgba(124,58,237,0.10); }
   [data-theme="dark"] .btn-purple {
-    background: rgba(167,139,250,0.12);
-    border-color: rgba(167,139,250,0.30);
+    background: var(--surface);
     color: #a78bfa;
   }
-  [data-theme="dark"] .btn-purple:hover { background: rgba(167,139,250,0.20); }
+  [data-theme="dark"] .btn-purple:hover { background: rgba(167,139,250,0.12); }
   .btn:disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
   .actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 
@@ -950,7 +950,6 @@
             <span>Excel</span>
           </button>
         </div>
-        <div style="height:1px;background:var(--border2);margin:0.35rem 0"></div>
         <button class="btn btn-purple" onclick="exportScript()" id="btn-script" disabled style="width:100%;justify-content:center">
           <svg class="icon-svg" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
           <span>Exportar pipeline .py</span>

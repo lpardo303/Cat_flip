@@ -375,6 +375,15 @@ def export_script():
     script_content = header + "\n\n".join(code_log)
 
     buf = io.BytesIO(script_content.encode("utf-8"))
+    buf.seek(0)
+    return send_file(
+        buf,
+        mimetype="text/x-python",
+        as_attachment=True,
+        download_name=f"{filename}.py"
+    )
+
+
 @app.route("/stats", methods=["GET"])
 def stats():
     global current_df
