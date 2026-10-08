@@ -6,71 +6,138 @@
 <title>Cat_flip — Studio ETL</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&family=Geist:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700;800&family=Geist:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 /* ── TOKENS ────────────────────────────────────────────── */
   :root {
-    --base:    #f6f8f9;
-    --base2:   #eef7f7;
-    --surface: rgba(255,255,255,0.72);
-    --surface2:rgba(255,255,255,0.52);
-    --glass:   rgba(238,247,247,0.60);
-    --teal:    #267c7c;
-    --teal2:   #1e6565;
+    /* Escala cromática teal (spec Cat_flip Studio) */
+    --teal-50:  #f2faf9;
+    --teal-100: #cfefef;
+    --teal-200: #99d4d4;
+    --teal-300: #66b2b2;
+    --teal-400: #3f9191;
+    --teal-500: #267c7c;
+    --teal-600: #1d6262;
+
+    /* Superficies y canvas (tema claro) */
+    --bg-main:         #f6f8f9;
+    --base:            #f6f8f9;   /* alias legacy */
+    --base2:           #eef7f7;
+    --surface:         rgba(255,255,255,0.72);
+    --surface-elevated:rgba(255,255,255,0.88);
+    --surface-glass:   rgba(238,247,247,0.60);
+    --surface2:        rgba(255,255,255,0.52);
+    --glass:           rgba(238,247,247,0.60); /* alias legacy */
+
+    /* Acento principal → apunta a la escala */
+    --teal:    var(--teal-500);
+    --teal2:   var(--teal-600);
     --teal-bg: rgba(38,124,124,0.08);
     --teal-bd: rgba(38,124,124,0.22);
-    --orange:  #e26d0d;
-    --orange-bg:rgba(226,109,13,0.10);
-    --orange-bd:rgba(226,109,13,0.30);
-    --color-mutation: #e26d0d;
+
+    /* Semánticos de color funcional */
+    --orange:        #e26d0d;
+    --orange-bg:     rgba(226,109,13,0.10);
+    --orange-bd:     rgba(226,109,13,0.30);
+    --color-mutation:#e26d0d;
+    --green:         #2d9e6b;
+    --red:           #d94f4f;
+    --yellow:        #c08a1a;
+
+    /* Logo */
     --logo-disc: var(--teal);
     --logo-cat:  #ffffff;
-    --green:   #2d9e6b;
-    --red:     #d94f4f;
-    --yellow:  #c08a1a;
-    --text:    #1a2b2b;
-    --text2:   #4e6b6b;
+
+    /* Texto */
+    --text-primary:   #1a2b2b;
+    --text-secondary: #4e6b6b;
+    --text-muted:     #7a9a9a;
+    --text:  var(--text-primary);   /* alias legacy */
+    --text2: var(--text-secondary); /* alias legacy */
+
+    /* Bordes */
+    --border-subtle: rgba(38,124,124,0.08);
     --border:  rgba(38,124,124,0.15);
     --border2: rgba(38,124,124,0.08);
-    --shadow:  0 2px 16px rgba(38,124,124,0.10);
+
+    /* Sombras glass (F0.3) */
+    --shadow-glass:        0 8px 32px rgba(38,124,124,0.06), 0 2px 8px rgba(0,0,0,0.02);
+    --shadow-glass-sm:     0 4px 16px rgba(38,124,124,0.04);
+    --shadow-glass-hover:  0 12px 36px rgba(38,124,124,0.12);
+    --shadow-glass-active: 0 4px 18px rgba(38,124,124,0.22);
+    /* Alias legacy → apuntan a glass */
+    --shadow:  var(--shadow-glass);
     --shadow2: 0 8px 32px rgba(38,124,124,0.12);
+
+    /* Radios */
     --radius:  12px;
     --radius2: 8px;
-    --row-alt: rgba(238, 247, 247, 0.40);  /* filas pares de la tabla */
-    --row-hover: rgba(38, 124, 124, 0.1); /* <- Hover añadido */
-    --font-ui:   'Geist', 'Segoe UI', system-ui, sans-serif;
-    --font-head: 'Hanken Grotesk', 'Segoe UI', sans-serif;
-    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+    /* Tabla */
+    --row-alt:   rgba(238,247,247,0.40);
+    --row-hover: rgba(38,124,124,0.10);
+
+    /* Tipografía */
+    --font-display: 'Hanken Grotesk', 'Segoe UI', sans-serif;
+    --font-ui:      'Geist', 'Segoe UI', system-ui, sans-serif;
+    --font-mono:    'JetBrains Mono', 'Fira Code', monospace;
+    --font-head: var(--font-display); /* alias legacy */
   }
 
   /* ── TEMA OSCURO ───────────────────────────────────────── */
   [data-theme="dark"] {
-    --base:    #0f1117;
-    --base2:   #161b26;
-    --surface: rgba(26,29,39,0.92);
-    --surface2:rgba(22,27,38,0.80);
-    --glass:   rgba(22,27,38,0.75);
-    --teal:    #3db8b8;
-    --teal2:   #57d0d0;
+    /* Escala teal más luminosa para oscuro */
+    --teal-200: #b8e8e8;
+    --teal-300: #85cccc;
+    --teal-400: #57d0d0;
+    --teal-500: #3db8b8;
+    --teal-600: #2e9494;
+
+    /* Superficies (regla 60-30-10) */
+    --bg-main:          #2d2d2d;
+    --base:             #0f1117;  /* alias legacy */
+    --base2:            #161b26;
+    --surface:          rgba(26,29,39,0.92);
+    --surface-elevated: rgba(36,40,54,0.95);
+    --surface-glass:    rgba(22,27,38,0.75);
+    --surface2:         rgba(22,27,38,0.80);
+    --glass:            rgba(22,27,38,0.75); /* alias legacy */
+
+    --teal:    var(--teal-500);
+    --teal2:   var(--teal-400);
     --teal-bg: rgba(61,184,184,0.10);
     --teal-bd: rgba(61,184,184,0.22);
-    --orange:  #f08030;
-    --orange-bg:rgba(240,128,48,0.12);
-    --orange-bd:rgba(240,128,48,0.32);
-    --color-mutation: #f08030;
+
+    --orange:        #f08030;
+    --orange-bg:     rgba(240,128,48,0.12);
+    --orange-bd:     rgba(240,128,48,0.32);
+    --color-mutation:#f08030;
+    --green:         #22c55e;
+    --red:           #ef4444;
+    --yellow:        #f59e0b;
+
     --logo-disc: var(--teal);
     --logo-cat:  var(--base);
-    --green:   #22c55e;
-    --red:     #ef4444;
-    --yellow:  #f59e0b;
-    --text:    #e2e8f0;
-    --text2:   #7fa8a8;
+
+    --text-primary:   #e2e8f0;
+    --text-secondary: #7fa8a8;
+    --text-muted:     #4e6b6b;
+    --text:  var(--text-primary);
+    --text2: var(--text-secondary);
+
+    --border-subtle: rgba(255,255,255,0.05);
     --border:  rgba(61,184,184,0.18);
     --border2: rgba(61,184,184,0.08);
-    --shadow:  0 2px 16px rgba(0,0,0,0.35);
+
+    --shadow-glass:        0 8px 32px rgba(0,0,0,0.30), 0 2px 8px rgba(0,0,0,0.15);
+    --shadow-glass-sm:     0 4px 16px rgba(0,0,0,0.20);
+    --shadow-glass-hover:  0 12px 36px rgba(0,0,0,0.40);
+    --shadow-glass-active: 0 4px 18px rgba(61,184,184,0.20);
+    --shadow:  var(--shadow-glass);
     --shadow2: 0 8px 32px rgba(0,0,0,0.45);
-    --row-alt: rgba(255, 255, 255, 0.03); /* <- Ajuste modo oscuro */
-    --row-hover: rgba(255, 255, 255, 0.08); /* <- Hover modo oscuro */
+
+    --row-alt:   rgba(255,255,255,0.03);
+    --row-hover: rgba(255,255,255,0.08);
   }
 
   /* ── RESET & BASE ──────────────────────────────────────── */
@@ -323,7 +390,7 @@
     background: var(--teal-bg);
     border-color: var(--teal);
     color: var(--teal);
-    box-shadow: 0 2px 8px rgba(38,124,124,0.12);
+    box-shadow: var(--shadow-glass-sm);
     transform: translateY(-1px);
   }
   .op-btn .op-icon {
@@ -371,9 +438,9 @@
   .btn-primary {
     background: var(--teal);
     color: #fff;
-    box-shadow: 0 2px 8px rgba(38,124,124,0.25);
+    box-shadow: var(--shadow-glass-sm);
   }
-  .btn-primary:hover { background: var(--teal2); box-shadow: 0 4px 14px rgba(38,124,124,0.30); }
+  .btn-primary:hover { background: var(--teal2); box-shadow: var(--shadow-glass-hover); }
   .btn-secondary {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -666,7 +733,7 @@
     border-radius: 16px;
     padding: 1.5rem;
     width: 430px; max-width: 95vw;
-    box-shadow: 0 24px 64px rgba(38,124,124,0.18), 0 2px 12px rgba(0,0,0,0.08);
+    box-shadow: var(--shadow-glass-active);
     animation: modalIn 0.18s ease;
   }
   @keyframes modalIn { from { transform: scale(0.96) translateY(8px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
@@ -752,11 +819,102 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── ORBES DE FONDO (F0.5) ─────────────────────────────── */
+  .orb {
+    position: fixed;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 0;
+    will-change: transform;
+  }
+  .orb-1 {
+    width: 520px; height: 520px;
+    top: -160px; left: -120px;
+    background: radial-gradient(circle, rgba(38,124,124,0.13) 0%, transparent 70%);
+    filter: blur(100px);
+    animation: orb-drift-1 18s ease-in-out infinite alternate;
+  }
+  .orb-2 {
+    width: 420px; height: 420px;
+    bottom: -100px; right: -80px;
+    background: radial-gradient(circle, rgba(102,178,178,0.10) 0%, transparent 70%);
+    filter: blur(130px);
+    animation: orb-drift-2 22s ease-in-out infinite alternate;
+  }
+  @keyframes orb-drift-1 {
+    from { transform: translate(0, 0) scale(1); }
+    to   { transform: translate(40px, 30px) scale(1.08); }
+  }
+  @keyframes orb-drift-2 {
+    from { transform: translate(0, 0) scale(1); }
+    to   { transform: translate(-30px, -20px) scale(1.06); }
+  }
+  /* Respetar preferencia de movimiento reducido */
+  @media (prefers-reduced-motion: reduce) {
+    .orb { animation: none !important; filter: blur(120px); }
+  }
+  /* En oscuro los orbes son más tenues */
+  [data-theme="dark"] .orb-1 {
+    background: radial-gradient(circle, rgba(61,184,184,0.07) 0%, transparent 70%);
+  }
+  [data-theme="dark"] .orb-2 {
+    background: radial-gradient(circle, rgba(61,184,184,0.05) 0%, transparent 70%);
+  }
+
   /* ── SCROLLBAR ─────────────────────────────────────────── */
   ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--teal-bd); border-radius: 4px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--teal); }
+
+  /* ── GLASS LAYERS (F0.4) ───────────────────────────────── */
+  /* Panel principal — usado en header, paneles laterales     */
+  .glass-panel {
+    background: rgba(255,255,255,0.68);
+    backdrop-filter: blur(20px) saturate(1.6);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    border: 1px solid rgba(38,124,124,0.12);
+    box-shadow: var(--shadow-glass);
+  }
+  /* Tarjeta flotante — stat-card, pipeline-step, modales     */
+  .glass-card {
+    background: rgba(255,255,255,0.55);
+    backdrop-filter: blur(14px) saturate(1.4);
+    -webkit-backdrop-filter: blur(14px) saturate(1.4);
+    border: 1px solid rgba(38,124,124,0.10);
+    box-shadow: var(--shadow-glass-sm);
+  }
+  /* Botón glass — superficie translúcida para acciones       */
+  .glass-button {
+    background: rgba(207,239,239,0.45);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(38,124,124,0.15);
+    box-shadow: var(--shadow-glass-sm);
+    transition: box-shadow 0.2s ease, transform 0.15s ease;
+  }
+  .glass-button:hover {
+    box-shadow: var(--shadow-glass-hover);
+    transform: translateY(-1px);
+  }
+  .glass-button:active {
+    box-shadow: var(--shadow-glass-active);
+    transform: translateY(0);
+  }
+  /* Variantes modo oscuro */
+  [data-theme="dark"] .glass-panel {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.05);
+  }
+  [data-theme="dark"] .glass-card {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.05);
+  }
+  [data-theme="dark"] .glass-button {
+    background: rgba(61,184,184,0.08);
+    border-color: rgba(61,184,184,0.18);
+  }
+
   /* ── ICONS ─────────────────────────────────────────────── */
   .icon-svg {
     display: inline-block;
@@ -772,6 +930,9 @@
 </style>
 </head>
 <body>
+<!-- ── ORBES DE FONDO ──────────────────────────────────────────────────── -->
+<div class="orb orb-1" aria-hidden="true"></div>
+<div class="orb orb-2" aria-hidden="true"></div>
 
 <!-- ══ TOP RIBBON ══════════════════════════════════════════════════════════ -->
 <header>
