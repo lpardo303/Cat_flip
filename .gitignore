@@ -51,6 +51,5 @@ Desktop.ini
 *.bak
 *~
 
-# Documentación interna y contexto para IAs
-especificacion_del_proyecto_bitacora.md
-contexto_del_proyecto.md
+# Contexto local/privado para IAs
+/context/

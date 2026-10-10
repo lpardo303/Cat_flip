@@ -213,7 +213,10 @@
     height: 28px;
     display: block;
     flex-shrink: 0;
+    transform-origin: center;
+    transition: transform 0.25s ease;
   }
+  .logo:hover .logo-svg { transform: rotate(12deg); }
   .logo-circle {
     fill: var(--logo-disc, currentColor);
     transition: fill 0.25s ease;
@@ -891,10 +894,11 @@
   /* Respetar preferencia de movimiento reducido */
   @media (prefers-reduced-motion: reduce) {
     .orb { animation: none !important; filter: blur(120px); }
-    .op-btn, .btn, .pipeline-step, .stat-card, .glass-button {
+    .op-btn, .btn, .pipeline-step, .stat-card, .glass-button, .logo-svg {
       transition: none !important;
       transform: none !important;
     }
+    .logo:hover .logo-svg,
     .op-btn:hover:not(:disabled),
     .op-btn:active:not(:disabled),
     .btn:active:not(:disabled),
