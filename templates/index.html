@@ -183,6 +183,10 @@
     font-weight: 600;
     font-family: var(--font-ui);
   }
+  .theme-toggle .icon-svg { width: 15px; height: 15px; }
+  .theme-toggle .icon-sun { display: none; }
+  [data-theme="dark"] .theme-toggle .icon-moon { display: none; }
+  [data-theme="dark"] .theme-toggle .icon-sun { display: inline-block; }
 
   /* ── TOP RIBBON ────────────────────────────────────────── */
   header {
@@ -381,7 +385,7 @@
     font-size: 0.72rem;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: background 0.1s ease, border-color 0.1s ease, color 0.1s ease, box-shadow 0.1s ease, transform 0.1s ease;
     text-align: center;
     display: flex; flex-direction: column; align-items: center; gap: 0.25rem;
     line-height: 1.2;
@@ -390,8 +394,12 @@
     background: var(--teal-bg);
     border-color: var(--teal);
     color: var(--teal);
-    box-shadow: var(--shadow-glass-sm);
+    box-shadow: var(--shadow-glass-hover);
     transform: translateY(-1px);
+  }
+  .op-btn:active:not(:disabled) {
+    transform: scale(0.95);
+    box-shadow: var(--shadow-glass-active);
   }
   .op-btn .op-icon {
     display: flex;
@@ -421,9 +429,12 @@
     font-weight: 600;
     cursor: pointer;
     border: none;
-    transition: all 0.15s ease;
+    transition: all 0.1s ease;
     display: inline-flex; align-items: center; gap: 0.35rem;
     white-space: nowrap;
+  }
+  .btn:active:not(:disabled) {
+    transform: scale(0.95);
   }
   .btn svg {
     width: 14px;
@@ -694,10 +705,10 @@
     border: 1px solid var(--border);
     border-radius: var(--radius2);
     margin-bottom: 0.4rem;
-    transition: box-shadow 0.15s;
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
     cursor: default;
   }
-  .pipeline-step:hover { box-shadow: var(--shadow); }
+  .pipeline-step:hover { box-shadow: var(--shadow-glass-hover); transform: translateY(-1px); }
   .step-num {
     background: var(--teal-bg);
     border: 1px solid var(--teal-bd);
@@ -743,6 +754,33 @@
     font-weight: 700;
     color: var(--teal);
     margin-bottom: 1rem;
+    display: flex; align-items: center; gap: 0.45rem;
+  }
+  .modal h2 svg {
+    width: 18px; height: 18px;
+    stroke: currentColor;
+    stroke-width: 1.85;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex-shrink: 0;
+  }
+  .modal-warn {
+    font-size: 0.75rem;
+    color: var(--orange);
+    margin-top: 0.5rem;
+    display: flex; align-items: flex-start; gap: 0.35rem;
+    line-height: 1.45;
+  }
+  .modal-warn svg {
+    width: 14px; height: 14px;
+    stroke: currentColor;
+    stroke-width: 1.85;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex-shrink: 0;
+    margin-top: 1px;
   }
   .modal label {
     display: block;
@@ -797,6 +835,7 @@
     max-width: 300px;
     backdrop-filter: blur(12px);
   }
+  .toast .icon-svg { width: 15px; height: 15px; flex-shrink: 0; }
   @keyframes toastIn { from { transform: translateX(60px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
   .toast.success { background: rgba(45,158,107,0.12); border: 1px solid rgba(45,158,107,0.30); color: var(--green); }
   .toast.error   { background: rgba(217,79,79,0.12);  border: 1px solid rgba(217,79,79,0.30);  color: var(--red); }
@@ -852,6 +891,16 @@
   /* Respetar preferencia de movimiento reducido */
   @media (prefers-reduced-motion: reduce) {
     .orb { animation: none !important; filter: blur(120px); }
+    .op-btn, .btn, .pipeline-step, .stat-card, .glass-button {
+      transition: none !important;
+      transform: none !important;
+    }
+    .op-btn:hover:not(:disabled),
+    .op-btn:active:not(:disabled),
+    .btn:active:not(:disabled),
+    .pipeline-step:hover {
+      transform: none !important;
+    }
   }
   /* En oscuro los orbes son más tenues */
   [data-theme="dark"] .orb-1 {
@@ -958,10 +1007,16 @@
   </div>
   <div class="header-spacer"></div>
   <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Cambiar tema">
-    <span id="theme-icon">🌙</span>
+    <span id="theme-icon">
+      <svg class="icon-svg icon-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      <svg class="icon-svg icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+    </span>
     <span class="toggle-label" id="theme-label">Oscuro</span>
   </button>
-  <span id="filename-badge" class="badge" style="display:none">📄 </span>
+  <span id="filename-badge" class="badge" style="display:none">
+    <svg class="icon-svg" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+    <span id="filename-text"></span>
+  </span>
 </header>
 
 <!-- ══ APP LAYOUT ══════════════════════════════════════════════════════════ -->
@@ -1166,20 +1221,45 @@ function toggleTheme() {
   if (isDark) {
     html.removeAttribute('data-theme');
     localStorage.setItem('catflip-theme', 'light');
-    document.getElementById('theme-icon').textContent  = '🌙';
     document.getElementById('theme-label').textContent = 'Oscuro';
   } else {
     html.setAttribute('data-theme', 'dark');
     localStorage.setItem('catflip-theme', 'dark');
-    document.getElementById('theme-icon').textContent  = '☀️';
     document.getElementById('theme-label').textContent = 'Claro';
   }
+}
+
+function icon(name) {
+  const paths = {
+    moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+    file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>',
+    'move-vertical': '<path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/>',
+    'move-horizontal': '<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>',
+    scissors: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/>',
+    filter: '<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>',
+    sparkles: '<path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>',
+    'trash-2': '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>',
+    pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
+    x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+    eraser: '<path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/>',
+    'case-sensitive': '<path d="m3 15 4-8 4 8"/><path d="M4 13h6"/><circle cx="18" cy="12" r="3"/><path d="M21 9v6"/>',
+    'refresh-cw': '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+    tag: '<path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/>',
+    'arrow-down-wide-narrow': '<path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="M11 4h10"/><path d="M11 8h7"/><path d="M11 12h4"/>',
+    'arrow-down-to-line': '<path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/>',
+    pin: '<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
+    check: '<polyline points="20 6 9 17 4 12"/>',
+    info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+    'triangle-alert': '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/>',
+    'undo-2': '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/>',
+  };
+  return '<svg class="icon-svg" viewBox="0 0 24 24">' + (paths[name] || '') + '</svg>';
 }
 
 // Sincronizar label al cargar (si se cargó oscuro desde localStorage)
 document.addEventListener('DOMContentLoaded', () => {
   if (document.documentElement.getAttribute('data-theme') === 'dark') {
-    document.getElementById('theme-icon').textContent  = '☀️';
     document.getElementById('theme-label').textContent = 'Claro';
   }
 });
@@ -1197,8 +1277,8 @@ function hideLoading() { document.getElementById('loading').classList.remove('op
 function toast(msg, type='success') {
   const t = document.createElement('div');
   t.className = 'toast ' + type;
-  const icons = {success:'✅',error:'❌',info:'ℹ️'};
-  t.innerHTML = '<span>' + (icons[type]||'ℹ️') + '</span><span>' + msg + '</span>';
+  const icons = {success:'check',error:'x',info:'info'};
+  t.innerHTML = '<span>' + icon(icons[type]||'info') + '</span><span>' + msg + '</span>';
   document.getElementById('toast-container').appendChild(t);
   setTimeout(() => t.remove(), 3500);
 }
@@ -1290,7 +1370,7 @@ async function uploadFile(file, sheet) {
     pipelineSteps = [];
     renderPipeline();
     const badge = document.getElementById('filename-badge');
-    badge.textContent = '📄 ' + file.name;
+    document.getElementById('filename-text').textContent = file.name;
     badge.style.display = '';
     document.getElementById('header-metrics').style.display = 'flex';
     document.getElementById('empty-state').style.display = 'none';
@@ -1381,52 +1461,52 @@ function selectAllHtml(containerId) {
 
 const modalDefs = {
   unpivot: {
-    title: '↕️ Unpivot (Anular dinamización)',
+    title: icon('move-vertical') + ' Unpivot (Anular dinamización)',
     body: () => '<label>Columnas ID (se mantienen fijas):</label>'+selectAllHtml('id-cols-check')+'<div class="col-check" id="id-cols-check">'+colOptions(true)+'</div><label>Nombre columna variable:</label><input type="text" id="var-name" value="Variable"><label>Nombre columna valor:</label><input type="text" id="val-name" value="Valor">',
     params: () => ({ id_cols: [...document.querySelectorAll('#id-cols-check input:checked')].map(i=>i.value), var_name: document.getElementById('var-name').value, value_name: document.getElementById('val-name').value })
   },
   pivot: {
-    title: '↔️ Pivot (Dinamizar)',
+    title: icon('move-horizontal') + ' Pivot (Dinamizar)',
     body: () => '<label>Columna índice (filas):</label><select id="pivot-index">'+colOptions()+'</select><label>Columna a pivotar (encabezados):</label><select id="pivot-cols">'+colOptions()+'</select><label>Columna de valores:</label><select id="pivot-vals">'+colOptions()+'</select>',
     params: () => ({ index: document.getElementById('pivot-index').value, columns: document.getElementById('pivot-cols').value, values: document.getElementById('pivot-vals').value })
   },
   split_column: {
-    title: '✂️ Separar columna',
+    title: icon('scissors') + ' Separar columna',
     body: () => '<label>Columna a separar:</label><select id="split-col">'+colOptions()+'</select><label>Delimitador:</label><input type="text" id="split-delim" value=","><label>Prefijo para nuevas columnas:</label><input type="text" id="split-prefix" value="Parte"><p style="font-size:0.75rem;color:var(--text2);margin-top:-0.3rem;margin-bottom:0.5rem">Se crearán columnas <em>Prefijo_1</em>, <em>Prefijo_2</em>, etc., según los fragmentos resultantes.</p><label>¿Cuántas veces separar?</label><select id="split-mode" onchange="document.getElementById(\'split-n-wrap\').style.display=this.value===\'n\'?\'block\':\'none\'"><option value="all">Siempre (todas las ocurrencias)</option><option value="n">N veces</option></select><div id="split-n-wrap" style="display:none;margin-top:0.4rem"><input type="number" id="split-n" value="1" min="1"></div>',
     params: () => { const mode = document.getElementById('split-mode').value; return { column: document.getElementById('split-col').value, delimiter: document.getElementById('split-delim').value, col_prefix: document.getElementById('split-prefix').value || document.getElementById('split-col').value, max_split: mode === 'n' ? parseInt(document.getElementById('split-n').value) || 1 : 0 }; }
   },
   filter: {
-    title: '🔍 Filtrar filas',
+    title: icon('filter') + ' Filtrar filas',
     body: () => '<label>Columna:</label><select id="filter-col">'+colOptions()+'</select><label>Condición:</label><select id="filter-op"><option value="==">== igual a</option><option value="!=">!= distinto de</option><option value="contiene">contiene</option><option value="no contiene">no contiene</option><option value=">">&gt; mayor que</option><option value="<">&lt; menor que</option></select><label>Valor:</label><input type="text" id="filter-val" placeholder="Escribe el valor...">',
     params: () => ({ column: document.getElementById('filter-col').value, operator: document.getElementById('filter-op').value, value: document.getElementById('filter-val').value })
   },
   drop_nulls: {
-    title: '🧹 Eliminar filas con nulos',
+    title: icon('sparkles') + ' Eliminar filas con nulos',
     body: () => '<label>Columnas (vacío = todas):</label>'+selectAllHtml('nulls-check')+'<div class="col-check" id="nulls-check">'+colOptions(true)+'</div><label>Eliminar fila si:</label><select id="nulls-how"><option value="any">ANY — alguna columna es nula</option><option value="all">ALL — todas las columnas son nulas</option></select>',
     params: () => { const c=[...document.querySelectorAll('#nulls-check input:checked')].map(i=>i.value); return { columns: c.length===currentColumns.length?null:c, how: document.getElementById('nulls-how').value }; }
   },
   drop_duplicates: {
-    title: '🗑️ Eliminar duplicados',
+    title: icon('trash-2') + ' Eliminar duplicados',
     body: () => '<label>Basado en columnas:</label>'+selectAllHtml('dup-check')+'<div class="col-check" id="dup-check">'+colOptions(true)+'</div>',
     params: () => { const c=[...document.querySelectorAll('#dup-check input:checked')].map(i=>i.value); return { columns: c.length===currentColumns.length?null:c }; }
   },
   rename_column: {
-    title: '✏️ Renombrar columna',
+    title: icon('pencil') + ' Renombrar columna',
     body: () => '<label>Columna a renombrar:</label><select id="rename-old">'+colOptions()+'</select><label>Nuevo nombre:</label><input type="text" id="rename-new" placeholder="Nuevo nombre...">',
     params: () => ({ old_name: document.getElementById('rename-old').value, new_name: document.getElementById('rename-new').value })
   },
   drop_column: {
-    title: '❌ Eliminar columna',
-    body: () => '<label>Columna a eliminar:</label><select id="drop-col">'+colOptions()+'</select><p style="font-size:0.75rem;color:var(--orange);margin-top:0.5rem">⚠️ Puedes deshacer con ↩️ Deshacer paso</p>',
+    title: icon('x') + ' Eliminar columna',
+    body: () => '<label>Columna a eliminar:</label><select id="drop-col">'+colOptions()+'</select><p class="modal-warn">'+icon('triangle-alert')+'<span>Puedes deshacer con '+icon('undo-2')+' Deshacer paso</span></p>',
     params: () => ({ column: document.getElementById('drop-col').value })
   },
   trim: {
-    title: '🧽 Eliminar espacios extra',
+    title: icon('eraser') + ' Eliminar espacios extra',
     body: () => '<label>Columnas:</label>'+selectAllHtml('trim-check')+'<div class="col-check" id="trim-check">'+colOptions(true)+'</div>',
     params: () => ({ columns: [...document.querySelectorAll('#trim-check input:checked')].map(i=>i.value) })
   },
   change_case: {
-    title: '🔡 Formateo de texto',
+    title: icon('case-sensitive') + ' Formateo de texto',
     body: () => '<label>Columna:</label><select id="case-col">'+colOptions()+'</select><label>Transformar a:</label><select id="case-type"><option value="lower">minúsculas (lower)</option><option value="upper">MAYÚSCULAS (upper)</option><option value="title">Título Caso (title)</option><option value="capitalize">Primera letra (capitalize)</option></select>',
     params: () => ({ column: document.getElementById('case-col').value, case: document.getElementById('case-type').value })
   },
@@ -1436,32 +1516,32 @@ const modalDefs = {
     params: () => { const c=[...document.querySelectorAll('#nl-check input:checked')].map(i=>i.value); return { columns: c.length===currentColumns.length ? null : c }; }
   },
   replace: {
-    title: '🔄 Reemplazar valores',
+    title: icon('refresh-cw') + ' Reemplazar valores',
     body: () => '<label>Columna:</label><select id="rep-col">'+colOptions()+'</select><label>Valor a reemplazar:</label><input type="text" id="rep-old" placeholder="Texto original..."><label>Reemplazar por:</label><input type="text" id="rep-new" placeholder="Texto nuevo...">',
     params: () => ({ column: document.getElementById('rep-col').value, old_value: document.getElementById('rep-old').value, new_value: document.getElementById('rep-new').value })
   },
   change_type: {
-    title: '🏷️ Cambiar tipo de dato',
+    title: icon('tag') + ' Cambiar tipo de dato',
     body: () => '<label>Columna:</label><select id="type-col">'+colOptions()+'</select><label>Nuevo tipo:</label><select id="type-dtype"><option value="str">Texto (str)</option><option value="int">Número entero (int)</option><option value="float">Número decimal (float)</option><option value="datetime">Fecha/hora (datetime)</option></select>',
     params: () => ({ column: document.getElementById('type-col').value, dtype: document.getElementById('type-dtype').value })
   },
   sort: {
-    title: '📶 Ordenar',
+    title: icon('arrow-down-wide-narrow') + ' Ordenar',
     body: () => '<label>Columna:</label><select id="sort-col">'+colOptions()+'</select><label>Orden:</label><select id="sort-asc"><option value="true">Ascendente (A→Z)</option><option value="false">Descendente (Z→A)</option></select>',
     params: () => ({ column: document.getElementById('sort-col').value, ascending: document.getElementById('sort-asc').value==='true' })
   },
   split_to_rows: {
-    title: '↧ Separar por filas',
+    title: icon('arrow-down-to-line') + ' Separar por filas',
     body: () => '<label>Columna a separar:</label><select id="str-col">'+colOptions()+'</select><label>Delimitador:</label><input type="text" id="str-delim" value=","><p style="font-size:0.75rem;color:var(--text2);margin-top:0.5rem">Cada valor separado por el delimitador se convertirá en una fila nueva.</p>',
     params: () => ({ column: document.getElementById('str-col').value, delimiter: document.getElementById('str-delim').value, strip: true })
   },
   drop_rows: {
-    title: '✂️ Eliminar filas por posición',
+    title: icon('scissors') + ' Eliminar filas por posición',
     body: () => '<label>¿Desde dónde?</label><select id="dr-pos"><option value="top">Desde el inicio (primeras filas)</option><option value="bottom">Desde el final (últimas filas)</option></select><label>¿Cuántas filas eliminar?</label><input type="number" id="dr-n" value="1" min="1">',
     params: () => ({ position: document.getElementById('dr-pos').value, n: parseInt(document.getElementById('dr-n').value) || 1 })
   },
   set_header: {
-    title: '📌 Definir fila como encabezado',
+    title: icon('pin') + ' Definir fila como encabezado',
     body: () => '<label>Índice de la fila (0 = primera fila):</label><input type="number" id="sh-idx" value="0" min="0"><p style="font-size:0.75rem;color:var(--text2);margin-top:0.5rem">Los valores de esa fila se usarán como nombres de columna y la fila será eliminada.</p>',
     params: () => ({ row_index: parseInt(document.getElementById('sh-idx').value) || 0 })
   },
@@ -1471,7 +1551,7 @@ function openModal(op) {
   if (!currentColumns.length) return;
   currentOp = op;
   const def = modalDefs[op];
-  document.getElementById('modal-title').textContent = def.title;
+  document.getElementById('modal-title').innerHTML = def.title;
   document.getElementById('modal-body').innerHTML = def.body();
   document.getElementById('modal-overlay').classList.add('open');
 }
@@ -1508,7 +1588,7 @@ async function confirmModal() {
     updateCode(data.code);
     addPipelineStep(op, params);
     loadStats(); // refrescar diagnóstico en segundo plano
-    toast('✅ ' + op.replace(/_/g,' ') + ' aplicado');
+    toast(op.replace(/_/g,' ') + ' aplicado');
   } catch(e) { hideLoading(); toast('Error al aplicar operación', 'error'); }
 }
 
