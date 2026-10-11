@@ -82,6 +82,14 @@
     --font-ui:      'Geist', 'Segoe UI', system-ui, sans-serif;
     --font-mono:    'JetBrains Mono', 'Fira Code', monospace;
     --font-head: var(--font-display); /* alias legacy */
+
+    /* Layout Fase 2 */
+    --ribbon-h1: 52px;   /* altura fila 1 del ribbon */
+    --ribbon-h2: 40px;   /* altura fila 2 (tabs + buscador) */
+    --ribbon-total: 92px;/* suma de ambas filas */
+    --rail-w: 48px;      /* ancho de panel colapsado a rail */
+    --panel-left-w: 256px;
+    --panel-right-w: 240px;
   }
 
   /* ── TEMA OSCURO ───────────────────────────────────────── */
@@ -188,18 +196,40 @@
   [data-theme="dark"] .theme-toggle .icon-moon { display: none; }
   [data-theme="dark"] .theme-toggle .icon-sun { display: inline-block; }
 
-  /* ── TOP RIBBON ────────────────────────────────────────── */
+  /* ── TOP RIBBON (Fase 2 — 2 filas) ────────────────────── */
   header {
-    display: flex; align-items: center; gap: 1rem;
-    padding: 0 1.25rem;
-    height: 52px;
+    position: sticky; top: 0; z-index: 200;
     background: var(--surface);
     backdrop-filter: blur(16px) saturate(1.6);
     -webkit-backdrop-filter: blur(16px) saturate(1.6);
     border-bottom: 1px solid var(--border);
     box-shadow: var(--shadow);
-    position: sticky; top: 0; z-index: 200;
+    display: flex;
+    flex-direction: column;
   }
+
+  /* Fila 1 — identidad + métricas + controles */
+  .ribbon-row1 {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0 1.25rem;
+    height: var(--ribbon-h1);
+    flex-shrink: 0;
+  }
+
+  /* Fila 2 — tabs + buscador + visibilidad de columnas */
+  .ribbon-row2 {
+    display: flex;
+    align-items: stretch;
+    height: var(--ribbon-h2);
+    border-top: 1px solid var(--border2);
+    padding: 0 0.5rem;
+    gap: 0;
+    flex-shrink: 0;
+  }
+
+  /* ── LOGO ──────────────────────────────────────────────── */
   .logo {
     display: flex; align-items: center; gap: 0.55rem;
     font-family: var(--font-head);
@@ -207,50 +237,106 @@
     font-size: 1rem;
     color: var(--teal);
     white-space: nowrap;
+    flex-shrink: 0;
   }
   .logo-svg {
-    width: 28px;
-    height: 28px;
-    display: block;
-    flex-shrink: 0;
+    width: 28px; height: 28px;
+    display: block; flex-shrink: 0;
     transform-origin: center;
     transition: transform 0.25s ease;
   }
   .logo:hover .logo-svg { transform: rotate(12deg); }
-  .logo-circle {
-    fill: var(--logo-disc, currentColor);
-    transition: fill 0.25s ease;
-  }
-  .logo-cat {
-    fill: var(--logo-cat, #ffffff);
-    transition: fill 0.25s ease;
-  }
+  .logo-circle { fill: var(--logo-disc, currentColor); transition: fill 0.25s ease; }
+  .logo-cat    { fill: var(--logo-cat, #ffffff);       transition: fill 0.25s ease; }
   .logo-sub {
-    font-family: var(--font-ui);
-    font-weight: 400;
-    font-size: 0.72rem;
+    font-family: var(--font-ui); font-weight: 400; font-size: 0.72rem;
     color: var(--text2);
-    border-left: 1px solid var(--border);
-    padding-left: 0.65rem;
-    margin-left: 0.1rem;
+    border-left: 1px solid var(--border); padding-left: 0.65rem; margin-left: 0.1rem;
   }
-  .header-spacer { flex: 1; }
-  .badge {
-    display: inline-flex; align-items: center; gap: 0.3rem;
+
+  /* Breadcrumb de archivo activo */
+  .ribbon-breadcrumb {
+    display: none;
+    align-items: center; gap: 0.3rem;
+    font-family: var(--font-mono); font-size: 0.72rem;
+    color: var(--text2);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    max-width: 200px;
+  }
+  .ribbon-breadcrumb.visible { display: flex; }
+  .ribbon-breadcrumb svg {
+    width: 12px; height: 12px; flex-shrink: 0;
+    stroke: var(--teal); stroke-width: 2; fill: none;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+  .ribbon-breadcrumb span { color: var(--text); font-weight: 500; }
+  .ribbon-sep { color: var(--text-muted); margin: 0 0.15rem; }
+
+  /* Badge "● Active Buffer" pulsante */
+  .badge-active {
+    display: none;
+    align-items: center; gap: 0.35rem;
+    background: rgba(45,158,107,0.12);
+    border: 1px solid rgba(45,158,107,0.28);
+    padding: 0.18rem 0.6rem;
+    border-radius: 20px;
+    font-family: var(--font-ui); font-size: 0.68rem; font-weight: 600;
+    color: var(--green);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .badge-active.visible { display: flex; }
+  .badge-active-dot {
+    width: 6px; height: 6px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: pulse-dot 2s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.4; transform: scale(0.7); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .badge-active-dot { animation: none; }
+  }
+
+  /* Botones toggle panel (colapsar/expandir) */
+  .panel-toggle-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius2);
+    padding: 0.22rem 0.45rem;
+    cursor: pointer;
+    color: var(--text2);
+    display: flex; align-items: center;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+  }
+  .panel-toggle-btn:hover { border-color: var(--teal); color: var(--teal); background: var(--teal-bg); }
+  .panel-toggle-btn svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 1.85; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Badge "Canvas Expandido" */
+  .badge-expanded {
+    display: none;
+    align-items: center; gap: 0.3rem;
     background: var(--teal-bg);
     border: 1px solid var(--teal-bd);
-    padding: 0.2rem 0.65rem;
+    padding: 0.18rem 0.55rem;
     border-radius: 20px;
-    font-size: 0.72rem;
-    font-weight: 500;
+    font-family: var(--font-ui); font-size: 0.66rem; font-weight: 600;
     color: var(--teal);
     white-space: nowrap;
-    max-width: 260px;
-    overflow: hidden; text-overflow: ellipsis;
+    flex-shrink: 0;
   }
-  .header-metrics {
-    display: flex; gap: 0.5rem; align-items: center;
-  }
+  .badge-expanded.visible { display: flex; }
+  .badge-expanded svg { width: 12px; height: 12px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Separador flexible entre grupos del ribbon */
+  .ribbon-spacer { flex: 1; }
+
+  /* Métricas de dataset (Filas / Cols / % Calidad) */
+  .header-metrics { display: flex; gap: 0.5rem; align-items: center; }
   .metric-pill {
     display: inline-flex; align-items: center; gap: 0.3rem;
     background: var(--surface2);
@@ -259,27 +345,211 @@
     border-radius: 20px;
     font-size: 0.72rem;
     color: var(--text2);
+    white-space: nowrap;
   }
   .metric-pill strong { color: var(--text); font-weight: 600; }
 
-  /* ── APP LAYOUT ────────────────────────────────────────── */
+  /* Pastilla de % Calidad con color semántico */
+  .metric-quality {
+    display: none;
+    align-items: center; gap: 0.35rem;
+    padding: 0.22rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.72rem; font-weight: 600;
+    border: 1px solid transparent;
+    white-space: nowrap;
+    cursor: default;
+    flex-shrink: 0;
+  }
+  .metric-quality.visible { display: inline-flex; }
+  .metric-quality.q-green { background: rgba(45,158,107,0.12); border-color: rgba(45,158,107,0.28); color: var(--green); }
+  .metric-quality.q-amber { background: rgba(192,138,26,0.12);  border-color: rgba(192,138,26,0.30); color: var(--yellow); }
+  .metric-quality.q-red   { background: rgba(217,79,79,0.12);   border-color: rgba(217,79,79,0.28);  color: var(--red); }
+  .metric-quality svg { width: 12px; height: 12px; stroke: currentColor; stroke-width: 2.2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Badge de archivo (filename) en ribbon */
+  .badge {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    background: var(--teal-bg); border: 1px solid var(--teal-bd);
+    padding: 0.2rem 0.65rem; border-radius: 20px;
+    font-size: 0.72rem; font-weight: 500; color: var(--teal);
+    white-space: nowrap; max-width: 260px;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* ── THEME TOGGLE BUTTON ───────────────────────────────── */
+  .theme-toggle {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 0.22rem 0.6rem;
+    cursor: pointer; font-size: 0.85rem;
+    display: flex; align-items: center; gap: 0.35rem;
+    color: var(--text2); transition: all 0.2s ease; white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .theme-toggle:hover { border-color: var(--teal); color: var(--teal); background: var(--teal-bg); }
+  .theme-toggle .toggle-label { font-size: 0.7rem; font-weight: 600; font-family: var(--font-ui); }
+  .theme-toggle .icon-svg { width: 15px; height: 15px; }
+  .theme-toggle .icon-sun { display: none; }
+  [data-theme="dark"] .theme-toggle .icon-moon { display: none; }
+  [data-theme="dark"] .theme-toggle .icon-sun { display: inline-block; }
+
+  /* ── TABS en Fila 2 del ribbon ──────────────────────────── */
+  .ribbon-tabs {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    flex-shrink: 0;
+  }
+  .tab {
+    padding: 0 1rem;
+    font-family: var(--font-head); font-size: 0.78rem; font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    color: var(--text2);
+    transition: all 0.15s;
+    white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 0.45rem;
+    height: 100%;
+  }
+  .tab svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 1.85; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .tab.active { color: var(--teal); border-bottom-color: var(--teal); }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  /* ── BUSCADOR REACTIVO (Fila 2) ─────────────────────────── */
+  .ribbon-search-wrap {
+    display: flex;
+    align-items: center;
+    padding: 0 0.5rem;
+    gap: 0.3rem;
+    flex: 1;
+    max-width: 280px;
+    margin-left: auto;
+  }
+  .ribbon-search {
+    flex: 1;
+    height: 26px;
+    padding: 0 0.6rem;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 0.75rem;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    width: auto; /* override global select/input width:100% */
+  }
+  .ribbon-search:focus {
+    outline: none;
+    border-color: var(--teal);
+    box-shadow: 0 0 0 2px rgba(38,124,124,0.10);
+  }
+  .ribbon-search::placeholder { color: var(--text-muted); }
+  .search-clear {
+    background: none; border: none;
+    color: var(--text2); cursor: pointer;
+    display: none; padding: 2px;
+    border-radius: 50%;
+    line-height: 1;
+  }
+  .search-clear.visible { display: flex; align-items: center; }
+  .search-clear:hover { color: var(--teal); }
+  .search-clear svg { width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Resaltado de texto buscado */
+  mark.search-hl {
+    background: rgba(192,138,26,0.30);
+    color: inherit;
+    border-radius: 2px;
+    padding: 0 1px;
+  }
+  [data-theme="dark"] mark.search-hl { background: rgba(192,138,26,0.40); }
+
+  /* ── BOTÓN COLUMNAS (visibilidad) + badge contador ──────── */
+  .btn-col-vis {
+    display: flex; align-items: center; gap: 0.4rem;
+    margin: auto 0 auto 0.35rem;
+    padding: 0.22rem 0.65rem;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-family: var(--font-ui); font-size: 0.72rem; font-weight: 600;
+    color: var(--text2); cursor: pointer; white-space: nowrap;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+  }
+  .btn-col-vis:hover { border-color: var(--teal); color: var(--teal); background: var(--teal-bg); }
+  .btn-col-vis svg { width: 13px; height: 13px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .col-vis-badge {
+    display: none;
+    background: var(--teal); color: #fff;
+    border-radius: 20px; padding: 0 5px;
+    font-size: 0.62rem; font-weight: 700; line-height: 1.5;
+    min-width: 16px; text-align: center;
+  }
+  .col-vis-badge.visible { display: inline-block; }
+
+  /* ── APP LAYOUT (Fase 2 — paneles colapsables) ────────────── */
   .layout {
     display: grid;
-    grid-template-columns: 256px 1fr 240px;
-    height: calc(100vh - 52px);
+    grid-template-columns: var(--panel-left-w) 1fr var(--panel-right-w);
+    height: calc(100vh - var(--ribbon-total));
+    transition: grid-template-columns 0.28s ease;
   }
+  .layout.left-collapsed  { grid-template-columns: var(--rail-w) 1fr var(--panel-right-w); }
+  .layout.right-collapsed { grid-template-columns: var(--panel-left-w) 1fr var(--rail-w); }
+  .layout.both-collapsed  { grid-template-columns: var(--rail-w) 1fr var(--rail-w); }
 
   /* ── PANEL SHARED STYLES ───────────────────────────────── */
   .panel {
     background: var(--glass);
     backdrop-filter: blur(12px) saturate(1.4);
     -webkit-backdrop-filter: blur(12px) saturate(1.4);
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
+    overflow-y: auto; overflow-x: hidden;
+    display: flex; flex-direction: column;
+    transition: width 0.28s ease, min-width 0.28s ease;
+    position: relative;
+    min-width: 0;
   }
   .panel-left  { border-right: 1px solid var(--border); }
   .panel-right { border-left: 1px solid var(--border); }
+
+  /* Rail (panel colapsado): oculta el contenido normal, muestra el label vertical */
+  .panel.collapsed .panel-inner    { display: none; }
+  .panel.collapsed .rail-label     { display: flex; }
+  .panel.collapsed                 { overflow: hidden; }
+  .panel-inner { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+
+  /* Label vertical del rail */
+  .rail-label {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 0.6rem;
+    cursor: pointer;
+    padding: 1.5rem 0;
+  }
+  .rail-label:hover { background: var(--teal-bg); }
+  .rail-label svg {
+    width: 16px; height: 16px;
+    stroke: var(--teal); stroke-width: 1.85; fill: none;
+    stroke-linecap: round; stroke-linejoin: round;
+    flex-shrink: 0;
+  }
+  .rail-label span {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    transform: rotate(180deg);
+    font-family: var(--font-ui); font-size: 0.65rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--teal);
+    white-space: nowrap;
+  }
+
+
 
   .panel-section { padding: 1rem; border-bottom: 1px solid var(--border2); }
   .panel-section:last-child { border-bottom: none; }
@@ -491,41 +761,6 @@
   /* ── CENTRAL CANVAS ────────────────────────────────────── */
   .canvas { display: flex; flex-direction: column; overflow: hidden; background: transparent; }
 
-  .tab-bar {
-    display: flex;
-    background: var(--surface);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border);
-    padding: 0 0.5rem;
-    flex-shrink: 0;
-  }
-  .tab {
-    padding: 0.55rem 1rem;
-    font-family: var(--font-head);
-    font-size: 0.78rem;
-    font-weight: 600;
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-    color: var(--text2);
-    transition: all 0.15s;
-    white-space: nowrap;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-  }
-  .tab svg {
-    width: 14px;
-    height: 14px;
-    stroke: currentColor;
-    stroke-width: 1.85;
-    fill: none;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-  .tab.active { color: var(--teal); border-bottom-color: var(--teal); }
-  .tab:hover:not(.active) { color: var(--text); }
-
   .content-area { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
   .tab-content { display: none; flex: 1; overflow: auto; }
   .tab-content.active { display: flex; flex-direction: column; }
@@ -614,6 +849,133 @@
   }
   /* Si la calidad es perfecta (100%) la barra desaparece sutilmente */
   .quality-bar-wrap.perfect { background: transparent; }
+
+  /* ── MENÚ CONTEXTUAL DE COLUMNA (F2.8) ─────────────────── */
+  .th-content {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    width: 100%;
+  }
+  .th-name {
+    cursor: default;
+    user-select: text;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .th-menu-btn {
+    background: transparent;
+    border: none;
+    color: var(--text2);
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.45;
+    transition: opacity 0.15s, background 0.15s, color 0.15s;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  thead th:hover .th-menu-btn, .th-menu-btn.active {
+    opacity: 1;
+  }
+  .th-menu-btn:hover {
+    background: var(--teal-bg);
+    color: var(--teal);
+    opacity: 1;
+  }
+  .th-menu-btn svg {
+    width: 14px; height: 14px;
+    stroke: currentColor; stroke-width: 2.2;
+    fill: currentColor;
+  }
+
+  /* Popover Flotante con Glassmorphism */
+  .col-dropdown-menu {
+    position: fixed;
+    z-index: 999;
+    background: var(--surface);
+    backdrop-filter: blur(20px) saturate(1.6);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-glass-active);
+    padding: 0.4rem 0;
+    width: 220px;
+    max-height: 80vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    font-family: var(--font-ui);
+    animation: menuFadeIn 0.12s ease;
+  }
+  @keyframes menuFadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .col-dropdown-menu { animation: none !important; }
+  }
+
+  .col-menu-header {
+    padding: 0.4rem 0.8rem 0.35rem;
+    border-bottom: 1px solid var(--border2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--teal);
+  }
+  .col-menu-header span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 140px;
+  }
+  .col-menu-group-title {
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    padding: 0.45rem 0.8rem 0.2rem;
+  }
+  .col-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.38rem 0.8rem;
+    font-size: 0.76rem;
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+    user-select: none;
+  }
+  .col-menu-item:hover {
+    background: var(--teal-bg);
+    color: var(--teal);
+  }
+  .col-menu-item svg {
+    width: 14px; height: 14px;
+    stroke: currentColor; stroke-width: 1.85; fill: none;
+    stroke-linecap: round; stroke-linejoin: round;
+    flex-shrink: 0;
+  }
+  .col-menu-item.danger {
+    color: var(--orange);
+  }
+  .col-menu-item.danger:hover {
+    background: var(--orange-bg);
+    color: var(--orange);
+  }
+  .col-menu-divider {
+    height: 1px;
+    background: var(--border2);
+    margin: 0.3rem 0;
+  }
 
   /* ── EMPTY STATE ───────────────────────────────────────── */
   .empty-state {
@@ -893,7 +1255,10 @@
   }
   /* Respetar preferencia de movimiento reducido */
   @media (prefers-reduced-motion: reduce) {
+    /* Orbes — sin animación de deriva */
     .orb { animation: none !important; filter: blur(120px); }
+
+    /* Botones, tarjetas ETL, pasos de receta — sin escala ni traslación */
     .op-btn, .btn, .pipeline-step, .stat-card, .glass-button, .logo-svg {
       transition: none !important;
       transform: none !important;
@@ -905,6 +1270,24 @@
     .pipeline-step:hover {
       transform: none !important;
     }
+
+    /* Modal — aparece instantáneamente sin scale/translateY */
+    .modal { animation: none !important; }
+    @keyframes modalIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* Toast — sin deslizamiento, solo fade */
+    .toast { animation: none !important; }
+    @keyframes toastIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* Spinner — detiene la rotación continua */
+    .spinner {
+      animation: none !important;
+      border-top-color: var(--teal);
+      opacity: 0.75;
+    }
+
+    /* Quality-bar — sin transición de ancho al renderizar */
+    .quality-bar-fill { transition: none !important; }
   }
   /* En oscuro los orbes son más tenues */
   [data-theme="dark"] .orb-1 {
@@ -989,116 +1372,179 @@
 
 <!-- ══ TOP RIBBON ══════════════════════════════════════════════════════════ -->
 <header>
-  <div class="logo">
-    <svg class="logo-svg" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
-      <g transform="matrix(1,0,0,1,-2001.834001,-2225.317355)">
-        <g>
-          <g transform="matrix(0.23305,0,0,0.23305,1630.143102,2129.445765)">
-            <circle class="logo-circle" cx="1979.911" cy="796.389" r="385.011"/>
-          </g>
-          <g id="Gato" transform="matrix(0.302993,-0.147024,0.147024,0.302993,1872.95909,2299.818244)">
-            <path class="logo-cat" d="M507.103,289.218C507.164,288.439 505.131,269.43 491.857,260.017C478.987,250.891 478.062,252.233 466.317,241.709C431.584,210.589 426.222,212.598 413.509,212.062C407.329,211.801 395.353,208.378 402.205,195.339C403.746,192.406 393.372,186.063 397.925,176.713C400.976,170.446 406.647,174.037 407.471,167.496C408.346,160.55 418.5,156.722 426.234,161.885C431.301,165.267 431.466,159.681 437.509,160.371C452.231,162.051 448.305,180.194 449.953,183.291C460.374,202.868 495.905,216.015 521.188,232.966C535.952,242.866 537.367,254.089 541.434,253.188C581.953,244.211 590.122,259.774 612.942,233.883C625.625,219.492 632.929,208.197 671.475,206.122C684.717,205.41 686.921,204.194 700.298,179.396C701.999,176.243 698.133,153 718.514,152.865C745.839,152.683 746.959,187.504 730.416,192.226C718.289,195.687 719.228,197.891 698.915,227.784C693.486,235.775 692.572,234.928 684.346,238.088C663.434,246.12 673.285,277.381 654.216,298.253C646.282,306.938 661.775,297.992 706.416,320.666C742.013,338.747 785.856,373.355 769.394,380.215C756.879,385.431 721.123,350.229 660.586,332.221C659.359,331.856 653.397,329.261 654.444,332.508C664.254,362.939 661.718,365.515 682.133,380.975C692.337,388.703 704.839,415.573 713.577,418.233C742.088,426.913 719.793,468.476 693.757,453.09C683.047,446.761 689.298,435.244 687.412,430.533C677.667,406.188 668.078,401.97 665.366,400.778C648.533,393.374 639.365,393.958 625.955,378.114C597.785,344.828 595.541,345.588 577.503,344.451C574.841,344.283 557.049,341.325 552.584,355.525C551.237,359.811 553.412,364.609 550.505,364.32C549.014,364.171 535.702,362.845 531.843,365.893C525.645,370.788 544.638,360.702 559.503,374.497C573.333,387.332 563.801,407.734 565.934,412.282C567.56,415.749 581.239,439.611 573.482,440.255C564.308,441.018 550.245,429.087 546.633,430.841C535.598,436.201 535.454,435.666 523.469,438.343C515.804,440.055 513.568,456.842 504.137,464.03C498.334,468.453 496.036,460.054 494.438,453.518C490.162,436.026 494.962,434.71 490.036,427.837C475.149,407.068 486.297,395.945 475.527,392.426C452.986,385.06 434.576,398.106 413.419,416.406C405.409,423.334 409.472,426.392 401.872,433.861C397.95,437.715 405.989,452.626 386.559,457.725C363.072,463.888 345.994,429.686 373.624,416.765C379.319,414.102 382.404,418.094 387.898,407.701C389.091,405.446 392.761,405.629 402.101,392.215C436.625,342.626 446.187,352.27 460.405,337.409C464.432,333.201 464.533,331.544 465.893,333.186C465.977,333.288 465.717,346.192 467.355,349.665C467.533,350.042 469.096,350.79 468.98,348.732C466.812,310.283 485.922,286.562 494.42,276.433C497.918,272.263 498.744,276.043 501.127,279.742C505.91,287.165 504.211,289.143 507.103,289.218Z"/>
+  <!-- ── Fila 1: Identidad + controles + métricas ──────────── -->
+  <div class="ribbon-row1">
+    <!-- Logo -->
+    <div class="logo">
+      <svg class="logo-svg" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+        <g transform="matrix(1,0,0,1,-2001.834001,-2225.317355)">
+          <g>
+            <g transform="matrix(0.23305,0,0,0.23305,1630.143102,2129.445765)">
+              <circle class="logo-circle" cx="1979.911" cy="796.389" r="385.011"/>
+            </g>
+            <g id="Gato" transform="matrix(0.302993,-0.147024,0.147024,0.302993,1872.95909,2299.818244)">
+              <path class="logo-cat" d="M507.103,289.218C507.164,288.439 505.131,269.43 491.857,260.017C478.987,250.891 478.062,252.233 466.317,241.709C431.584,210.589 426.222,212.598 413.509,212.062C407.329,211.801 395.353,208.378 402.205,195.339C403.746,192.406 393.372,186.063 397.925,176.713C400.976,170.446 406.647,174.037 407.471,167.496C408.346,160.55 418.5,156.722 426.234,161.885C431.301,165.267 431.466,159.681 437.509,160.371C452.231,162.051 448.305,180.194 449.953,183.291C460.374,202.868 495.905,216.015 521.188,232.966C535.952,242.866 537.367,254.089 541.434,253.188C581.953,244.211 590.122,259.774 612.942,233.883C625.625,219.492 632.929,208.197 671.475,206.122C684.717,205.41 686.921,204.194 700.298,179.396C701.999,176.243 698.133,153 718.514,152.865C745.839,152.683 746.959,187.504 730.416,192.226C718.289,195.687 719.228,197.891 698.915,227.784C693.486,235.775 692.572,234.928 684.346,238.088C663.434,246.12 673.285,277.381 654.216,298.253C646.282,306.938 661.775,297.992 706.416,320.666C742.013,338.747 785.856,373.355 769.394,380.215C756.879,385.431 721.123,350.229 660.586,332.221C659.359,331.856 653.397,329.261 654.444,332.508C664.254,362.939 661.718,365.515 682.133,380.975C692.337,388.703 704.839,415.573 713.577,418.233C742.088,426.913 719.793,468.476 693.757,453.09C683.047,446.761 689.298,435.244 687.412,430.533C677.667,406.188 668.078,401.97 665.366,400.778C648.533,393.374 639.365,393.958 625.955,378.114C597.785,344.828 595.541,345.588 577.503,344.451C574.841,344.283 557.049,341.325 552.584,355.525C551.237,359.811 553.412,364.609 550.505,364.32C549.014,364.171 535.702,362.845 531.843,365.893C525.645,370.788 544.638,360.702 559.503,374.497C573.333,387.332 563.801,407.734 565.934,412.282C567.56,415.749 581.239,439.611 573.482,440.255C564.308,441.018 550.245,429.087 546.633,430.841C535.598,436.201 535.454,435.666 523.469,438.343C515.804,440.055 513.568,456.842 504.137,464.03C498.334,468.453 496.036,460.054 494.438,453.518C490.162,436.026 494.962,434.71 490.036,427.837C475.149,407.068 486.297,395.945 475.527,392.426C452.986,385.06 434.576,398.106 413.419,416.406C405.409,423.334 409.472,426.392 401.872,433.861C397.95,437.715 405.989,452.626 386.559,457.725C363.072,463.888 345.994,429.686 373.624,416.765C379.319,414.102 382.404,418.094 387.898,407.701C389.091,405.446 392.761,405.629 402.101,392.215C436.625,342.626 446.187,352.27 460.405,337.409C464.432,333.201 464.533,331.544 465.893,333.186C465.977,333.288 465.717,346.192 467.355,349.665C467.533,350.042 469.096,350.79 468.98,348.732C466.812,310.283 485.922,286.562 494.42,276.433C497.918,272.263 498.744,276.043 501.127,279.742C505.91,287.165 504.211,289.143 507.103,289.218Z"/>
+            </g>
           </g>
         </g>
-      </g>
-    </svg>
-    <span>Cat_flip</span>
-    <span class="logo-sub">Studio ETL</span>
-  </div>
-  <div class="header-metrics" id="header-metrics" style="display:none">
-    <div class="metric-pill">Filas: <strong id="info-rows">–</strong></div>
-    <div class="metric-pill">Cols: <strong id="info-cols">–</strong></div>
-  </div>
-  <div class="header-spacer"></div>
-  <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Cambiar tema">
-    <span id="theme-icon">
-      <svg class="icon-svg icon-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
-      <svg class="icon-svg icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
-    </span>
-    <span class="toggle-label" id="theme-label">Oscuro</span>
-  </button>
-  <span id="filename-badge" class="badge" style="display:none">
-    <svg class="icon-svg" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
-    <span id="filename-text"></span>
-  </span>
-</header>
-
-<!-- ══ APP LAYOUT ══════════════════════════════════════════════════════════ -->
-<div class="layout">
-
-  <!-- ─ LEFT PANEL: Caja de Transformaciones ─────────────────────────────── -->
-  <aside class="panel panel-left">
-
-    <!-- Cargar archivo -->
-    <div class="panel-section">
-      <div class="section-title">
-        <svg class="icon-svg" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
-        <span>Fuente de datos</span>
-      </div>
-      <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
-        <div class="upload-icon">
-          <svg viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 12v6"/><path d="m15 15-3-3-3 3"/></svg>
-        </div>
-        <p><strong>Clic</strong> o arrastra un archivo</p>
-        <p style="margin-top:0.2rem;font-size:0.68rem">.CSV · .XLSX · .XLS</p>
-      </div>
-      <input type="file" id="file-input" accept=".csv,.xlsx,.xls">
-      <div id="sheet-selector">
-        <label style="font-size:0.73rem;color:var(--text2);display:block;margin-top:0.5rem;margin-bottom:0.25rem">Seleccionar hoja:</label>
-        <select id="sheet-select"></select>
-        <button class="btn btn-primary" style="width:100%;margin-top:0.5rem;justify-content:center" onclick="loadSheet()">Cargar hoja</button>
-      </div>
+      </svg>
+      <span>Cat_flip</span>
+      <span class="logo-sub">Studio ETL</span>
     </div>
 
-    <!-- Transformaciones — Estructural -->
-    <div class="panel-section" style="flex:1">
-      <div class="section-title">
-        <svg class="icon-svg" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-        <span>Transformaciones</span>
-      </div>
-
-      <div class="cat-label">Estructural</div>
-      <div class="op-grid">
-        <button class="op-btn" onclick="openModal('pivot')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg></span>Pivot</button>
-        <button class="op-btn" onclick="openModal('unpivot')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg></span>Unpivot</button>
-        <button class="op-btn" onclick="openModal('split_column')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></svg></span>Separar col.</button>
-        <button class="op-btn" onclick="openModal('split_to_rows')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/></svg></span>Separar filas</button>
-        <button class="op-btn" onclick="openModal('set_header')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="M6 12h12"/><path d="M6 20V4"/><path d="M18 20V4"/></svg></span>Def. encabezado</button>
-      </div>
-
-      <div class="cat-label">Limpieza &amp; Filtrado</div>
-      <div class="op-grid">
-        <button class="op-btn" onclick="openModal('drop_nulls')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg></span>Elim. nulos</button>
-        <button class="op-btn" onclick="openModal('drop_duplicates')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg></span>Elim. dupl.</button>
-        <button class="op-btn" onclick="openModal('drop_rows')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="M11 12H3"/><path d="M16 6H3"/><path d="M16 18H3"/><path d="m19 10-4 4"/><path d="m15 10 4 4"/></svg></span>Elim. filas</button>
-        <button class="op-btn" onclick="openModal('trim')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg></span>Trim espacios</button>
-        <button class="op-btn" onclick="openModal('clean_newlines')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg></span>Limpiar saltos</button>
-      </div>
-
-      <div class="cat-label">Texto &amp; Tipos</div>
-      <div class="op-grid">
-        <button class="op-btn" onclick="openModal('change_case')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="m3 15 4-8 4 8"/><path d="M4 13h6"/><circle cx="18" cy="12" r="3"/><path d="M21 9v6"/></svg></span>May/Min</button>
-        <button class="op-btn" onclick="openModal('replace')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></span>Reemplazar</button>
-        <button class="op-btn" onclick="openModal('rename_column')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></span>Renombrar</button>
-        <button class="op-btn" onclick="openModal('drop_column')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span>Elim. col.</button>
-        <button class="op-btn" onclick="openModal('change_type')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg></span>Tipo dato</button>
-      </div>
-
-      <div class="cat-label">Reglas &amp; Operaciones</div>
-      <div class="op-grid">
-        <button class="op-btn" onclick="openModal('filter')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></span>Filtrar</button>
-        <button class="op-btn" onclick="openModal('sort')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="M11 4h10"/><path d="M11 8h7"/><path d="M11 12h4"/></svg></span>Ordenar</button>
-      </div>
+    <!-- Breadcrumb de archivo activo -->
+    <div class="ribbon-breadcrumb" id="ribbon-breadcrumb">
+      <span class="ribbon-sep">/</span>
+      <svg viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+      <span id="ribbon-filename">—</span>
     </div>
-  </aside>
 
-  <!-- ─ CENTRAL CANVAS ────────────────────────────────────────────────────── -->
-  <main class="canvas">
-    <div class="tab-bar" id="tab-bar">
+    <!-- Badge Active Buffer -->
+    <div class="badge-active" id="badge-active">
+      <span class="badge-active-dot"></span>
+      Active Buffer
+    </div>
+
+    <!-- Badge Canvas Expandido -->
+    <div class="badge-expanded" id="badge-expanded">
+      <svg viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>
+      Canvas Expandido
+    </div>
+
+    <div class="ribbon-spacer"></div>
+
+    <!-- Botón colapsar panel izquierdo -->
+    <button class="panel-toggle-btn" id="toggle-left" onclick="togglePanel('left')" title="Colapsar/expandir panel izquierdo">
+      <svg viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
+    </button>
+
+    <!-- Botón colapsar panel derecho -->
+    <button class="panel-toggle-btn" id="toggle-right" onclick="togglePanel('right')" title="Colapsar/expandir panel derecho">
+      <svg viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/></svg>
+    </button>
+
+    <!-- Métricas de dataset -->
+    <div class="header-metrics" id="header-metrics" style="display:none">
+      <div class="metric-pill">Filas: <strong id="info-rows">–</strong></div>
+      <div class="metric-pill">Cols: <strong id="info-cols">–</strong></div>
+      <div class="metric-quality" id="metric-quality" title="% Calidad global del dataset"></div>
+    </div>
+
+    <!-- Toggle tema -->
+    <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Cambiar tema">
+      <span id="theme-icon">
+        <svg class="icon-svg icon-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        <svg class="icon-svg icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+      </span>
+      <span class="toggle-label" id="theme-label">Oscuro</span>
+    </button>
+  </div>
+
+  <!-- ── Fila 2: Tabs + Buscador + Visibilidad de columnas ── -->
+  <div class="ribbon-row2">
+    <div class="ribbon-tabs">
       <div class="tab active" onclick="switchTab('data')"><svg viewBox="0 0 24 24"><path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg><span>Data Grid</span></div>
       <div class="tab" onclick="switchTab('stats')"><svg viewBox="0 0 24 24"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg><span>Diagnóstico</span></div>
       <div class="tab" onclick="switchTab('code')"><svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg><span>Python</span></div>
     </div>
+
+    <div class="ribbon-spacer"></div>
+
+    <!-- Buscador reactivo (solo Data Grid) -->
+    <div class="ribbon-search-wrap">
+      <input class="ribbon-search" id="ribbon-search" type="text" placeholder="Buscar en tabla..." oninput="onSearchInput(this.value)" autocomplete="off">
+      <button class="search-clear" id="search-clear" onclick="clearSearch()" title="Limpiar búsqueda">
+        <svg viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+
+    <!-- Botón visibilidad de columnas -->
+    <button class="btn-col-vis" id="btn-col-vis" onclick="openColVisModal()" title="Mostrar/ocultar columnas">
+      <svg viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+      Columnas
+      <span class="col-vis-badge" id="col-vis-badge"></span>
+    </button>
+  </div>
+</header>
+
+<!-- ══ APP LAYOUT ══════════════════════════════════════════════════════════ -->
+<div class="layout" id="layout">
+
+  <!-- ─ LEFT PANEL: Caja de Transformaciones ─────────────────────────────── -->
+  <aside class="panel panel-left" id="panel-left">
+    <!-- Rail colapsado -->
+    <div class="rail-label" onclick="togglePanel('left')" title="Expandir panel de transformaciones">
+      <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+      <span>Transformaciones</span>
+    </div>
+    <!-- Contenido del panel -->
+    <div class="panel-inner">
+      <!-- Cargar archivo -->
+      <div class="panel-section">
+        <div class="section-title">
+          <svg class="icon-svg" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+          <span>Fuente de datos</span>
+        </div>
+        <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
+          <div class="upload-icon">
+            <svg viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 12v6"/><path d="m15 15-3-3-3 3"/></svg>
+          </div>
+          <p><strong>Clic</strong> o arrastra un archivo</p>
+          <p style="margin-top:0.2rem;font-size:0.68rem">.CSV · .XLSX · .XLS</p>
+        </div>
+        <input type="file" id="file-input" accept=".csv,.xlsx,.xls">
+        <div id="sheet-selector">
+          <label style="font-size:0.73rem;color:var(--text2);display:block;margin-top:0.5rem;margin-bottom:0.25rem">Seleccionar hoja:</label>
+          <select id="sheet-select"></select>
+          <button class="btn btn-primary" style="width:100%;margin-top:0.5rem;justify-content:center" onclick="loadSheet()">Cargar hoja</button>
+        </div>
+      </div>
+
+      <!-- Transformaciones -->
+      <div class="panel-section" style="flex:1">
+        <div class="section-title">
+          <svg class="icon-svg" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          <span>Transformaciones</span>
+        </div>
+
+        <div class="cat-label">Estructural</div>
+        <div class="op-grid">
+          <button class="op-btn" onclick="openModal('pivot')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg></span>Pivot</button>
+          <button class="op-btn" onclick="openModal('unpivot')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg></span>Unpivot</button>
+          <button class="op-btn" onclick="openModal('split_column')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></svg></span>Separar col.</button>
+          <button class="op-btn" onclick="openModal('split_to_rows')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/></svg></span>Separar filas</button>
+          <button class="op-btn" onclick="openModal('set_header')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="M6 12h12"/><path d="M6 20V4"/><path d="M18 20V4"/></svg></span>Def. encabezado</button>
+        </div>
+
+        <div class="cat-label">Limpieza &amp; Filtrado</div>
+        <div class="op-grid">
+          <button class="op-btn" onclick="openModal('drop_nulls')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg></span>Elim. nulos</button>
+          <button class="op-btn" onclick="openModal('drop_duplicates')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg></span>Elim. dupl.</button>
+          <button class="op-btn" onclick="openModal('drop_rows')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="M11 12H3"/><path d="M16 6H3"/><path d="M16 18H3"/><path d="m19 10-4 4"/><path d="m15 10 4 4"/></svg></span>Elim. filas</button>
+          <button class="op-btn" onclick="openModal('trim')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg></span>Trim espacios</button>
+          <button class="op-btn" onclick="openModal('clean_newlines')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg></span>Limpiar saltos</button>
+        </div>
+
+        <div class="cat-label">Texto &amp; Tipos</div>
+        <div class="op-grid">
+          <button class="op-btn" onclick="openModal('change_case')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="m3 15 4-8 4 8"/><path d="M4 13h6"/><circle cx="18" cy="12" r="3"/><path d="M21 9v6"/></svg></span>May/Min</button>
+          <button class="op-btn" onclick="openModal('replace')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></span>Reemplazar</button>
+          <button class="op-btn" onclick="openModal('rename_column')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></span>Renombrar</button>
+          <button class="op-btn" onclick="openModal('drop_column')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span>Elim. col.</button>
+          <button class="op-btn" onclick="openModal('change_type')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg></span>Tipo dato</button>
+        </div>
+
+        <div class="cat-label">Reglas &amp; Operaciones</div>
+        <div class="op-grid">
+          <button class="op-btn" onclick="openModal('filter')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></span>Filtrar</button>
+          <button class="op-btn" onclick="openModal('sort')" disabled><span class="op-icon"><svg viewBox="0 0 24 24"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="M11 4h10"/><path d="M11 8h7"/><path d="M11 12h4"/></svg></span>Ordenar</button>
+        </div>
+      </div>
+    </div><!-- /panel-inner -->
+  </aside>
+
+  <!-- ─ CENTRAL CANVAS ────────────────────────────────────────────────────── -->
+  <main class="canvas">
     <div class="content-area">
       <!-- Empty state -->
       <div class="empty-state" id="empty-state">
@@ -1147,49 +1593,57 @@
   </main>
 
   <!-- ─ RIGHT PANEL: Pipeline & Exportación ──────────────────────────────── -->
-  <aside class="panel panel-right">
-
-    <!-- Acciones globales -->
-    <div class="panel-section">
-      <div class="section-title">
-        <svg class="icon-svg" viewBox="0 0 24 24"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></svg>
-        <span>Control de flujo</span>
-      </div>
-      <div class="actions" style="flex-direction:column; gap:0.4rem">
-        <button class="btn btn-secondary" onclick="undo()" id="btn-undo" disabled style="width:100%;justify-content:center">
-          <svg class="icon-svg" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>
-          <span>Deshacer paso</span>
-        </button>
-        <div style="display:flex;gap:0.4rem;width:100%">
-          <button class="btn btn-danger" onclick="exportData('csv')" id="btn-csv" disabled style="flex:1;justify-content:center">
-            <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-            <span>CSV</span>
-          </button>
-          <button class="btn btn-green" onclick="exportData('xlsx')" id="btn-xlsx" disabled style="flex:1;justify-content:center">
-            <svg class="icon-svg" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h2"/><path d="M14 13h2"/><path d="M8 17h2"/><path d="M14 17h2"/></svg>
-            <span>Excel</span>
-          </button>
-        </div>
-        <button class="btn btn-purple" onclick="exportScript()" id="btn-script" disabled style="width:100%;justify-content:center">
-          <svg class="icon-svg" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-          <span>Exportar pipeline .py</span>
-        </button>
-      </div>
+  <aside class="panel panel-right" id="panel-right">
+    <!-- Rail colapsado -->
+    <div class="rail-label" onclick="togglePanel('right')" title="Expandir panel de pipeline y exportación">
+      <svg viewBox="0 0 24 24"><rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg>
+      <span>Pipeline &amp; Receta</span>
     </div>
 
-    <!-- Recipe / Historial de pasos -->
-    <div class="panel-section" style="flex:1;display:flex;flex-direction:column;">
-      <div class="section-title">
-        <svg class="icon-svg" viewBox="0 0 24 24"><rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg>
-        <span>Pipeline — Receta</span>
-      </div>
-      <div id="pipeline-list" style="flex:1">
-        <div class="pipeline-empty" id="pipeline-empty">
-          <svg viewBox="0 0 24 24"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
-          <span>Los pasos aplicados aparecerán aquí como tarjetas de receta.</span>
+    <!-- Contenido del panel -->
+    <div class="panel-inner">
+      <!-- Acciones globales -->
+      <div class="panel-section">
+        <div class="section-title">
+          <svg class="icon-svg" viewBox="0 0 24 24"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></svg>
+          <span>Control de flujo</span>
+        </div>
+        <div class="actions" style="flex-direction:column; gap:0.4rem">
+          <button class="btn btn-secondary" onclick="undo()" id="btn-undo" disabled style="width:100%;justify-content:center">
+            <svg class="icon-svg" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>
+            <span>Deshacer paso</span>
+          </button>
+          <div style="display:flex;gap:0.4rem;width:100%">
+            <button class="btn btn-danger" onclick="exportData('csv')" id="btn-csv" disabled style="flex:1;justify-content:center">
+              <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+              <span>CSV</span>
+            </button>
+            <button class="btn btn-green" onclick="exportData('xlsx')" id="btn-xlsx" disabled style="flex:1;justify-content:center">
+              <svg class="icon-svg" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h2"/><path d="M14 13h2"/><path d="M8 17h2"/><path d="M14 17h2"/></svg>
+              <span>Excel</span>
+            </button>
+          </div>
+          <button class="btn btn-purple" onclick="exportScript()" id="btn-script" disabled style="width:100%;justify-content:center">
+            <svg class="icon-svg" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            <span>Exportar pipeline .py</span>
+          </button>
         </div>
       </div>
-    </div>
+
+      <!-- Recipe / Historial de pasos -->
+      <div class="panel-section" style="flex:1;display:flex;flex-direction:column;">
+        <div class="section-title">
+          <svg class="icon-svg" viewBox="0 0 24 24"><rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg>
+          <span>Pipeline — Receta</span>
+        </div>
+        <div id="pipeline-list" style="flex:1">
+          <div class="pipeline-empty" id="pipeline-empty">
+            <svg viewBox="0 0 24 24"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+            <span>Los pasos aplicados aparecerán aquí como tarjetas de receta.</span>
+          </div>
+        </div>
+      </div>
+    </div><!-- /panel-inner -->
 
   </aside>
 </div>
@@ -1208,7 +1662,34 @@
     </div>
   </div>
 </div>
+
+<!-- ══ MODAL VISIBILIDAD DE COLUMNAS (F2.6) ═════════════════════════════════ -->
+<div class="modal-overlay" id="colvis-overlay" onclick="if(event.target===this)closeColVisModal()">
+  <div class="modal" style="width: 440px;">
+    <h2>
+      <svg class="icon-svg" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+      <span>Visibilidad de Columnas</span>
+    </h2>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.25rem; margin-bottom:0.75rem;">
+      <span style="font-size:0.75rem; color:var(--text2)">Selecciona las columnas visibles:</span>
+      <div style="display:flex; gap:0.4rem;">
+        <button type="button" class="btn btn-secondary" style="font-size:0.7rem; padding:0.2rem 0.5rem" onclick="setAllColVis(true)">Mostrar todas</button>
+        <button type="button" class="btn btn-secondary" style="font-size:0.7rem; padding:0.2rem 0.5rem" onclick="setAllColVis(false)">Ocultar todas</button>
+      </div>
+    </div>
+    <div class="col-check" id="colvis-list" style="max-height: 200px;"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeColVisModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="applyColVis()">
+        <svg class="icon-svg" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        <span>Aplicar</span>
+      </button>
+    </div>
+  </div>
+</div>
+
 <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
+<div id="col-menu-dropdown" class="col-dropdown-menu" style="display:none"></div>
 <div id="toast-container"></div>
 
 <!-- ══ SCRIPT ══════════════════════════════════════════════════════════════ -->
@@ -1257,16 +1738,303 @@ function icon(name) {
     info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
     'triangle-alert': '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/>',
     'undo-2': '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/>',
+    'more-vertical': '<circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="19" r="1.5"/>',
   };
   return '<svg class="icon-svg" viewBox="0 0 24 24">' + (paths[name] || '') + '</svg>';
 }
 
-// Sincronizar label al cargar (si se cargó oscuro desde localStorage)
+// Sincronizar tema y layout al cargar (desde localStorage)
 document.addEventListener('DOMContentLoaded', () => {
   if (document.documentElement.getAttribute('data-theme') === 'dark') {
     document.getElementById('theme-label').textContent = 'Claro';
   }
+  applyPanelClasses();
+  updateColVisBadge();
 });
+
+// ── PANELES COLAPSABLES (F2.3) ──────────────────────────────────────────
+let panelState = { left: false, right: false };
+try {
+  const savedPanels = JSON.parse(localStorage.getItem('catflip-panels') || '{}');
+  if (savedPanels.left) panelState.left = true;
+  if (savedPanels.right) panelState.right = true;
+} catch(e) {}
+
+function applyPanelClasses() {
+  const layout = document.getElementById('layout');
+  const panelL = document.getElementById('panel-left');
+  const panelR = document.getElementById('panel-right');
+  const badgeExp = document.getElementById('badge-expanded');
+  if (!layout) return;
+
+  if (panelL) panelL.classList.toggle('collapsed', !!panelState.left);
+  if (panelR) panelR.classList.toggle('collapsed', !!panelState.right);
+
+  layout.classList.remove('left-collapsed', 'right-collapsed', 'both-collapsed');
+  if (panelState.left && panelState.right) layout.classList.add('both-collapsed');
+  else if (panelState.left) layout.classList.add('left-collapsed');
+  else if (panelState.right) layout.classList.add('right-collapsed');
+
+  if (badgeExp) {
+    badgeExp.classList.toggle('visible', !!(panelState.left || panelState.right));
+  }
+}
+
+function togglePanel(side) {
+  if (side === 'left') panelState.left = !panelState.left;
+  if (side === 'right') panelState.right = !panelState.right;
+  localStorage.setItem('catflip-panels', JSON.stringify(panelState));
+  applyPanelClasses();
+}
+
+// ── VISIBILIDAD DE COLUMNAS (F2.6) ──────────────────────────────────────
+let hiddenColumns = new Set();
+try {
+  const savedHidden = JSON.parse(localStorage.getItem('catflip-hidden-cols') || '[]');
+  hiddenColumns = new Set(savedHidden);
+} catch(e) {}
+
+function updateColVisBadge() {
+  const badge = document.getElementById('col-vis-badge');
+  if (!badge) return;
+  const hiddenCount = currentColumns.filter(c => hiddenColumns.has(c)).length;
+  if (hiddenCount > 0) {
+    badge.textContent = hiddenCount;
+    badge.classList.add('visible');
+    badge.title = `${hiddenCount} columna(s) oculta(s)`;
+  } else {
+    badge.textContent = '';
+    badge.classList.remove('visible');
+  }
+}
+
+function openColVisModal() {
+  if (!currentColumns.length) {
+    toast('Carga un archivo para gestionar la visibilidad de columnas', 'info');
+    return;
+  }
+  const list = document.getElementById('colvis-list');
+  list.innerHTML = currentColumns.map(c => {
+    const isChecked = !hiddenColumns.has(c);
+    const escaped = c.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return `<label><input type="checkbox" value="${escaped}" ${isChecked ? 'checked' : ''}> ${escaped}</label>`;
+  }).join('');
+  document.getElementById('colvis-overlay').classList.add('open');
+}
+
+function closeColVisModal() {
+  const overlay = document.getElementById('colvis-overlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function setAllColVis(showAll) {
+  document.querySelectorAll('#colvis-list input[type="checkbox"]').forEach(cb => cb.checked = showAll);
+}
+
+function applyColVis() {
+  const checkboxes = document.querySelectorAll('#colvis-list input[type="checkbox"]');
+  checkboxes.forEach(cb => {
+    if (cb.checked) {
+      hiddenColumns.delete(cb.value);
+    } else {
+      hiddenColumns.add(cb.value);
+    }
+  });
+  localStorage.setItem('catflip-hidden-cols', JSON.stringify([...hiddenColumns]));
+  closeColVisModal();
+  updateColVisBadge();
+  if (currentRawData) renderTable(currentRawData);
+  toast('Visibilidad de columnas actualizada');
+}
+
+// ── BUSCADOR REACTIVO EN DATA GRID (F2.5) ───────────────────────────────
+let currentRawData = null;
+let currentSearchQuery = '';
+
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapeRegExp(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function highlightEscaped(escapedText, query) {
+  if (!query) return escapedText;
+  const escapedQuery = escapeHtml(query);
+  const regex = new RegExp(`(${escapeRegExp(escapedQuery)})`, 'gi');
+  return escapedText.replace(regex, '<mark class="search-hl">$1</mark>');
+}
+
+function onSearchInput(val) {
+  currentSearchQuery = (val || '').trim();
+  const clearBtn = document.getElementById('search-clear');
+  if (clearBtn) clearBtn.classList.toggle('visible', currentSearchQuery.length > 0);
+  if (currentRawData) {
+    renderTable(currentRawData);
+  }
+}
+
+function clearSearch() {
+  const input = document.getElementById('ribbon-search');
+  if (input) input.value = '';
+  onSearchInput('');
+}
+
+// ── MENÚ CONTEXTUAL DE COLUMNAS (F2.8) ──────────────────────────
+let activeColMenuCol = null;
+
+function escapeColArg(s) {
+  return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+function closeColMenu() {
+  const dropdown = document.getElementById('col-menu-dropdown');
+  if (dropdown) {
+    dropdown.style.display = 'none';
+    dropdown.innerHTML = '';
+  }
+  document.querySelectorAll('.th-menu-btn.active').forEach(b => b.classList.remove('active'));
+  activeColMenuCol = null;
+}
+
+function buildColMenuHtml(col, dtype) {
+  const isText = (dtype === 'STR' || !['INT', 'FLOAT', 'DATE', 'BOOL'].includes(dtype));
+  let html = `
+    <div class="col-menu-header">
+      <span title="${escapeHtml(col)}">${escapeHtml(col)}</span>
+      <span class="type-badge ${dtype}">${dtype}</span>
+    </div>
+    <div class="col-menu-group-title">Ordenar y filtrar</div>
+    <div class="col-menu-item" onclick="handleColMenuAction('sort')">
+      ${icon('arrow-down-wide-narrow')}<span>Ordenar</span>
+    </div>
+    <div class="col-menu-item" onclick="handleColMenuAction('filter')">
+      ${icon('filter')}<span>Filtrar filas</span>
+    </div>
+  `;
+
+  if (isText) {
+    html += `
+      <div class="col-menu-divider"></div>
+      <div class="col-menu-group-title">Texto y formato</div>
+      <div class="col-menu-item" onclick="handleColMenuAction('change_case')">
+        ${icon('case-sensitive')}<span>Mayúsculas / Minúsculas</span>
+      </div>
+      <div class="col-menu-item" onclick="handleColMenuAction('trim')">
+        ${icon('eraser')}<span>Eliminar espacios (Trim)</span>
+      </div>
+      <div class="col-menu-item" onclick="handleColMenuAction('clean_newlines')">
+        <span style="font-family:var(--font-mono);font-size:0.75rem;width:14px;display:inline-block;text-align:center">↵</span><span>Limpiar saltos de línea</span>
+      </div>
+      <div class="col-menu-item" onclick="handleColMenuAction('replace')">
+        ${icon('refresh-cw')}<span>Reemplazar valores</span>
+      </div>
+      <div class="col-menu-item" onclick="handleColMenuAction('split_column')">
+        ${icon('scissors')}<span>Separar en columnas</span>
+      </div>
+      <div class="col-menu-item" onclick="handleColMenuAction('split_to_rows')">
+        ${icon('arrow-down-to-line')}<span>Separar por filas</span>
+      </div>
+    `;
+  } else {
+    html += `
+      <div class="col-menu-divider"></div>
+      <div class="col-menu-group-title">Transformación</div>
+      <div class="col-menu-item" onclick="handleColMenuAction('replace')">
+        ${icon('refresh-cw')}<span>Reemplazar valores</span>
+      </div>
+    `;
+  }
+
+  html += `
+    <div class="col-menu-divider"></div>
+    <div class="col-menu-group-title">Calidad y limpieza</div>
+    <div class="col-menu-item" onclick="handleColMenuAction('drop_nulls')">
+      ${icon('sparkles')}<span>Eliminar filas con nulos</span>
+    </div>
+    <div class="col-menu-item" onclick="handleColMenuAction('drop_duplicates')">
+      ${icon('trash-2')}<span>Eliminar duplicados</span>
+    </div>
+    <div class="col-menu-divider"></div>
+    <div class="col-menu-group-title">Esquema</div>
+    <div class="col-menu-item" onclick="handleColMenuAction('change_type')">
+      ${icon('tag')}<span>Cambiar tipo de dato</span>
+    </div>
+    <div class="col-menu-item" onclick="handleColMenuAction('rename_column')">
+      ${icon('pencil')}<span>Renombrar columna</span>
+    </div>
+    <div class="col-menu-item" onclick="handleColMenuAction('hide_column')">
+      ${icon('x')}<span>Ocultar columna</span>
+    </div>
+    <div class="col-menu-divider"></div>
+    <div class="col-menu-item danger" onclick="handleColMenuAction('drop_column')">
+      ${icon('trash-2')}<span>Eliminar columna</span>
+    </div>
+  `;
+
+  return html;
+}
+
+function openColMenu(event, col) {
+  event.stopPropagation();
+  const dropdown = document.getElementById('col-menu-dropdown');
+  if (!dropdown) return;
+
+  if (dropdown.style.display !== 'none' && activeColMenuCol === col) {
+    closeColMenu();
+    return;
+  }
+
+  activeColMenuCol = col;
+  const dtype = currentDtypes[col] || 'STR';
+  dropdown.innerHTML = buildColMenuHtml(col, dtype);
+  dropdown.style.display = 'block';
+
+  const btn = event.currentTarget;
+  const rect = btn.getBoundingClientRect();
+  const menuWidth = 220;
+
+  let left = rect.left;
+  if (left + menuWidth > window.innerWidth - 12) {
+    left = Math.max(12, rect.right - menuWidth);
+  }
+
+  let top = rect.bottom + 4;
+  const menuHeight = dropdown.offsetHeight || 320;
+  if (top + menuHeight > window.innerHeight - 12) {
+    top = Math.max(12, rect.top - menuHeight - 4);
+  }
+
+  dropdown.style.left = `${left}px`;
+  dropdown.style.top = `${top}px`;
+
+  document.querySelectorAll('.th-menu-btn.active').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function handleColMenuAction(action) {
+  const targetCol = activeColMenuCol;
+  closeColMenu();
+  if (!targetCol) return;
+
+  if (action === 'hide_column') {
+    hiddenColumns.add(targetCol);
+    localStorage.setItem('catflip-hidden-cols', JSON.stringify([...hiddenColumns]));
+    updateColVisBadge();
+    if (currentRawData) renderTable(currentRawData);
+    toast(`Columna "${targetCol}" oculta`);
+    return;
+  }
+
+  openModalForCol(action, targetCol);
+}
 
 // ── ESTADO ──────────────────────────────────────────────────────────────
 let currentColumns = [];
@@ -1369,13 +2137,32 @@ async function uploadFile(file, sheet) {
     const data = await res.json();
     hideLoading();
     if (data.error) { toast(data.error, 'error'); return; }
+
+    currentSearchQuery = '';
+    const searchInput = document.getElementById('ribbon-search');
+    if (searchInput) searchInput.value = '';
+    const clearBtn = document.getElementById('search-clear');
+    if (clearBtn) clearBtn.classList.remove('visible');
+
     renderTable(data.data);
     updateCode(data.code);
     pipelineSteps = [];
     renderPipeline();
+
+    // Top ribbon breadcrumb & Active Buffer badge (F2.1)
+    const breadcrumb = document.getElementById('ribbon-breadcrumb');
+    if (breadcrumb) {
+      document.getElementById('ribbon-filename').textContent = file.name;
+      breadcrumb.classList.add('visible');
+    }
+    const badgeActive = document.getElementById('badge-active');
+    if (badgeActive) badgeActive.classList.add('visible');
+
     const badge = document.getElementById('filename-badge');
-    document.getElementById('filename-text').textContent = file.name;
-    badge.style.display = '';
+    if (badge) {
+      document.getElementById('filename-text').textContent = file.name;
+      badge.style.display = 'none';
+    }
     document.getElementById('header-metrics').style.display = 'flex';
     document.getElementById('empty-state').style.display = 'none';
     enableOps();
@@ -1385,16 +2172,50 @@ async function uploadFile(file, sheet) {
 }
 
 function renderTable(data) {
-  currentColumns = data.columns;
+  closeColMenu();
+  currentRawData = data;
+  currentColumns = data.columns || [];
   currentDtypes  = data.dtypes || {};
   const nulls     = data.nulls || {};
-  const totalRows = data.total_rows || data.shape[0] || 0;
+  const totalRows = data.total_rows || (data.shape ? data.shape[0] : 0) || (data.data ? data.data.length : 0);
 
-  document.getElementById('info-rows').textContent = data.shape[0].toLocaleString();
-  document.getElementById('info-cols').textContent = data.shape[1];
+  updateColVisBadge();
+
+  // % Calidad global del dataset (F2.2)
+  const totalCols = currentColumns.length;
+  const totalCells = totalRows * totalCols;
+  let totalNulls = 0;
+  currentColumns.forEach(c => { totalNulls += (nulls[c] || 0); });
+  const qualityScore = totalCells > 0 ? ((totalCells - totalNulls) / totalCells) : 1;
+  const qPct = Math.round(qualityScore * 100);
+
+  const qEl = document.getElementById('metric-quality');
+  if (qEl) {
+    qEl.className = 'metric-quality visible ' + (qPct >= 95 ? 'q-green' : qPct >= 80 ? 'q-amber' : 'q-red');
+    qEl.innerHTML = `<svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Calidad: <strong>${qPct}%</strong>`;
+    qEl.title = `Calidad global: ${qPct}% (${(totalCells - totalNulls).toLocaleString()} celdas válidas de ${totalCells.toLocaleString()} celdas totales)`;
+  }
+
+  // Columnas visibles (F2.6)
+  const visibleCols = currentColumns.filter(c => !hiddenColumns.has(c));
+  const visibleIndices = visibleCols.map(c => currentColumns.indexOf(c));
+
+  if (data.shape) {
+    document.getElementById('info-rows').textContent = data.shape[0].toLocaleString();
+    document.getElementById('info-cols').textContent = data.shape[1];
+  }
+
+  if (visibleCols.length === 0) {
+    let html = '<table><thead><tr><th>#</th></tr></thead><tbody>';
+    html += '<tr><td style="padding:2.5rem;text-align:center;color:var(--text2);font-size:0.8rem">Todas las columnas están ocultas.<br><button class="btn btn-secondary" style="margin-top:0.75rem" onclick="openColVisModal()">Gestionar columnas</button></td></tr>';
+    html += '</tbody></table>';
+    document.getElementById('table-wrap').innerHTML = html;
+    document.getElementById('truncated-msg').style.display = 'none';
+    return;
+  }
 
   let html = '<table><thead><tr><th>#</th>';
-  data.columns.forEach(c => {
+  visibleCols.forEach(c => {
     const dtype    = currentDtypes[c] || 'STR';
     const nullCount = nulls[c] || 0;
     const quality  = totalRows > 0 ? ((totalRows - nullCount) / totalRows) : 1;
@@ -1406,21 +2227,57 @@ function renderTable(data) {
       : `${c} — ${nullCount} nulo${nullCount>1?'s':''} (${pct}% válido)`;
 
     html += `<th title="${tooltip}">
-      ${c}<span class="type-badge ${dtype}" onclick="openModalForCol('change_type','${c.replace(/'/g,"\\'")}')" title="Tipo: ${dtype} — clic para cambiar">${dtype}</span>
+      <div class="th-content">
+        <span class="th-name">${escapeHtml(c)}</span>
+        <span class="type-badge ${dtype}" data-col="${escapeHtml(c)}" onclick="event.stopPropagation();openModalForCol('change_type',this.dataset.col)" title="Tipo: ${dtype} — clic para cambiar">${dtype}</span>
+        <button type="button" class="th-menu-btn" data-col="${escapeHtml(c)}" onclick="openColMenu(event,this.dataset.col)" title="Transformaciones para ${escapeHtml(c)}">
+          ${icon('more-vertical')}
+        </button>
+      </div>
       <div class="quality-bar-wrap${isPerfect?' perfect':''}">
         <div class="quality-bar-fill" style="width:${pct}%;background:${barColor}"></div>
       </div>
     </th>`;
   });
   html += '</tr></thead><tbody>';
-  data.data.forEach((row,i) => {
-    html += '<tr><td>'+(i+1)+'</td>';
-    row.forEach(cell => { html += '<td title="'+cell+'">'+cell+'</td>'; });
+
+  // Filtrado reactivo en Data Grid (F2.5)
+  const query = currentSearchQuery.toLowerCase();
+  let renderedRowsCount = 0;
+
+  (data.data || []).forEach((row, i) => {
+    // Si hay query, verificar si alguna celda visible coincide
+    if (query) {
+      let matches = false;
+      for (let idx of visibleIndices) {
+        const val = row[idx];
+        if (val !== undefined && val !== null && String(val).toLowerCase().includes(query)) {
+          matches = true;
+          break;
+        }
+      }
+      if (!matches) return;
+    }
+
+    renderedRowsCount++;
+    html += '<tr><td>' + (i + 1) + '</td>';
+    visibleIndices.forEach(idx => {
+      const cellVal = row[idx];
+      const rawStr = cellVal !== undefined && cellVal !== null ? String(cellVal) : '';
+      const escaped = escapeHtml(rawStr);
+      const highlighted = query ? highlightEscaped(escaped, query) : escaped;
+      html += '<td title="' + escaped + '">' + highlighted + '</td>';
+    });
     html += '</tr>';
   });
+
+  if (renderedRowsCount === 0 && query) {
+    html += `<tr><td colspan="${visibleCols.length + 1}" style="padding:2.5rem;text-align:center;color:var(--text2);font-size:0.8rem">No se encontraron filas que coincidan con "<strong>${escapeHtml(currentSearchQuery)}</strong>".<br><button class="btn btn-secondary" style="margin-top:0.75rem" onclick="clearSearch()">Limpiar búsqueda</button></td></tr>`;
+  }
+
   html += '</tbody></table>';
   document.getElementById('table-wrap').innerHTML = html;
-  document.getElementById('truncated-msg').style.display = data.truncated ? 'block' : 'none';
+  document.getElementById('truncated-msg').style.display = (data.truncated && !query) ? 'block' : 'none';
 }
 
 function updateCode(code) { document.getElementById('code-pre').textContent = code; }
@@ -1560,18 +2417,62 @@ function openModal(op) {
   document.getElementById('modal-overlay').classList.add('open');
 }
 
-// Abre un modal pre-seleccionando una columna específica (usado por los badges de tipo)
+// Abre un modal pre-seleccionando una columna específica (badges de tipo y menú contextual)
 function openModalForCol(op, col) {
   openModal(op);
-  // Espera un tick para que el DOM del modal esté listo antes de forzar la selección
   setTimeout(() => {
-    const sel = document.getElementById('type-col');
-    if (sel) sel.value = col;
-    // Pre-seleccionar el tipo actual en el select de dtype
-    const dtypeMap = { INT: 'int', FLOAT: 'float', STR: 'str', DATE: 'datetime', BOOL: 'str' };
-    const dtypeSel = document.getElementById('type-dtype');
-    if (dtypeSel && currentDtypes[col]) {
-      dtypeSel.value = dtypeMap[currentDtypes[col]] || 'str';
+    // 1. Mapeo de selects de columna individual
+    const selectMap = {
+      sort: 'sort-col',
+      filter: 'filter-col',
+      change_type: 'type-col',
+      rename_column: 'rename-old',
+      drop_column: 'drop-col',
+      change_case: 'case-col',
+      replace: 'rep-col',
+      split_column: 'split-col',
+      split_to_rows: 'str-col'
+    };
+
+    const selId = selectMap[op];
+    if (selId) {
+      const sel = document.getElementById(selId);
+      if (sel) sel.value = col;
+    }
+
+    // Caso especial para change_type: pre-seleccionar el tipo actual
+    if (op === 'change_type') {
+      const dtypeMap = { INT: 'int', FLOAT: 'float', STR: 'str', DATE: 'datetime', BOOL: 'str' };
+      const dtypeSel = document.getElementById('type-dtype');
+      if (dtypeSel && currentDtypes[col]) {
+        dtypeSel.value = dtypeMap[currentDtypes[col]] || 'str';
+      }
+    }
+
+    // 2. Mapeo de contenedores con checkboxes múltiples
+    const checkMap = {
+      trim: 'trim-check',
+      clean_newlines: 'nl-check',
+      drop_nulls: 'nulls-check',
+      drop_duplicates: 'dup-check'
+    };
+
+    const containerId = checkMap[op];
+    if (containerId) {
+      const container = document.getElementById(containerId);
+      if (container) {
+        // Desmarcar "Seleccionar todo" si existe
+        const parent = container.parentElement;
+        if (parent) {
+          const selectAllCb = parent.querySelector('input[type="checkbox"][onchange*="toggleAllChecks"]');
+          if (selectAllCb) selectAllCb.checked = false;
+        }
+
+        // Desmarcar todas las opciones y marcar exclusivamente la columna elegida
+        container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+          cb.checked = (cb.value === col);
+        });
+      }
     }
   }, 0);
 }
@@ -1644,10 +2545,33 @@ function copyCode() {
 }
 
 document.addEventListener('keydown', e => {
-  if (e.key==='Escape') closeModal();
+  if (e.key==='Escape') {
+    closeModal();
+    closeColVisModal();
+    closeColMenu();
+  }
   if ((e.ctrlKey||e.metaKey) && e.key==='z') { e.preventDefault(); undo(); }
-  if (e.key==='Enter' && document.getElementById('modal-overlay').classList.contains('open')) confirmModal();
+  if (e.key==='Enter') {
+    if (document.getElementById('modal-overlay').classList.contains('open')) confirmModal();
+    if (document.getElementById('colvis-overlay').classList.contains('open')) applyColVis();
+  }
 });
+
+// Cerrar menú contextual al hacer clic fuera
+document.addEventListener('click', e => {
+  const dropdown = document.getElementById('col-menu-dropdown');
+  if (dropdown && dropdown.style.display !== 'none' && !dropdown.contains(e.target)) {
+    closeColMenu();
+  }
+});
+
+// Cerrar menú contextual en resize o scroll (excepto scroll interno del propio dropdown)
+window.addEventListener('resize', closeColMenu);
+window.addEventListener('scroll', e => {
+  const dropdown = document.getElementById('col-menu-dropdown');
+  if (dropdown && dropdown.contains(e.target)) return;
+  closeColMenu();
+}, true);
 </script>
 </body>
 </html>
