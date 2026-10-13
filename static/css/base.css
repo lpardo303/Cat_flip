@@ -1,0 +1,94 @@
+/* Cat_flip Studio ETL — reset, base, orbes, reduced-motion (extraído de templates/index.html, P0 modularización) */
+  /* ── RESET & BASE ──────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { height: 100%; }
+  body {
+    font-family: var(--font-ui);
+    background: var(--base);
+    background-image:
+      radial-gradient(ellipse 80% 50% at 20% 0%, rgba(38,124,124,0.07) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 80% 100%, rgba(238,247,247,0.9) 0%, transparent 60%);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    transition: background 0.3s ease, color 0.3s ease;
+  }
+  [data-theme="dark"] body {
+    background-image:
+      radial-gradient(ellipse 80% 50% at 20% 0%, rgba(61,184,184,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 80% 100%, rgba(15,17,23,0.9) 0%, transparent 60%);
+  }
+
+/* ── ORBES DE FONDO (F0.5) ─────────────────────────────── */
+  .orb {
+    position: fixed;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 0;
+    will-change: transform;
+  }
+  .orb-1 {
+    width: 520px; height: 520px;
+    top: -160px; left: -120px;
+    background: radial-gradient(circle, rgba(38,124,124,0.13) 0%, transparent 70%);
+    filter: blur(100px);
+    animation: orb-drift-1 18s ease-in-out infinite alternate;
+  }
+  .orb-2 {
+    width: 420px; height: 420px;
+    bottom: -100px; right: -80px;
+    background: radial-gradient(circle, rgba(102,178,178,0.10) 0%, transparent 70%);
+    filter: blur(130px);
+    animation: orb-drift-2 22s ease-in-out infinite alternate;
+  }
+  @keyframes orb-drift-1 {
+    from { transform: translate(0, 0) scale(1); }
+    to   { transform: translate(40px, 30px) scale(1.08); }
+  }
+  @keyframes orb-drift-2 {
+    from { transform: translate(0, 0) scale(1); }
+    to   { transform: translate(-30px, -20px) scale(1.06); }
+  }
+  /* Respetar preferencia de movimiento reducido */
+  @media (prefers-reduced-motion: reduce) {
+    /* Orbes — sin animación de deriva */
+    .orb { animation: none !important; filter: blur(120px); }
+
+    /* Botones, tarjetas ETL, pasos de receta — sin escala ni traslación */
+    .op-btn, .btn, .pipeline-step, .stat-card, .glass-button, .logo-svg {
+      transition: none !important;
+      transform: none !important;
+    }
+    .logo:hover .logo-svg,
+    .op-btn:hover:not(:disabled),
+    .op-btn:active:not(:disabled),
+    .btn:active:not(:disabled),
+    .pipeline-step:hover {
+      transform: none !important;
+    }
+
+    /* Modal — aparece instantáneamente sin scale/translateY */
+    .modal { animation: none !important; }
+    @keyframes modalIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* Toast — sin deslizamiento, solo fade */
+    .toast { animation: none !important; }
+    @keyframes toastIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* Spinner — detiene la rotación continua */
+    .spinner {
+      animation: none !important;
+      border-top-color: var(--teal);
+      opacity: 0.75;
+    }
+
+    /* Quality-bar — sin transición de ancho al renderizar */
+    .quality-bar-fill { transition: none !important; }
+  }
+  /* En oscuro los orbes son más tenues */
+  [data-theme="dark"] .orb-1 {
+    background: radial-gradient(circle, rgba(61,184,184,0.07) 0%, transparent 70%);
+  }
+  [data-theme="dark"] .orb-2 {
+    background: radial-gradient(circle, rgba(61,184,184,0.05) 0%, transparent 70%);
+  }

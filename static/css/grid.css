@@ -1,0 +1,212 @@
+/* Cat_flip Studio ETL — data grid, badges de tipo, quality bars, menú contextual (extraído de templates/index.html, P0 modularización) */
+  /* ── DATA GRID ─────────────────────────────────────────── */
+  .table-wrap { flex: 1; overflow: auto; }
+  table { border-collapse: collapse; width: 100%; font-family: var(--font-mono); font-size: 0.75rem; }
+  thead th {
+    background: var(--base2);
+    color: var(--teal);
+    font-family: var(--font-head);
+    font-weight: 600;
+    font-size: 0.72rem;
+    padding: 0.55rem 0.85rem 0.7rem; /* padding-bottom extra para la barra */
+    text-align: left;
+    border-bottom: 2px solid var(--teal-bd);
+    position: sticky; top: 0;
+    white-space: nowrap;
+    backdrop-filter: blur(8px);
+    overflow: visible; /* permite que la barra absoluta sea visible */
+  }
+  tbody tr { transition: background 0.1s; }
+  tbody tr:hover { background: var(--row-hover); }
+  tbody tr:nth-child(even) { background: var(--row-alt); }
+  tbody tr:nth-child(even):hover { background: var(--row-hover); }
+  tbody td {
+    padding: 0.38rem 0.85rem;
+    border-bottom: 1px solid var(--border2);
+    max-width: 220px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--text);
+  }
+  tbody td:first-child {
+    color: var(--text2);
+    font-size: 0.68rem;
+    font-weight: 500;
+    border-right: 1px solid var(--border2);
+    user-select: none;
+  }
+  .truncated-msg {
+    padding: 0.45rem 1rem;
+    font-size: 0.75rem;
+    color: var(--yellow);
+    background: rgba(192,138,26,0.08);
+    border-top: 1px solid rgba(192,138,26,0.18);
+    text-align: center;
+  }
+
+  /* ── TYPE BADGES (cabeceras Data Grid) ────────────────── */
+  .type-badge {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 0.08rem 0.36rem;
+    border-radius: 4px;
+    margin-left: 0.4rem;
+    vertical-align: middle;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: opacity 0.15s, transform 0.15s;
+    line-height: 1.5;
+  }
+  .type-badge:hover { opacity: 0.75; transform: translateY(-1px); }
+  .type-badge.INT  { background: var(--teal-bg);    border-color: var(--teal-bd);    color: var(--teal); }
+  .type-badge.FLOAT{ background: var(--teal-bg);    border-color: var(--teal-bd);    color: var(--teal); }
+  .type-badge.STR  { background: var(--surface2);   border-color: var(--border);     color: var(--text2); }
+  .type-badge.DATE { background: var(--orange-bg);  border-color: var(--orange-bd);  color: var(--orange); }
+  .type-badge.BOOL { background: rgba(45,158,107,0.10); border-color: rgba(45,158,107,0.28); color: var(--green); }
+
+  /* ── DATA QUALITY BAR (cabeceras Data Grid) ───────────── */
+  .quality-bar-wrap {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: rgba(192,138,26,0.22); /* base: amarillo apagado = zona de nulos */
+    border-radius: 0 0 2px 2px;
+    overflow: hidden;
+  }
+  .quality-bar-fill {
+    height: 100%;
+    background: var(--green);
+    border-radius: 0 0 2px 2px;
+    transition: width 0.4s ease;
+  }
+  /* Si la calidad es perfecta (100%) la barra desaparece sutilmente */
+  .quality-bar-wrap.perfect { background: transparent; }
+
+  /* ── MENÚ CONTEXTUAL DE COLUMNA (F2.8) ─────────────────── */
+  .th-content {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    width: 100%;
+  }
+  .th-name {
+    cursor: default;
+    user-select: text;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .th-menu-btn {
+    background: transparent;
+    border: none;
+    color: var(--text2);
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.45;
+    transition: opacity 0.15s, background 0.15s, color 0.15s;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  thead th:hover .th-menu-btn, .th-menu-btn.active {
+    opacity: 1;
+  }
+  .th-menu-btn:hover {
+    background: var(--teal-bg);
+    color: var(--teal);
+    opacity: 1;
+  }
+  .th-menu-btn svg {
+    width: 14px; height: 14px;
+    stroke: currentColor; stroke-width: 2.2;
+    fill: currentColor;
+  }
+
+  /* Popover Flotante con Glassmorphism */
+  .col-dropdown-menu {
+    position: fixed;
+    z-index: 999;
+    background: var(--surface);
+    backdrop-filter: blur(20px) saturate(1.6);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-glass-active);
+    padding: 0.4rem 0;
+    width: 220px;
+    max-height: 80vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    font-family: var(--font-ui);
+    animation: menuFadeIn 0.12s ease;
+  }
+  @keyframes menuFadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .col-dropdown-menu { animation: none !important; }
+  }
+
+  .col-menu-header {
+    padding: 0.4rem 0.8rem 0.35rem;
+    border-bottom: 1px solid var(--border2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--teal);
+  }
+  .col-menu-header span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 140px;
+  }
+  .col-menu-group-title {
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    padding: 0.45rem 0.8rem 0.2rem;
+  }
+  .col-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.38rem 0.8rem;
+    font-size: 0.76rem;
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+    user-select: none;
+  }
+  .col-menu-item:hover {
+    background: var(--teal-bg);
+    color: var(--teal);
+  }
+  .col-menu-item svg {
+    width: 14px; height: 14px;
+    stroke: currentColor; stroke-width: 1.85; fill: none;
+    stroke-linecap: round; stroke-linejoin: round;
+    flex-shrink: 0;
+  }
+  .col-menu-item.danger {
+    color: var(--orange);
+  }
+  .col-menu-item.danger:hover {
+    background: var(--orange-bg);
+    color: var(--orange);
+  }
+  .col-menu-divider {
+    height: 1px;
+    background: var(--border2);
+    margin: 0.3rem 0;
+  }
