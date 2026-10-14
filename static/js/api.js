@@ -12,6 +12,7 @@ document.getElementById('file-input').addEventListener('change', e => {
 });
 
 async function handleFile(file) {
+  closeDatasetPicker();
   const name = file.name.toLowerCase();
   if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
     showLoading();

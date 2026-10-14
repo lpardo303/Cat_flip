@@ -237,3 +237,184 @@ function copyCode() {
   navigator.clipboard.writeText(document.getElementById('code-pre').textContent)
     .then(() => toast('Código copiado al portapapeles', 'info'));
 }
+
+// ── DATASET PICKER (F2.7) ─────────────────────────────────────────────
+// 3 datasets demo embebidos como CSV. Elegir uno crea un File y reutiliza
+// uploadFile() de api.js — sin cambios de backend.
+const DEMO_DATASETS = [
+  {
+    name: 'Ventas Q4',
+    file: 'ventas_q4.csv',
+    desc: 'Ventas por región. Tipos limpios: INT, FLOAT y texto.',
+    icon: 'arrow-down-wide-narrow',
+    csv: `Fecha,Region,Producto,Unidades,Precio,Total
+2026-10-01,Norte,Teclado,12,45.90,550.80
+2026-10-02,Sur,Ratón,30,25.50,765.00
+2026-10-03,Este,Monitor,5,189.00,945.00
+2026-10-04,Oeste,Audífonos,8,79.90,639.20
+2026-10-05,Norte,Ratón,22,25.50,561.00
+2026-10-06,Sur,Teclado,15,45.90,688.50
+2026-10-07,Este,Audífonos,11,79.90,878.90
+2026-10-08,Oeste,Monitor,3,189.00,567.00
+2026-10-09,Norte,Monitor,7,189.00,1323.00
+2026-10-10,Sur,Audífonos,9,79.90,719.10
+2026-10-11,Este,Teclado,18,45.90,826.20
+2026-10-12,Oeste,Ratón,27,25.50,688.50
+2026-10-13,Norte,Audífonos,6,79.90,479.40
+2026-10-14,Sur,Monitor,4,189.00,756.00
+2026-10-15,Este,Ratón,35,25.50,892.50
+2026-10-16,Oeste,Teclado,10,45.90,459.00
+2026-10-17,Norte,Teclado,25,45.90,1147.50
+2026-10-18,Sur,Ratón,14,25.50,357.00
+2026-10-19,Este,Monitor,2,189.00,378.00
+2026-10-20,Oeste,Audífonos,13,79.90,1038.70
+2026-10-21,Norte,Ratón,19,25.50,484.50
+2026-10-22,Sur,Teclado,8,45.90,367.20
+2026-10-23,Este,Audífonos,16,79.90,1278.40
+2026-10-24,Oeste,Monitor,6,189.00,1134.00
+2026-10-25,Norte,Monitor,4,189.00,756.00
+2026-10-26,Sur,Audífonos,7,79.90,559.30
+2026-10-27,Este,Teclado,21,45.90,963.90
+2026-10-28,Oeste,Ratón,31,25.50,790.50
+2026-10-29,Norte,Audífonos,10,79.90,799.00
+2026-10-30,Sur,Monitor,5,189.00,945.00
+2026-10-31,Este,Ratón,28,25.50,714.00
+2026-11-01,Oeste,Teclado,13,45.90,596.70
+2026-11-02,Norte,Teclado,17,45.90,780.30
+2026-11-03,Sur,Ratón,24,25.50,612.00
+2026-11-04,Este,Monitor,9,189.00,1701.00
+2026-11-05,Oeste,Audífonos,5,79.90,399.50
+2026-11-06,Norte,Ratón,33,25.50,841.50
+2026-11-07,Sur,Teclado,11,45.90,504.90
+2026-11-08,Este,Audífonos,14,79.90,1118.60
+2026-11-09,Oeste,Monitor,8,189.00,1512.00`
+  },
+  {
+    name: 'Empleados',
+    file: 'empleados.csv',
+    desc: 'Celdas vacías reales (NaN). Ideal para nulos y trim.',
+    icon: 'sparkles',
+    csv: `ID,Nombre,Departamento,Salario,Email
+1,Ana Torres,Dirección,9500.00,ana.torres@catflip.dev
+2,Luis Pardo,Ingeniería,7200.00,luis.pardo@catflip.dev
+3,María Ruiz,Marketing,5400.00,maria.ruiz@catflip.dev
+4,Carlos Vega,Ingeniería,7800.00,
+5,Lucía Herrera,,,
+6,Jorge Molina,Soporte,4100.00,jorge.molina@catflip.dev
+7,Carmen Lozano,Marketing,,carmen.lozano@catflip.dev
+8,Diego Navarro,Ingeniería,6900.00,
+9,Sofía Ramos,Ventas,4800.00,sofia.ramos@catflip.dev
+10,Pablo Serrano,Ventas,5100.00,pablo.serrano@catflip.dev
+11,Elena Bravo,,,
+12,Óscar Vidal,Soporte,3900.00,oscar.vidal@catflip.dev
+13,Paula Ortega,Marketing,5200.00,
+14,Iván Castillo,Ingeniería,,ivan.castillo@catflip.dev
+15,Beatriz Gil,Ventas,4600.00,beatriz.gil@catflip.dev
+16,Raúl Reyes,Dirección,8700.00,raul.reyes@catflip.dev
+17,Nuria Peña,Soporte,,nuria.pena@catflip.dev
+18,Andrés Cruz,Ingeniería,7100.00,
+19,Irene Santos,Marketing,4900.00,irene.santos@catflip.dev
+20,Mario Ríos,Ventas,,mario.rios@catflip.dev
+21,Julia Pastor,Ingeniería,6500.00,julia.pastor@catflip.dev
+22,Hugo Sáez,Soporte,4200.00,
+23,Teresa León,Dirección,,
+24,Adrián Mora,Ventas,5000.00,adrian.mora@catflip.dev
+25,Rosa Iglesias,Marketing,5300.00,rosa.iglesias@catflip.dev`
+  },
+  {
+    name: 'Sensores IoT',
+    file: 'sensores_iot.csv',
+    desc: 'Fechas ISO, booleanos y FLOAT negativos. Para change_type.',
+    icon: 'tag',
+    csv: `timestamp,sensor_id,temp_c,humedad,activo
+2026-11-01T08:00:00,SN-01,18.4,61.2,TRUE
+2026-11-01T09:00:00,SN-02,19.1,58.7,TRUE
+2026-11-01T10:00:00,SN-03,21.6,55.3,TRUE
+2026-11-01T11:00:00,SN-04,23.2,52.1,FALSE
+2026-11-01T12:00:00,SN-05,24.8,49.6,TRUE
+2026-11-01T13:00:00,SN-01,25.5,47.2,TRUE
+2026-11-01T14:00:00,SN-02,26.1,45.8,TRUE
+2026-11-01T15:00:00,SN-03,27.4,43.5,FALSE
+2026-11-01T16:00:00,SN-04,26.8,44.9,TRUE
+2026-11-01T17:00:00,SN-05,25.2,48.3,TRUE
+2026-11-01T18:00:00,SN-01,23.7,51.6,TRUE
+2026-11-01T19:00:00,SN-02,22.1,54.4,FALSE
+2026-11-01T20:00:00,SN-03,20.5,57.8,TRUE
+2026-11-01T21:00:00,SN-04,19.2,60.1,TRUE
+2026-11-01T22:00:00,SN-05,17.8,62.9,TRUE
+2026-11-01T23:00:00,SN-01,16.4,64.5,FALSE
+2026-11-02T00:00:00,SN-02,15.1,66.2,TRUE
+2026-11-02T01:00:00,SN-03,13.7,68.4,TRUE
+2026-11-02T02:00:00,SN-04,12.3,70.1,TRUE
+2026-11-02T03:00:00,SN-05,10.9,71.8,FALSE
+2026-11-02T04:00:00,SN-01,9.5,73.2,TRUE
+2026-11-02T05:00:00,SN-02,8.2,74.6,TRUE
+2026-11-02T06:00:00,SN-03,6.8,75.9,TRUE
+2026-11-02T07:00:00,SN-04,5.4,77.3,FALSE
+2026-11-02T08:00:00,SN-05,4.1,78.5,TRUE
+2026-11-02T08:00:00,SN-01,2.7,79.4,TRUE
+2026-11-02T09:00:00,SN-02,1.3,80.6,TRUE
+2026-11-02T10:00:00,SN-03,-0.1,81.9,TRUE
+2026-11-02T11:00:00,SN-04,-1.5,83.2,FALSE
+2026-11-02T12:00:00,SN-05,-2.8,84.1,TRUE
+2026-11-02T13:00:00,SN-01,-4.2,85.6,TRUE
+2026-11-02T14:00:00,SN-02,-5.2,86.3,TRUE
+2026-11-02T15:00:00,SN-03,-3.7,84.8,FALSE
+2026-11-02T16:00:00,SN-04,-1.9,82.5,TRUE
+2026-11-02T17:00:00,SN-05,0.4,80.1,TRUE
+2026-11-02T18:00:00,SN-01,2.6,77.6,TRUE
+2026-11-02T19:00:00,SN-02,4.9,75.2,FALSE
+2026-11-02T20:00:00,SN-03,7.3,72.8,TRUE
+2026-11-02T21:00:00,SN-04,9.6,70.4,TRUE
+2026-11-02T22:00:00,SN-05,11.8,68.0,TRUE
+2026-11-02T23:00:00,SN-01,13.5,66.1,FALSE
+2026-11-03T00:00:00,SN-02,14.9,64.3,TRUE
+2026-11-03T01:00:00,SN-03,16.2,62.5,TRUE
+2026-11-03T02:00:00,SN-04,15.7,63.8,TRUE
+2026-11-03T03:00:00,SN-05,14.3,65.6,FALSE
+2026-11-03T04:00:00,SN-01,12.8,67.4,TRUE
+2026-11-03T05:00:00,SN-02,11.2,69.1,TRUE
+2026-11-03T06:00:00,SN-03,9.7,71.0,TRUE
+2026-11-03T07:00:00,SN-04,8.1,72.7,FALSE
+2026-11-03T08:00:00,SN-05,7.6,73.4,TRUE`
+  }
+];
+
+function openDatasetPicker() {
+  const grid = document.getElementById('ds-grid');
+  grid.innerHTML = DEMO_DATASETS.map((d, i) => {
+    const lines = d.csv.trim().split('\n');
+    const cols = lines[0].split(',').length;
+    return '<button type="button" class="ds-card" onclick="loadDemoDataset(' + i + ')">'
+         + '<span class="ds-card-icon">' + icon(d.icon) + '</span>'
+         + '<span class="ds-card-name">' + d.name + '</span>'
+         + '<span class="ds-card-meta">' + (lines.length - 1) + ' filas × ' + cols + ' columnas</span>'
+         + '<span class="ds-card-desc">' + d.desc + '</span>'
+         + '</button>';
+  }).join('');
+  document.getElementById('datasetpicker-overlay').classList.add('open');
+}
+
+function closeDatasetPicker() {
+  const overlay = document.getElementById('datasetpicker-overlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function loadDemoDataset(i) {
+  const d = DEMO_DATASETS[i];
+  if (!d) return;
+  closeDatasetPicker();
+  uploadFile(new File([d.csv], d.file, { type: 'text/csv' }), 0);
+}
+
+// Dropzone del picker: mismo flujo handleFile que el upload-area original
+const dsDropzone = document.getElementById('ds-dropzone');
+if (dsDropzone) {
+  dsDropzone.addEventListener('dragover', e => { e.preventDefault(); dsDropzone.classList.add('drag-over'); });
+  dsDropzone.addEventListener('dragleave', () => dsDropzone.classList.remove('drag-over'));
+  dsDropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    dsDropzone.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+}

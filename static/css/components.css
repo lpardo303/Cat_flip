@@ -910,3 +910,76 @@
     stroke-linecap: round;
     stroke-linejoin: round;
   }
+
+  /* ── DATASET PICKER (F2.7) ──────────────────────────────── */
+  .ds-picker-sub {
+    font-size: 0.78rem;
+    color: var(--text2);
+    margin: -0.5rem 0 0.85rem;
+  }
+  .ds-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.6rem;
+  }
+  .ds-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
+    padding: 0.75rem;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius2);
+    cursor: pointer;
+    text-align: left;
+    font-family: var(--font-ui);
+    color: var(--text);
+    transition: all 0.18s ease;
+  }
+  .ds-card:hover, .ds-card:focus-visible {
+    border-color: var(--teal);
+    background: var(--teal-bg);
+    box-shadow: var(--shadow-glass-hover);
+    transform: translateY(-2px);
+  }
+  .ds-card-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px; height: 30px;
+    border-radius: var(--radius2);
+    background: var(--teal-bg);
+    color: var(--teal);
+    flex-shrink: 0;
+  }
+  .ds-card-icon .icon-svg { width: 16px; height: 16px; }
+  .ds-card-name { font-size: 0.8rem; font-weight: 700; color: var(--text); }
+  .ds-card-meta { font-size: 0.67rem; font-weight: 600; color: var(--teal); }
+  .ds-card-desc { font-size: 0.7rem; color: var(--text2); line-height: 1.45; }
+  .ds-dropzone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: 0.75rem;
+    padding: 0.9rem;
+    border: 1.5px dashed var(--teal-bd);
+    border-radius: var(--radius);
+    text-align: center;
+    cursor: pointer;
+    font-size: 0.75rem;
+    color: var(--text2);
+    transition: all 0.2s ease;
+  }
+  .ds-dropzone strong { color: var(--teal); }
+  .ds-dropzone .icon-svg { width: 18px; height: 18px; color: var(--teal); }
+  .ds-dropzone:hover, .ds-dropzone.drag-over {
+    border-color: var(--teal);
+    background: var(--teal-bg);
+    box-shadow: 0 0 0 3px rgba(38,124,124,0.08);
+  }
+  .ds-dropzone-hint { font-size: 0.68rem; color: var(--text2); }
+  @media (max-width: 560px) {
+    .ds-grid { grid-template-columns: 1fr; }
+  }

@@ -133,7 +133,7 @@
           <svg class="icon-svg" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
           <span>Fuente de datos</span>
         </div>
-        <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
+        <div class="upload-area" id="upload-area" onclick="openDatasetPicker()">
           <div class="upload-icon">
             <svg viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 12v6"/><path d="m15 15-3-3-3 3"/></svg>
           </div>
@@ -331,6 +331,30 @@
       <button class="btn btn-primary" onclick="applyColVis()">
         <svg class="icon-svg" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
         <span>Aplicar</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL DATASET PICKER (F2.7) ═══════════════════════════════════════ -->
+<div class="modal-overlay" id="datasetpicker-overlay" onclick="if(event.target===this)closeDatasetPicker()">
+  <div class="modal" style="width: 520px;">
+    <h2>
+      <svg class="icon-svg" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+      <span>Fuente de datos</span>
+    </h2>
+    <p class="ds-picker-sub">Elige un dataset demo o carga tu propio archivo.</p>
+    <div class="ds-grid" id="ds-grid"></div>
+    <div class="ds-dropzone" id="ds-dropzone" role="button" tabindex="0" onclick="document.getElementById('file-input').click()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('file-input').click()}">
+      <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+      <span><strong>Arrastra</strong> un archivo aquí o clic para examinar</span>
+      <span class="ds-dropzone-hint">.CSV · .XLSX · .XLS</span>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeDatasetPicker()">Cancelar</button>
+      <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">
+        <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+        <span>Examinar archivos</span>
       </button>
     </div>
   </div>

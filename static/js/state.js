@@ -100,13 +100,13 @@ function addPipelineStep(op, params) {
 function renderPipeline() {
   const list = document.getElementById('pipeline-list');
   const empty = document.getElementById('pipeline-empty');
+  // Remove existing step cards (keep empty div) — also on empty, Bug 5
+  [...list.querySelectorAll('.pipeline-step')].forEach(el => el.remove());
   if (pipelineSteps.length === 0) {
     empty.style.display = 'flex';
     return;
   }
   empty.style.display = 'none';
-  // Remove existing step cards (keep empty div)
-  [...list.querySelectorAll('.pipeline-step')].forEach(el => el.remove());
   pipelineSteps.forEach((s, i) => {
     const card = document.createElement('div');
     card.className = 'pipeline-step';

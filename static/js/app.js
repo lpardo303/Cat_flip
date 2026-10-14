@@ -97,6 +97,7 @@ document.addEventListener('keydown', e => {
     closeModal();
     closeColVisModal();
     closeColMenu();
+    closeDatasetPicker();
   }
   if ((e.ctrlKey||e.metaKey) && e.key==='z') { e.preventDefault(); undo(); }
   if (e.key==='Enter') {
