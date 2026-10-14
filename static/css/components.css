@@ -556,6 +556,8 @@
     box-shadow: var(--shadow-glass-sm);
   }
   .btn-primary:hover { background: var(--teal2); box-shadow: var(--shadow-glass-hover); }
+  /* F0.6: en oscuro, texto oscuro sobre teal brillante (spec 13.1: ≥5.8:1) — blanco daba 2.5:1 */
+  [data-theme="dark"] .btn-primary { color: var(--base); }
   .btn-secondary {
     background: var(--surface);
     border: 1px solid var(--border);

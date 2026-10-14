@@ -7,7 +7,7 @@
     --teal-200: #99d4d4;
     --teal-300: #66b2b2;
     --teal-400: #3f9191;
-    --teal-500: #267c7c;
+    --teal-500: #237373;   /* F0.6: 4.6:1 mínimo sobre tintes teal */
     --teal-600: #1d6262;
 
     /* Superficies y canvas (tema claro) */
@@ -27,13 +27,13 @@
     --teal-bd: rgba(38,124,124,0.22);
 
     /* Semánticos de color funcional */
-    --orange:        #e26d0d;
+    --orange:        #a5500a;  /* F0.6: ≥4.6:1 también sobre vidrio de modal */
     --orange-bg:     rgba(226,109,13,0.10);
     --orange-bd:     rgba(226,109,13,0.30);
-    --color-mutation:#e26d0d;
-    --green:         #2d9e6b;
-    --red:           #d94f4f;
-    --yellow:        #c08a1a;
+    --color-mutation:#a5500a;
+    --green:         #21754f;  /* F0.6: ≥4.6:1 también sobre toast */
+    --red:           #af4040;  /* F0.6: ≥4.6:1 sobre toast */
+    --yellow:        #8c6513;  /* F0.6: 4.6:1 sobre tintes */
 
     /* Logo */
     --logo-disc: var(--teal);
@@ -42,7 +42,7 @@
     /* Texto */
     --text-primary:   #1a2b2b;
     --text-secondary: #4e6b6b;
-    --text-muted:     #7a9a9a;
+    --text-muted:     #5c7474;  /* F0.6: ≥4.6:1 (antes #7a9a9a = 2.9:1) */
     --text:  var(--text-primary);   /* alias legacy */
     --text2: var(--text-secondary); /* alias legacy */
 
@@ -112,7 +112,7 @@
     --orange-bd:     rgba(240,128,48,0.32);
     --color-mutation:#f08030;
     --green:         #22c55e;
-    --red:           #ef4444;
+    --red:           #ff4d4d;  /* F0.6: ≥4.6:1 sobre toast y superficies */
     --yellow:        #f59e0b;
 
     --logo-disc: var(--teal);
@@ -120,7 +120,7 @@
 
     --text-primary:   #e2e8f0;
     --text-secondary: #7fa8a8;
-    --text-muted:     #4e6b6b;
+    --text-muted:     #6d8f8f;  /* F0.6: ≥4.6:1 sobre superficies oscuras */
     --text:  var(--text-primary);
     --text2: var(--text-secondary);
 
