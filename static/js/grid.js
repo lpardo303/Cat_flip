@@ -305,8 +305,47 @@ async function loadStats() {
   const data = await res.json();
   if (data.error) {
     grid.innerHTML = '<div style="padding:2rem;color:var(--text2);font-size:0.82rem;text-align:center">Carga un archivo para ver el diagnóstico.</div>';
+    const top0 = document.getElementById('diag-top');
+    if (top0) top0.innerHTML = '';
     return;
   }
+  lastStatsData = data;
+  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const totalRows = (currentRawData && currentRawData.shape) ? currentRawData.shape[0] : 0;
+
+  // ── F3.2: tarjetas KPI + distribución (contenedor creado por JS) ──
+  let top = document.getElementById('diag-top');
+  if (!top) {
+    top = document.createElement('div');
+    top.id = 'diag-top';
+    grid.parentElement.insertBefore(top, grid);
+  }
+  const cols = data.columns;
+  const totalCells = totalRows * cols.length;
+  let nullSum = 0;
+  cols.forEach(c => { const n = (data.stats[c] || {}).nulls; if (typeof n === 'number') nullSum += n; });
+  const integrity = totalCells > 0 ? ((1 - nullSum / totalCells) * 100) : 100;
+  const integrityColor = integrity >= 99 ? 'var(--green)' : (integrity >= 90 ? 'var(--yellow)' : 'var(--red)');
+  const dups = (typeof data.duplicates === 'number') ? data.duplicates : null;
+  const typed = cols.filter(c => !/^(object|str|string)/.test(String((data.stats[c] || {}).dtype || ''))).length;
+  const typedPct = cols.length ? (typed / cols.length * 100) : 0;
+
+  const catCols = cols.filter(c => Array.isArray((data.stats[c] || {}).top) && (data.stats[c].top.length > 0));
+  const distHtml = catCols.length
+    ? '<div class="dist-block"><div class="dist-head"><span class="dist-title">Distribución — top 5 valores</span>'
+      + '<select id="dist-col" aria-label="Columna categórica para la distribución" onchange="renderDistBars()">'
+      + catCols.map(c => '<option value="' + esc(c) + '">' + esc(c) + '</option>').join('')
+      + '</select></div><div id="dist-bars"></div></div>'
+    : '<div class="dist-block"><div class="dist-head"><span class="dist-title">Distribución — top 5 valores</span></div><div class="dist-empty">Sin columnas categóricas con valores.</div></div>';
+
+  top.innerHTML =
+      '<div class="kpi-grid">'
+    + '<div class="kpi-card"><span class="kpi-label">Integridad Nulos</span><span class="kpi-value" style="color:' + integrityColor + '">' + integrity.toFixed(1) + '%</span><span class="kpi-hint">celdas no nulas</span></div>'
+    + '<div class="kpi-card"><span class="kpi-label">Duplicados Excluidos</span><span class="kpi-value" style="color:' + (dups > 0 ? 'var(--orange)' : 'var(--green)') + '">' + (dups === null ? '–' : dups) + '</span><span class="kpi-hint">filas idénticas</span></div>'
+    + '<div class="kpi-card"><span class="kpi-label">Tipos Válidos</span><span class="kpi-value">' + typedPct.toFixed(0) + '%</span><span class="kpi-hint">' + typed + ' de ' + cols.length + ' columnas tipadas</span></div>'
+    + '</div>' + distHtml;
+  if (catCols.length) renderDistBars();
+
   grid.innerHTML = '';
   data.columns.forEach(col => {
     const s = data.stats[col] || {};
@@ -323,6 +362,29 @@ async function loadStats() {
   // Refrescar Schema & Profiling si está visible (F3.1)
   const schemaTab = document.getElementById('tab-schema');
   if (schemaTab && schemaTab.classList.contains('active')) loadSchema();
+}
+
+// Última respuesta de /stats (para redibujar la distribución sin re-fetch)
+let lastStatsData = null;
+
+// F3.2 — barras top-5 de la columna categórica seleccionada
+function renderDistBars() {
+  const box = document.getElementById('dist-bars');
+  const sel = document.getElementById('dist-col');
+  if (!box || !sel || !lastStatsData) return;
+  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const totalRows = (currentRawData && currentRawData.shape) ? currentRawData.shape[0] : 0;
+  const top5 = (lastStatsData.stats[sel.value] || {}).top || [];
+  if (!top5.length) { box.innerHTML = '<div class="dist-empty">Sin valores para mostrar.</div>'; return; }
+  const max = top5[0][1] || 1;
+  box.innerHTML = top5.map(([val, count]) => {
+    const pct = totalRows > 0 ? (count / totalRows * 100) : 0;
+    return '<div class="dist-row">'
+      + '<span class="dist-label" title="' + esc(val) + '">' + esc(val) + '</span>'
+      + '<div class="dist-track"><div class="dist-fill" style="width:' + (count / max * 100).toFixed(1) + '%"></div></div>'
+      + '<span class="dist-count">' + count + ' · ' + pct.toFixed(1) + '%</span>'
+      + '</div>';
+  }).join('');
 }
 
 // ── SCHEMA & PROFILING (F3.1): tabla de metadatos por columna ─────────

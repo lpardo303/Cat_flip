@@ -447,3 +447,31 @@ def test_stats_with_data_returns_metrics(client):
     assert stats["B"]["nulls"] == 1  # celda vacía en B
     assert stats["B"]["unique"] == 1
     assert stats["A"]["min"] == 1.0
+
+
+def test_stats_duplicates_and_categorical_top(client):
+    """F3.2: duplicates global + top-5 valores solo en columnas categóricas."""
+    upload(client, "A,B\n1,x\n1,x\n2,y\n")
+    data = client.get("/stats").get_json()
+    assert data["duplicates"] == 1  # la fila 2 repite a la 1
+    assert data["stats"]["B"]["top"] == [["x", 2], ["y", 1]]
+    assert "top" not in data["stats"]["A"]  # numérica → sin top
+
+
+def test_stats_duplicates_zero_and_all_null_column(client):
+    upload(client, "A,B\n1,\n2,\n")
+    data = client.get("/stats").get_json()
+    assert data["duplicates"] == 0
+    assert data["stats"]["B"]["top"] == []  # todo nulo → sin valores
+    assert "top" not in data["stats"]["A"]
+
+
+def test_stats_top_limits_five_and_bool(client):
+    upload(client, "C,B\na,TRUE\nb,FALSE\na,TRUE\nc,TRUE\na,FALSE\nd,TRUE\ne,TRUE\n")
+    data = client.get("/stats").get_json()
+    top_c = data["stats"]["C"]["top"]
+    assert top_c[0] == ["a", 3]
+    assert len(top_c) == 5  # nunca más de 5
+    top_b = dict(data["stats"]["B"]["top"])
+    # pandas convierte el bool a str canónico: "True"/"False" (no el literal del CSV)
+    assert top_b["True"] == 5 and top_b["False"] == 2

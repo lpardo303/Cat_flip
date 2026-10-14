@@ -424,9 +424,29 @@ def stats():
             except (TypeError, ValueError):
                 col_stats["min"] = col_stats["max"] = col_stats["mean"] = None
 
+        # Top-5 valores para columnas categóricas (F3.2 Diagnostics):
+        # texto/objeto + bool (pandas trata bool como numérico) + columnas
+        # todas nulas (para que el front las muestre vacías, no ausentes).
+        if (
+            not pd.api.types.is_numeric_dtype(series)
+            or pd.api.types.is_bool_dtype(series)
+            or (not series.notna().any())
+        ):
+            try:
+                vc = series.dropna().astype(str).value_counts().head(5)
+                col_stats["top"] = [[str(v), int(c)] for v, c in vc.items()]
+            except Exception:
+                col_stats["top"] = []
+
         stats[col] = col_stats
 
-    return jsonify({"columns": current_df.columns.tolist(), "stats": stats})
+    # Filas duplicadas exactas (F3.2 — KPI "Duplicados Excluidos")
+    try:
+        duplicates = int(current_df.duplicated().sum())
+    except Exception:
+        duplicates = None
+
+    return jsonify({"columns": current_df.columns.tolist(), "stats": stats, "duplicates": duplicates})
 
 if __name__ == "__main__":
     app.run(debug=False, port=5050, host="127.0.0.1")
