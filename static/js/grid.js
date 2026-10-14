@@ -318,8 +318,62 @@ async function loadStats() {
       rows += '<div class="stat-row"><span>Max</span><span>'+s.max+'</span></div>';
       rows += '<div class="stat-row"><span>Media</span><span>'+s.mean+'</span></div>';
     }
-    grid.innerHTML += '<div class="stat-card"><h4 title="'+col+'">'+col+'</h4>'+rows+'</div>';
+    grid.innerHTML += '<div class="stat-card"><h2 title="'+col+'">'+col+'</h2>'+rows+'</div>';
   });
+  // Refrescar Schema & Profiling si está visible (F3.1)
+  const schemaTab = document.getElementById('tab-schema');
+  if (schemaTab && schemaTab.classList.contains('active')) loadSchema();
+}
+
+// ── SCHEMA & PROFILING (F3.1): tabla de metadatos por columna ─────────
+async function loadSchema() {
+  const wrap = document.getElementById('schema-wrap');
+  if (!wrap) return;
+  const res = await fetch('/stats');
+  const data = await res.json();
+  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  if (data.error) {
+    wrap.innerHTML = '<div class="schema-empty">Carga un archivo para ver el esquema y el perfilado de columnas.</div>';
+    return;
+  }
+  const totalRows = (currentRawData && currentRawData.shape) ? currentRawData.shape[0] : 0;
+  const kindOf = dtype => {
+    const t = String(dtype || '');
+    if (/int/.test(t)) return 'INT';
+    if (/float/.test(t)) return 'FLOAT';
+    if (/bool/.test(t)) return 'BOOL';
+    if (/datetime/.test(t)) return 'DATE';
+    return 'STR';
+  };
+  let rows = '';
+  data.columns.forEach(col => {
+    const s = data.stats[col] || {};
+    const hasNulls = (s.nulls !== undefined && s.nulls !== null);
+    const nulls = hasNulls ? s.nulls : null;
+    const nullPct = (hasNulls && totalRows > 0) ? (nulls / totalRows * 100) : 0;
+    const hasUnique = (s.unique !== undefined && s.unique !== null);
+    const unique = hasUnique ? s.unique : null;
+    const cardPct = (hasUnique && totalRows > 0) ? (unique / totalRows * 100) : null;
+    const isNum = (s.min !== undefined && s.min !== null);
+    const kind = kindOf(s.dtype);
+    const nullCell = !hasNulls ? '–'
+      : nulls + ' <span class="schema-pct">(' + nullPct.toFixed(1) + '%)</span>';
+    rows += '<tr>'
+      + '<td class="schema-col" title="' + esc(col) + '">' + esc(col) + '</td>'
+      + '<td><span class="type-badge ' + kind + '" title="' + esc(s.dtype || '') + '">' + kind + '</span></td>'
+      + '<td style="color:' + (nulls > 0 ? 'var(--yellow)' : 'var(--green)') + '">' + nullCell + '</td>'
+      + '<td>' + (hasUnique ? unique : '–') + '</td>'
+      + '<td>' + (cardPct !== null ? cardPct.toFixed(1) + '%' : '–') + '</td>'
+      + '<td>' + (isNum ? esc(s.min) : '–') + '</td>'
+      + '<td>' + (isNum ? esc(s.max) : '–') + '</td>'
+      + '<td>' + (isNum && s.mean !== undefined && s.mean !== null ? esc(s.mean) : '–') + '</td>'
+      + '</tr>';
+  });
+  wrap.innerHTML =
+      '<div class="schema-summary">' + data.columns.length + ' columna(s) · ' + totalRows + ' fila(s) · perfilado en vivo desde <code>GET /stats</code></div>'
+    + '<table class="schema-table">'
+    + '<thead><tr><th scope="col">Columna</th><th scope="col">Tipo</th><th scope="col">Nulos</th><th scope="col">Únicos</th><th scope="col">Cardinalidad</th><th scope="col">Min</th><th scope="col">Max</th><th scope="col">Media</th></tr></thead>'
+    + '<tbody>' + rows + '</tbody></table>';
 }
 
 // Cerrar menú contextual al hacer clic fuera

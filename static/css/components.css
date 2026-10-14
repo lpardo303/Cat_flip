@@ -630,7 +630,7 @@
     transition: box-shadow 0.15s, transform 0.15s;
   }
   .stat-card:hover { box-shadow: var(--shadow2); transform: translateY(-1px); }
-  .stat-card h4 {
+  .stat-card h2 {
     font-family: var(--font-head);
     font-size: 0.72rem;
     font-weight: 700;
@@ -982,4 +982,72 @@
   .ds-dropzone-hint { font-size: 0.68rem; color: var(--text2); }
   @media (max-width: 560px) {
     .ds-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ── H1 DEL LOGO (a11y page-has-heading-one) ───────────── */
+  .logo-title {
+    margin: 0;
+    font-size: inherit;
+    font-weight: inherit;
+    font-family: inherit;
+  }
+
+  /* ── SCHEMA & PROFILING (F3.1) ─────────────────────────── */
+  .schema-wrap { padding: 1rem; overflow: auto; }
+  .schema-summary {
+    font-size: 0.75rem;
+    color: var(--text2);
+    margin-bottom: 0.6rem;
+  }
+  .schema-summary code {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    background: var(--teal-bg);
+    border: 1px solid var(--teal-bd);
+    border-radius: 4px;
+    padding: 0 0.3rem;
+    color: var(--teal);
+  }
+  .schema-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .schema-table th {
+    text-align: left;
+    font-family: var(--font-ui);
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text2);
+    background: var(--surface2);
+    padding: 0.5rem 0.7rem;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .schema-table td {
+    padding: 0.45rem 0.7rem;
+    border-bottom: 1px solid var(--border2);
+    color: var(--text);
+    white-space: nowrap;
+  }
+  .schema-table tbody tr:last-child td { border-bottom: none; }
+  .schema-table tbody tr:hover { background: var(--row-hover); }
+  .schema-col {
+    font-weight: 600;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .schema-pct { color: var(--text2); font-size: 0.68rem; }
+  .schema-empty {
+    padding: 2rem;
+    text-align: center;
+    color: var(--text2);
+    font-size: 0.82rem;
   }
