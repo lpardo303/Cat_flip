@@ -6,7 +6,7 @@
 
 ## ✨ Características Principales
 
-* 🚀 **25 Operaciones ETL:** Herramientas de limpieza, filtrado, transformación estructural (Pivot/Unpivot) y manejo de texto.
+* 🚀 **29 Operaciones ETL:** Herramientas de limpieza, filtrado, transformación estructural (Pivot/Unpivot) y manejo de texto.
 * 🐍 **Generador de Código en Vivo:** Aprende y audita con el visor que muestra el código de Pandas autogenerado en tiempo real.
 * 🌗 **Kinetic Query Minimal:** Interfaz fluida y minimalista (Glassmorphism) con soporte persistente para modo claro y oscuro.
 * 📊 **Perfilado de Datos:** Diagnóstico estadístico instantáneo de tus columnas (nulos, valores únicos, mínimos, máximos).
@@ -71,6 +71,21 @@ Asegúrate de tener **Python 3.10+** instalado en tu sistema.
 > ```powershell
 > Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 > ```
+
+## 🧪 Tests
+
+El proyecto usa `pytest` con cobertura. Los fixtures de `tests/conftest.py` resetean el estado global de `app` en cada test, así que los tests son independientes entre sí.
+
+```bash
+pip install -r requirements-dev.txt   # pytest + pytest-cov
+pytest                                # suite completa
+coverage gate (lo que usa CI):
+pytest tests/ --cov=app --cov-report=term-missing --cov-fail-under=93
+```
+
+Los tests originales siguen siendo unittest y también corren con `python -m unittest discover -s tests`.
+
+El workflow de CI (`.github/workflows/ci.yml`) ejecuta la suite con el gate de cobertura y añade `node --check` sobre los 5 módulos de `static/js/` en cada push/PR a `main`.
 
 ## 🛠️ Arquitectura
 

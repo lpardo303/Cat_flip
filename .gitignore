@@ -53,3 +53,13 @@ Desktop.ini
 
 # Contexto local/privado para IAs
 /context/
+
+# Historiales de R
+.Rhistory
+.RData
+
+# Cobertura de tests
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
