@@ -479,7 +479,7 @@ def test_stats_top_limits_five_and_bool(client):
 
 # ── Registro de operaciones (refactor P2) ───────────────────────────
 
-def test_registry_expone_las_17_operaciones():
+def test_registry_expone_las_18_operaciones():
     """El registro define exactamente las ops del contrato UI/API.
 
     Protege contra borrados accidentales al mover handlers en operations.py.
@@ -490,7 +490,7 @@ def test_registry_expone_las_17_operaciones():
         "unpivot", "pivot", "split_column", "split_to_rows", "set_header",
         "drop_nulls", "drop_duplicates", "drop_rows", "trim", "clean_newlines",
         "change_case", "replace", "rename_column", "drop_column", "change_type",
-        "filter", "sort",
+        "filter", "sort", "group_by",
     }
     assert set(OPS) == expected
     assert all(callable(fn) for fn in OPS.values())

@@ -100,6 +100,11 @@ const modalDefs = {
     body: () => '<label>Índice de la fila (0 = primera fila):</label><input type="number" id="sh-idx" value="0" min="0"><p style="font-size:0.75rem;color:var(--text2);margin-top:0.5rem">Los valores de esa fila se usarán como nombres de columna y la fila será eliminada.</p>',
     params: () => ({ row_index: parseInt(document.getElementById('sh-idx').value) || 0 })
   },
+  group_by: {
+    title: icon('layers') + ' Group By (Agregación)',
+    body: () => '<label>Agrupar por (columna):</label><select id=\"gb-by\" aria-label=\"Columna para agrupar\">'+colOptions()+'</select><label>Columna numérica a agregar:</label><select id=\"gb-col\" aria-label=\"Columna numérica a agregar\">'+colOptions()+'</select><label>Función de agregación:</label><select id=\"gb-func\" aria-label=\"Función de agregación\"><option value=\"sum\">sum — suma</option><option value=\"mean\">mean — media</option><option value=\"count\">count — conteo</option><option value=\"min\">min — mínimo</option><option value=\"max\">max — máximo</option><option value=\"median\">median — mediana</option><option value=\"nunique\">nunique — valores únicos</option></select>',
+    params: () => ({ by: document.getElementById('gb-by').value, column: document.getElementById('gb-col').value, func: document.getElementById('gb-func').value })
+  },
 };
 
 function openModal(op) {

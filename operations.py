@@ -231,6 +231,18 @@ def op_sort(df, params):
     return df, code
 
 
+def op_group_by(df, params):
+    by = params.get("by") or []
+    if isinstance(by, str):
+        by = [by]
+    column = params.get("column")
+    func = params.get("func", "sum")
+    aggs = {column: func}
+    df = df.groupby(by, dropna=False, as_index=False).agg(aggs)
+    code = f"df = df.groupby({by}, dropna=False).agg({aggs})  # {len(df)} grupo(s)"
+    return df, code
+
+
 # ── Registro (consumido por app.operation()) ────────────────────────────
 
 OPS = {
@@ -255,4 +267,5 @@ OPS = {
     # Reglas & Operaciones
     "filter": op_filter,
     "sort": op_sort,
+    "group_by": op_group_by,
 }
