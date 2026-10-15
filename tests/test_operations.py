@@ -475,3 +475,22 @@ def test_stats_top_limits_five_and_bool(client):
     top_b = dict(data["stats"]["B"]["top"])
     # pandas convierte el bool a str canónico: "True"/"False" (no el literal del CSV)
     assert top_b["True"] == 5 and top_b["False"] == 2
+
+
+# ── Registro de operaciones (refactor P2) ───────────────────────────
+
+def test_registry_expone_las_17_operaciones():
+    """El registro define exactamente las ops del contrato UI/API.
+
+    Protege contra borrados accidentales al mover handlers en operations.py.
+    """
+    from operations import OPS
+
+    expected = {
+        "unpivot", "pivot", "split_column", "split_to_rows", "set_header",
+        "drop_nulls", "drop_duplicates", "drop_rows", "trim", "clean_newlines",
+        "change_case", "replace", "rename_column", "drop_column", "change_type",
+        "filter", "sort",
+    }
+    assert set(OPS) == expected
+    assert all(callable(fn) for fn in OPS.values())

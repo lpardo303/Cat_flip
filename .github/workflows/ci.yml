@@ -29,6 +29,7 @@ jobs:
         run: >
           pytest tests/
           --cov=app
+          --cov=operations
           --cov-report=term-missing
           --cov-fail-under=93
 
