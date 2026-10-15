@@ -84,12 +84,13 @@ function enableOps() {
 }
 
 function switchTab(name) {
-  const names = ['data','stats','schema','code'];
+  const names = ['data','stats','schema','lineage','code'];
   document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', names[i]===name));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   if (name === 'stats') loadStats();
   if (name === 'schema') loadSchema();
+  if (name === 'lineage') loadLineage();
 }
 
 // ── Pipeline recipe ─────────────────────────────────────────────────────

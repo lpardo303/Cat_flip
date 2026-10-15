@@ -1141,3 +1141,61 @@
   @media (max-width: 720px) {
     .kpi-grid { grid-template-columns: 1fr; }
   }
+
+  /* ── LINEAGE GRAPH (F3.3) ─────────────────────────────── */
+  .lin-wrap { padding: 1rem; overflow: auto; }
+  .lin-summary {
+    font-size: 0.75rem;
+    color: var(--text2);
+    margin-bottom: 0.6rem;
+  }
+  .lin-svg { width: 100%; max-width: 420px; display: block; margin: 0 auto; }
+  .lin-node rect {
+    fill: var(--surface);
+    stroke: var(--border);
+    stroke-width: 1;
+  }
+  .lin-node-source rect {
+    stroke: var(--teal);
+    fill: var(--teal-bg);
+  }
+  .lin-op {
+    font-family: var(--font-ui);
+    font-size: 12.5px;
+    font-weight: 700;
+    fill: var(--text);
+  }
+  .lin-shape {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    fill: var(--teal);
+  }
+  .lin-params {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    fill: var(--text2);
+  }
+  .lin-edge { stroke: var(--teal-bd); stroke-width: 1.5; }
+  .lin-arrow-head { fill: var(--teal); }
+  .lin-hint {
+    text-align: center;
+    font-size: 0.72rem;
+    color: var(--text2);
+    margin-top: 0.6rem;
+  }
+  .lin-empty {
+    padding: 2rem;
+    text-align: center;
+    color: var(--text2);
+    font-size: 0.82rem;
+  }
+  /* Alternativa textual del grafo: solo lectores de pantalla */
+  .lin-sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }

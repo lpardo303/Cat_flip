@@ -387,6 +387,68 @@ function renderDistBars() {
   }).join('');
 }
 
+// ── LINEAGE GRAPH (F3.3): cadena SVG de pasos del pipeline ─────────────
+async function loadLineage() {
+  const wrap = document.getElementById('lin-wrap');
+  if (!wrap) return;
+  const res = await fetch('/lineage');
+  const data = await res.json();
+  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  if (data.error) {
+    wrap.innerHTML = '<div class="lin-empty">Carga un archivo para ver el linaje del pipeline.</div>';
+    return;
+  }
+  const nodes = data.nodes || [];
+  if (!nodes.length) {
+    wrap.innerHTML = '<div class="lin-empty">Sin pasos registrados.</div>';
+    return;
+  }
+
+  const OP_LABELS = {
+    dataset: 'Dataset original',
+  };
+  const clip = (s, n) => s.length > n ? s.slice(0, n - 1) + '…' : s;
+  const labelOf = n => clip(OP_LABELS[n.op] || String(n.op || '?').replace(/_/g, ' '), 28);
+  const paramsOf = n => clip(Object.entries(n.params || {})
+    .filter(([, v]) => v !== null && v !== undefined && v !== '')
+    .map(([k, v]) => k + ': ' + (Array.isArray(v) ? v.join(', ') : v))
+    .join(' · '), 44);
+
+  // Geometría: cadena vertical, nodo = tarjeta SVG
+  const W = 360, NH = 68, GAP = 40, PAD = 8;
+  const H = nodes.length * NH + (nodes.length - 1) * GAP + PAD * 2;
+  const X = (W - 300) / 2, NW = 300;
+  let svg = '<svg class="lin-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Linaje del pipeline: '
+    + esc(nodes.map(labelOf).join(' → ')) + '">'
+    + '<defs><marker id="lin-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">'
+    + '<path d="M 0 0 L 10 5 L 0 10 z" class="lin-arrow-head"/></marker></defs>';
+  nodes.forEach((n, i) => {
+    const y = PAD + i * (NH + GAP);
+    const cls = n.op === 'dataset' ? ' lin-node-source' : '';
+    svg += '<g class="lin-node' + cls + '">'
+      + '<rect x="' + X + '" y="' + y + '" width="' + NW + '" height="' + NH + '" rx="10"/>'
+      + '<text class="lin-op" x="' + (X + 14) + '" y="' + (y + 22) + '">' + esc(labelOf(n)) + '</text>'
+      + '<text class="lin-shape" x="' + (X + NW - 14) + '" y="' + (y + 22) + '" text-anchor="end">' + n.rows + '×' + n.cols + '</text>'
+      + '<text class="lin-params" x="' + (X + 14) + '" y="' + (y + 42) + '">' + esc(paramsOf(n) || '—') + '</text>'
+      + '</g>';
+    if (i < nodes.length - 1) {
+      const x = W / 2;
+      svg += '<line class="lin-edge" x1="' + x + '" y1="' + (y + NH + 4) + '" x2="' + x + '" y2="' + (y + NH + GAP - 6) + '" marker-end="url(#lin-arrow)"/>';
+    }
+  });
+  svg += '</svg>';
+
+  // Alternativa textual accesible (lista de pasos, visible solo para lectores)
+  const srList = '<ol class="lin-sr-only">' + nodes.map(n =>
+    '<li>' + esc(labelOf(n)) + (paramsOf(n) ? ' — ' + esc(paramsOf(n)) : '') + ' — ' + n.rows + ' filas × ' + n.cols + ' columnas</li>'
+  ).join('') + '</ol>';
+
+  const hint = nodes.length === 1
+    ? '<div class="lin-hint">Aplica transformaciones para ver cómo evoluciona el dataset.</div>'
+    : '';
+  wrap.innerHTML = '<div class="lin-summary">' + nodes.length + ' estado' + (nodes.length > 1 ? 's' : '') + ' en el pipeline · ' + (nodes[nodes.length - 1].rows).toLocaleString() + ' fila(s) actual(es)</div>' + svg + srList + hint;
+}
+
 // ── SCHEMA & PROFILING (F3.1): tabla de metadatos por columna ─────────
 async function loadSchema() {
   const wrap = document.getElementById('schema-wrap');

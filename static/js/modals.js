@@ -187,6 +187,7 @@ async function confirmModal() {
     updateCode(data.code);
     addPipelineStep(op, params);
     loadStats(); // refrescar diagnóstico en segundo plano
+    loadLineage(); // refrescar linaje en segundo plano (F3.3)
     toast(op.replace(/_/g,' ') + ' aplicado');
   } catch(e) { hideLoading(); toast('Error al aplicar operación', 'error'); }
 }
@@ -200,6 +201,7 @@ async function undo() {
   renderTable(data.data); updateCode(data.code);
   if (pipelineSteps.length > 0) { pipelineSteps.pop(); renderPipeline(); }
   loadStats(); // refrescar diagnóstico en segundo plano
+  loadLineage(); // refrescar linaje en segundo plano (F3.3)
   toast('Paso deshecho', 'info');
 }
 

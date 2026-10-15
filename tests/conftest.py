@@ -1,7 +1,7 @@
 """Fixtures compartidos: aislar el estado global de `app` entre tests.
 
 `app.py` guarda el DataFrame y el pipeline en globals de módulo
-(`current_df`, `history`, `code_log`). Sin este reset, los tests se
+(`current_df`, `history`, `code_log`, `op_history`). Sin este reset, los tests se
 contaminan entre sí (el orden de ejecución importaba).
 """
 import pytest
@@ -15,10 +15,12 @@ def reset_app_state():
     app_module.current_df = None
     app_module.history = []
     app_module.code_log = []
+    app_module.op_history = []
     yield
     app_module.current_df = None
     app_module.history = []
     app_module.code_log = []
+    app_module.op_history = []
 
 
 @pytest.fixture()

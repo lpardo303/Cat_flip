@@ -11,6 +11,7 @@ app = Flask(__name__)
 current_df = None
 history = []  # Para undo
 code_log = []  # Log de código generado
+op_history = []  # Pasos estructurados {op, params} para el linaje (F3.3)
 
 def df_to_json(df, max_rows=500):
     """Convierte DataFrame a JSON seguro para el frontend."""
@@ -45,7 +46,7 @@ def index():
 
 @app.route("/upload", methods=["POST"])
 def upload():
-    global current_df, history, code_log
+    global current_df, history, code_log, op_history
     file = request.files["file"]
     filename = file.filename.lower()
     
@@ -66,6 +67,7 @@ def upload():
         
         history = [current_df.copy()]
         code_log = [f"import pandas as pd\n\n# Cargar archivo\n{code}"]
+        op_history = []
         
         return jsonify({
             "success": True,
@@ -87,7 +89,7 @@ def get_sheets():
 
 @app.route("/operation", methods=["POST"])
 def operation():
-    global current_df, history, code_log
+    global current_df, history, code_log, op_history
     if current_df is None:
         return jsonify({"error": "No hay datos cargados."}), 400
     
@@ -300,6 +302,7 @@ def operation():
 
         # Guardar en historial
         history.append(df.copy())
+        op_history.append({"op": op, "params": params})
         current_df = df
         code_log.append(f"# {op}\n{code}")
         
@@ -315,12 +318,14 @@ def operation():
 
 @app.route("/undo", methods=["POST"])
 def undo():
-    global current_df, history, code_log
+    global current_df, history, code_log, op_history
     if len(history) > 1:
         history.pop()
         current_df = history[-1].copy()
         if len(code_log) > 1:
             code_log.pop()
+        if len(op_history) > 0:
+            op_history.pop()
         return jsonify({
             "success": True,
             "data": df_to_json(current_df),
@@ -447,6 +452,43 @@ def stats():
         duplicates = None
 
     return jsonify({"columns": current_df.columns.tolist(), "stats": stats, "duplicates": duplicates})
+
+
+@app.route("/lineage", methods=["GET"])
+def lineage():
+    """Grafo de linaje del pipeline (F3.3): cadena de pasos con su shape.
+
+    Nodo 0 = dataset original (snapshot `history[0]`); nodo i = operación
+    `op_history[i-1]` con el shape del snapshot `history[i]`. Los shapes
+    salen gratis del historial de undo, así que no se guarda estado extra.
+    """
+    global current_df
+    if current_df is None:
+        return jsonify({"error": "No hay datos."}), 400
+
+    nodes = []
+    # Nodo fuente: snapshot original
+    src_rows, src_cols = (list(history[0].shape) if history else list(current_df.shape))
+    nodes.append({"id": 0, "op": "dataset", "params": {}, "rows": int(src_rows), "cols": int(src_cols)})
+
+    # Nodos de operaciones (zip defensivo por si history y op_history difieren)
+    for i, step in enumerate(op_history):
+        snap_idx = i + 1
+        if snap_idx < len(history):
+            rows, cols = history[snap_idx].shape
+        else:
+            rows, cols = current_df.shape
+        nodes.append({
+            "id": snap_idx,
+            "op": step.get("op", "?"),
+            "params": step.get("params", {}) or {},
+            "rows": int(rows),
+            "cols": int(cols),
+        })
+
+    edges = [[i, i + 1] for i in range(len(nodes) - 1)]
+    return jsonify({"nodes": nodes, "edges": edges})
+
 
 if __name__ == "__main__":
     app.run(debug=False, port=5050, host="127.0.0.1")
