@@ -16,11 +16,17 @@ def reset_app_state():
     app_module.history = []
     app_module.code_log = []
     app_module.op_history = []
+    app_module.right_df = None
+    app_module.right_name = ""
+    app_module.right_code = ""
     yield
     app_module.current_df = None
     app_module.history = []
     app_module.code_log = []
     app_module.op_history = []
+    app_module.right_df = None
+    app_module.right_name = ""
+    app_module.right_code = ""
 
 
 @pytest.fixture()

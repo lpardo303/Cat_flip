@@ -105,7 +105,73 @@ const modalDefs = {
     body: () => '<label>Agrupar por (columna):</label><select id=\"gb-by\" aria-label=\"Columna para agrupar\">'+colOptions()+'</select><label>Columna numérica a agregar:</label><select id=\"gb-col\" aria-label=\"Columna numérica a agregar\">'+colOptions()+'</select><label>Función de agregación:</label><select id=\"gb-func\" aria-label=\"Función de agregación\"><option value=\"sum\">sum — suma</option><option value=\"mean\">mean — media</option><option value=\"count\">count — conteo</option><option value=\"min\">min — mínimo</option><option value=\"max\">max — máximo</option><option value=\"median\">median — mediana</option><option value=\"nunique\">nunique — valores únicos</option></select>',
     params: () => ({ by: document.getElementById('gb-by').value, column: document.getElementById('gb-col').value, func: document.getElementById('gb-func').value })
   },
+  merge: {
+    title: icon('git-merge') + ' Join / Merge (Cruzar datasets)',
+    body: () => '<div class="merge-src"><div class="merge-src-head"><span>Frame derecho:</span><span id="merge-right-info">Sin cargar</span></div><div class="merge-src-actions"><select id="merge-right-demo" aria-label="Dataset demo para el frame derecho"><option value="">Elegir demo…</option>'+DEMO_DATASETS.map((d, i) => '<option value="'+i+'">'+d.name+'</option>').join('')+'</select><button type="button" class="btn btn-secondary" id="merge-right-browse">Examinar…</button><input type="file" id="merge-right-file" accept=".csv,.xlsx,.xls" hidden></div></div>'
+      + '<label>Columna de cruce (dataset activo):</label><select id="merge-left-col" aria-label="Columna de cruce del dataset activo">'+colOptions()+'</select>'
+      + '<label>Columna de cruce (frame derecho):</label><select id="merge-right-col" aria-label="Columna de cruce del frame derecho"><option value="">— carga primero el frame derecho —</option></select>'
+      + '<label>Tipo de cruce:</label><select id="merge-how" aria-label="Tipo de cruce"><option value="inner">inner — solo coincidencias</option><option value="left" selected>left — todas las filas izquierdas</option><option value="right">right — todas las filas derechas</option><option value="outer">outer — unión de ambos</option></select>'
+      + '<label>Sufijo columnas izquierda:</label><input type="text" id="merge-suffix-left" aria-label="Sufijo para columnas solo izquierda" value="_x">'
+      + '<label>Sufijo columnas derecha:</label><input type="text" id="merge-suffix-right" aria-label="Sufijo para columnas solo derecha" value="_y">'
+      + '<p class="modal-warn">'+icon('triangle-alert')+'<span>Las claves sin coincidir quedan con valores vacíos. Puedes deshacer con '+icon('undo-2')+' Deshacer paso</span></p>',
+    validate: (p) => !p.left_on ? 'Elige la columna de cruce del dataset activo'
+      : (!p.right_on ? 'Carga un frame derecho y elige su columna de cruce' : null),
+    params: () => ({
+      left_on: document.getElementById('merge-left-col').value,
+      right_on: document.getElementById('merge-right-col').value,
+      how: document.getElementById('merge-how').value,
+      suffixes: [document.getElementById('merge-suffix-left').value || '_x',
+                 document.getElementById('merge-suffix-right').value || '_y']
+    }),
+    init: () => {
+      const browse = document.getElementById('merge-right-browse');
+      const file = document.getElementById('merge-right-file');
+      const demo = document.getElementById('merge-right-demo');
+      browse.addEventListener('click', () => file.click());
+      file.addEventListener('change', e => {
+        if (e.target.files[0]) sendRightFile(e.target.files[0]);
+        e.target.value = '';
+      });
+      demo.addEventListener('change', e => {
+        const d = DEMO_DATASETS[Number(e.target.value)];
+        e.target.value = '';
+        if (d) sendRightFile(new File([d.csv], d.file, { type: 'text/csv' }));
+      });
+      refreshRightInfo();
+    }
+  },
 };
+
+// ── FRAME DERECHO DEL JOIN/MERGE (op #19) ─────────────────────────────
+async function sendRightFile(file) {
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const res = await fetch('/upload_right', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.error) { toast(data.error, 'error'); return; }
+    applyRightInfo(data.name, data.data.columns, data.data.shape);
+    toast('Frame derecho cargado: ' + data.name);
+  } catch (e) { toast('Error al cargar el frame derecho', 'error'); }
+}
+
+async function refreshRightInfo() {
+  try {
+    const res = await fetch('/right_info');
+    const data = await res.json();
+    if (data.loaded) applyRightInfo(data.name, data.columns, data.shape);
+  } catch (e) { /* sin red: el modal queda en "Sin cargar" */ }
+}
+
+function applyRightInfo(name, columns, shape) {
+  const info = document.getElementById('merge-right-info');
+  const sel = document.getElementById('merge-right-col');
+  if (!info || !sel) return; // modal cerrado
+  info.textContent = name + ' — ' + shape[0] + '×' + shape[1];
+  sel.innerHTML = columns.map(c => '<option value="' + escapeHtml(c) + '">' + escapeHtml(c) + '</option>').join('');
+  const left = document.getElementById('merge-left-col');
+  if (left && columns.includes(left.value)) sel.value = left.value;
+}
 
 function openModal(op) {
   if (!currentColumns.length) return;
@@ -113,6 +179,7 @@ function openModal(op) {
   const def = modalDefs[op];
   document.getElementById('modal-title').innerHTML = def.title;
   document.getElementById('modal-body').innerHTML = def.body();
+  if (def.init) def.init();
   document.getElementById('modal-overlay').classList.add('open');
 }
 
@@ -181,6 +248,10 @@ async function confirmModal() {
   if (!currentOp) return;
   const op = currentOp;
   const params = modalDefs[op].params();
+  if (modalDefs[op].validate) {
+    const err = modalDefs[op].validate(params);
+    if (err) { toast(err, 'error'); return; }
+  }
   closeModal();
   showLoading();
   try {

@@ -15,6 +15,12 @@ history = []  # Para undo
 code_log = []  # Log de código generado
 op_history = []  # Pasos estructurados {op, params} para el linaje (F3.3)
 
+# Frame derecho para el cruce Join/Merge (op #19): fuente independiente del
+# pipeline (no participa en undo) más su expresión de carga para el script.
+right_df = None
+right_name = ""
+right_code = ""
+
 def df_to_json(df, max_rows=500):
     """Convierte DataFrame a JSON seguro para el frontend."""
     preview = df.head(max_rows)
@@ -46,6 +52,26 @@ def df_to_json(df, max_rows=500):
 def index():
     return render_template("index.html")
 
+def read_table(file):
+    """Lee un CSV/XLSX/XLS subido y devuelve (df, expresión pandas).
+
+    La expresión es el RHS listo para el código generado: en /upload se usa
+    como `df = <expr>` y en el cruce como `df_right = <expr>`. El formato lo
+    valida el endpoint que llama; aquí solo se autodetecta el separador del
+    CSV (comas vs punto y coma) o se lee la hoja de Excel.
+    """
+    if file.filename.lower().endswith(".csv"):
+        # Intentar detectar el separador automáticamente
+        content = file.read()
+        file.seek(0)
+        sep = "," if content.count(b",") > content.count(b";") else ";"
+        df = pd.read_csv(io.BytesIO(content), sep=sep)
+        return df, f"pd.read_csv('{file.filename}', sep='{sep}')"
+    sheet = request.form.get("sheet", 0)
+    df = pd.read_excel(file, sheet_name=int(sheet) if str(sheet).isdigit() else sheet)
+    return df, f"pd.read_excel('{file.filename}', sheet_name={repr(sheet)})"
+
+
 @app.route("/upload", methods=["POST"])
 def upload():
     global current_df, history, code_log, op_history
@@ -53,19 +79,11 @@ def upload():
     filename = file.filename.lower()
     
     try:
-        if filename.endswith(".csv"):
-            # Intentar detectar el separador automáticamente
-            content = file.read()
-            file.seek(0)
-            sep = "," if content.count(b",") > content.count(b";") else ";"
-            current_df = pd.read_csv(io.BytesIO(content), sep=sep)
-            code = f"df = pd.read_csv('{file.filename}', sep='{sep}')"
-        elif filename.endswith((".xlsx", ".xls")):
-            sheet = request.form.get("sheet", 0)
-            current_df = pd.read_excel(file, sheet_name=int(sheet) if str(sheet).isdigit() else sheet)
-            code = f"df = pd.read_excel('{file.filename}', sheet_name={repr(sheet)})"
-        else:
+        if not filename.endswith((".csv", ".xlsx", ".xls")):
             return jsonify({"error": "Formato no soportado. Usa CSV, XLSX o XLS."}), 400
+
+        current_df, expr = read_table(file)
+        code = f"df = {expr}"
         
         history = [current_df.copy()]
         code_log = [f"import pandas as pd\n\n# Cargar archivo\n{code}"]
@@ -79,6 +97,41 @@ def upload():
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route("/upload_right", methods=["POST"])
+def upload_right():
+    """Carga el frame derecho para el cruce Join/Merge (op #19)."""
+    global right_df, right_name, right_code
+    file = request.files["file"]
+    filename = file.filename.lower()
+
+    if not filename.endswith((".csv", ".xlsx", ".xls")):
+        return jsonify({"error": "Formato no soportado. Usa CSV, XLSX o XLS."}), 400
+
+    try:
+        right_df, right_code = read_table(file)
+        right_name = file.filename
+        return jsonify({
+            "success": True,
+            "name": right_name,
+            "data": df_to_json(right_df),
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/right_info", methods=["GET"])
+def right_info():
+    """Estado del frame derecho: pre-pobla el select del modal de Join."""
+    if right_df is None:
+        return jsonify({"loaded": False})
+    return jsonify({
+        "loaded": True,
+        "name": right_name,
+        "columns": list(right_df.columns),
+        "shape": [int(right_df.shape[0]), int(right_df.shape[1])],
+    })
+
 
 @app.route("/get_sheets", methods=["POST"])
 def get_sheets():
@@ -104,11 +157,23 @@ def operation():
         handler = OPS.get(op)
         if handler is None:
             return jsonify({"error": f"Operación '{op}' no reconocida."}), 400
-        df, code = handler(current_df.copy(), params)
+
+        # Join/Merge (op #19): inyecta el frame derecho al handler. El
+        # DataFrame nunca entra en op_history (rompería la serialización de
+        # /lineage); el historial solo guarda el nombre de la fuente.
+        handler_params = params
+        history_params = params
+        if op == "merge":
+            if right_df is None:
+                return jsonify({"error": "No hay frame derecho cargado. Carga un segundo dataset desde el modal de Join."}), 400
+            handler_params = {**(params or {}), "right_df": right_df, "right_code": right_code}
+            history_params = {**(params or {}), "right_name": right_name}
+
+        df, code = handler(current_df.copy(), handler_params)
 
         # Guardar en historial
         history.append(df.copy())
-        op_history.append({"op": op, "params": params})
+        op_history.append({"op": op, "params": history_params})
         current_df = df
         code_log.append(f"# {op}\n{code}")
         

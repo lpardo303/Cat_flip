@@ -243,6 +243,52 @@ def op_group_by(df, params):
     return df, code
 
 
+def op_merge(df, params):
+    """Cruce Join/Merge del frame activo con el frame derecho (op #19).
+
+    `right_df` y `right_code` los inyecta `app.operation()`; el resto de
+    params (`left_on`, `right_on`, `how`, `suffixes`) llega serializado desde
+    el modal. Misma columna a ambos lados -> `on=[col]`; distintas ->
+    `left_on`/`right_on` (ambas claves quedan en el resultado).
+    """
+    right = params.get("right_df")
+    if right is None:
+        raise ValueError("No hay frame derecho cargado para el cruce.")
+    left_on = params.get("left_on")
+    right_on = params.get("right_on")
+    how = params.get("how", "left")
+    suffixes = tuple(params.get("suffixes") or ("_x", "_y"))
+
+    if how not in ("inner", "left", "right", "outer"):
+        raise ValueError(
+            f"Tipo de cruce '{how}' no válido. Usa: inner, left, right u outer."
+        )
+    if not left_on or not right_on:
+        raise ValueError("Debes elegir la columna de cruce en ambos frames.")
+    if left_on not in df.columns:
+        raise ValueError(f"La columna izquierda '{left_on}' no existe en el dataset activo.")
+    if right_on not in right.columns:
+        raise ValueError(f"La columna derecha '{right_on}' no existe en el frame derecho.")
+
+    if left_on == right_on:
+        merged = df.merge(right, how=how, on=[left_on], suffixes=suffixes)
+        keys = f"on=['{left_on}']"
+    else:
+        merged = df.merge(
+            right, how=how, left_on=[left_on], right_on=[right_on], suffixes=suffixes
+        )
+        keys = f"left_on=['{left_on}'], right_on=['{right_on}']"
+
+    right_code = params.get("right_code")
+    load_line = f"df_right = {right_code}\n" if right_code else ""
+    code = (
+        f"{load_line}"
+        f"df = df.merge(df_right, how='{how}', {keys}, suffixes={list(suffixes)})\n"
+        f"  # {len(df)} → {len(merged)} filas tras cruce {how}"
+    )
+    return merged, code
+
+
 # ── Registro (consumido por app.operation()) ────────────────────────────
 
 OPS = {
@@ -268,4 +314,5 @@ OPS = {
     "filter": op_filter,
     "sort": op_sort,
     "group_by": op_group_by,
+    "merge": op_merge,
 }

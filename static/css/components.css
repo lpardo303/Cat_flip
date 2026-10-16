@@ -803,6 +803,31 @@
     margin: 0; cursor: pointer; font-weight: 400;
   }
   .modal .col-check input[type=checkbox] { accent-color: var(--teal); }
+  /* ── MERGE: fuente del frame derecho (op #19) ─────────── */
+  .merge-src {
+    background: var(--base2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius2);
+    padding: 0.55rem 0.6rem;
+    margin-top: 0.75rem;
+    margin-bottom: 0.35rem;
+  }
+  .merge-src-head {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 0.5rem; font-size: 0.73rem; color: var(--text2);
+    margin-bottom: 0.45rem;
+  }
+  #merge-right-info {
+    font-family: var(--font-mono); font-size: 0.7rem; color: var(--teal);
+    max-width: 62%; text-align: right;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .merge-src-actions { display: flex; gap: 0.4rem; }
+  .merge-src-actions select { flex: 1; min-width: 0; }
+  .merge-src-actions .btn {
+    font-size: 0.72rem; padding: 0.4rem 0.6rem;
+    white-space: nowrap; justify-content: center;
+  }
   .modal-footer { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1.25rem; }
 
   /* ── TOAST ─────────────────────────────────────────────── */
