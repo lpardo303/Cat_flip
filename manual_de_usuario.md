@@ -34,7 +34,7 @@ Funciones esenciales para sanear tus datos y remover información basura.
 8. **Eliminar Filas (Por posición):** 
    Recorta un número específico de filas directamente desde el principio (Top) o el final (Bottom) de tu dataset.
 9. **Trim Espacios:** 
-   Limpia espacios en blanco accidentales al principio o al final del texto dentro de las celdas (ej. `"  texto "` se convierte en `"texto"`).
+   Limpia espacios en blanco accidentales al principio o al final del texto dentro de las celdas (ej. `"  texto "` se convierte en `"texto"`). Además, las operaciones de texto (Trim, Limpiar Saltos, May/Min, Reemplazar, Separar Filas/Columnas y Cambiar Tipo a texto) convierten las cadenas vacías, los espacios sobrantes y los strings `"nan"`/`"none"`/`"null"` en **nulos reales** de pandas, de modo que *Eliminar Nulos*, las estadísticas y la barra de calidad reflejan el vacío verdadero.
 10. **Limpiar Saltos de Línea:** 
     Normaliza el texto de las celdas eliminando saltos de línea invisibles (`\n`, `\r`, `\r\n`) que suelen causar problemas al exportar a CSV.
 
@@ -88,6 +88,7 @@ Lógica condicional, ordenamiento, agregación y cruce de datasets.
   - 🔴 **Rojo** — calidad < 60% (columna con muchos nulos)
   
   Al pasar el cursor sobre la cabecera, el tooltip muestra el conteo exacto de nulos y el porcentaje de datos válidos (ej. `Precio — 12 nulos (88.5% válido)`). Las columnas sin ningún nulo no muestran fondo de barra para no distraer visualmente.
+* **Nulos visibles en el Data Grid:** Las celdas con un nulo real de pandas (NaN) muestran la etiqueta `null` en cursiva y color tenue, distinguiéndose así de un string vacío legítimo. Eliminar Nulos y la barra de calidad operan sobre exactamente los mismos nulos.
 * **Visor de Código:** Revisa el script de Python en tiempo real generado por tus acciones visuales.
 * **Exportar datos:** Desde el panel derecho, descarga tus datos limpios en formato CSV o Excel XLSX.
 * **Exportar pipeline como script Python (`.py`):** Descarga todo el pipeline acumulado como un archivo Python ejecutable e independiente. El script incluye el código de cada transformación aplicada en orden, listo para ejecutarse con `python nombre_script.py`, integrarse en un flujo de automatización (cron, Airflow) o reproducirse en cualquier entorno con pandas instalado. El botón aparece en el panel derecho, separado de las opciones de exportación de datos, identificado con color violeta.

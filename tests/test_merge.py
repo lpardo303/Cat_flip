@@ -92,7 +92,8 @@ def test_merge_left_join_same_key_columns(client):
     assert data["columns"] == ["Region", "Producto", "Ventas", "Meta"]
     # NaN de Este promociona Meta a float64: df_to_json renderiza 120.0
     assert cell(body, 0, "Meta") == "120.0"    # Norte, coincidencia
-    assert cell(body, 2, "Meta") == ""         # Este, sin match -> NaN
+    # Bug 4: el NaN sin match llega como JSON null (antes "" indistinguible)
+    assert cell(body, 2, "Meta") is None
 
 
 @pytest.mark.parametrize(

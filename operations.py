@@ -14,6 +14,32 @@ import numpy as np
 import pandas as pd
 
 
+# ── Bug 4 — normalización de nulos en operaciones de texto ──────────────
+# `astype(str)` convierte el NaN real en el string "nan" y las operaciones
+# de texto dejan cadenas vacías ("" o "   "). Ambas variantes vuelven a
+# nulo real (np.nan) para que drop_nulls, /stats y la barra de calidad midan
+# de verdad. `read_csv` ya trae "nan"/"" del archivo como NaN: cualquier
+# string que sobrevive a esta normalización es dato legítimo del usuario.
+# El código generado usa float('nan') para que el script exportado no
+# dependa de numpy (solo importa pandas).
+_NUL_REGEX = r"(?i)^\s*(?:nan|none|null)?\s*$"
+
+
+def _normalize_nulls(series):
+    """Strings vacíos/de solo espacios y variantes 'nan'/'none'/'null' → NaN.
+
+    Solo columnas de texto (object/str); el resto de tipos pasa intacto.
+    """
+    if pd.api.types.is_object_dtype(series.dtype) or pd.api.types.is_string_dtype(series.dtype):
+        return series.replace(_NUL_REGEX, np.nan, regex=True)
+    return series
+
+
+def _null_code(col):
+    return (f"df['{col}'] = df['{col}'].replace(r'{_NUL_REGEX}', float('nan'), regex=True)"
+            "  # vacíos/'nan' → nulo real (Bug 4)")
+
+
 # ── Estructural ─────────────────────────────────────────────────────────
 
 def op_unpivot(df, params):
@@ -54,10 +80,11 @@ def op_split_column(df, params):
     # Generar nombres dinámicamente para TODOS los fragmentos obtenidos
     new_col_names = [f"{col_prefix}_{i+1}" for i in range(split_df.shape[1])]
     for i, name in enumerate(new_col_names):
-        df[name] = split_df[i]
+        df[name] = _normalize_nulls(split_df[i])
     code_lines = [f"split_df = df['{col}'].str.split('{delimiter}', n={max_split}, expand=True)"]
     for i, name in enumerate(new_col_names):
         code_lines.append(f"df['{name}'] = split_df[{i}]")
+        code_lines.append(_null_code(name))
     return df, "\n".join(code_lines)
 
 
@@ -70,10 +97,12 @@ def op_split_to_rows(df, params):
     df = df.explode(col).reset_index(drop=True)
     if strip:
         df[col] = df[col].str.strip()
+    df[col] = _normalize_nulls(df[col])
     after = len(df)
     code = (f"df['{col}'] = df['{col}'].astype(str).str.split('{delimiter}')\n"
             f"df = df.explode('{col}').reset_index(drop=True)\n"
-            f"df['{col}'] = df['{col}'].str.strip()  # generó {after - before} filas nuevas")
+            f"df['{col}'] = df['{col}'].str.strip()  # generó {after - before} filas nuevas\n"
+            f"{_null_code(col)}")
     return df, code
 
 
@@ -124,16 +153,22 @@ def op_drop_rows(df, params):
 def op_trim(df, params):
     cols = params.get("columns", list(df.select_dtypes(include=["object", "str"]).columns))
     for col in cols:
-        df[col] = df[col].astype(str).str.strip()
-    code = f"for col in {cols}:\n    df[col] = df[col].astype(str).str.strip()"
+        df[col] = _normalize_nulls(df[col].astype(str).str.strip())
+    code = (f"for col in {cols}:\n"
+            f"    df[col] = df[col].astype(str).str.strip()\n"
+            f"    df[col] = df[col].replace(r'{_NUL_REGEX}', float('nan'), regex=True)"
+            "  # vacíos/'nan' → nulo real (Bug 4)")
     return df, code
 
 
 def op_clean_newlines(df, params):
     cols = params.get("columns") or list(df.select_dtypes(include=["object", "str"]).columns)
     for col in cols:
-        df[col] = df[col].astype(str).str.replace(r'\r\n|\r|\n', ' ', regex=True).str.strip()
-    code = f"for col in {cols}:\n    df[col] = df[col].astype(str).str.replace(r'\\r\\n|\\r|\\n', ' ', regex=True).str.strip()"
+        df[col] = _normalize_nulls(df[col].astype(str).str.replace(r'\r\n|\r|\n', ' ', regex=True).str.strip())
+    code = (f"for col in {cols}:\n"
+            f"    df[col] = df[col].astype(str).str.replace(r'\\r\\n|\\r|\\n', ' ', regex=True).str.strip()\n"
+            f"    df[col] = df[col].replace(r'{_NUL_REGEX}', float('nan'), regex=True)"
+            "  # vacíos/'nan' → nulo real (Bug 4)")
     return df, code
 
 
@@ -143,8 +178,8 @@ def op_change_case(df, params):
     col = params.get("column")
     case = params.get("case", "lower")
     fn = {"lower": "lower", "upper": "upper", "title": "title", "capitalize": "capitalize"}.get(case, "lower")
-    df[col] = getattr(df[col].astype(str).str, fn)()
-    code = f"df['{col}'] = df['{col}'].astype(str).str.{fn}()"
+    df[col] = _normalize_nulls(getattr(df[col].astype(str).str, fn)())
+    code = f"df['{col}'] = df['{col}'].astype(str).str.{fn}()\n{_null_code(col)}"
     return df, code
 
 
@@ -152,8 +187,9 @@ def op_replace(df, params):
     col = params.get("column")
     old_val = params.get("old_value", "")
     new_val = params.get("new_value", "")
-    df[col] = df[col].astype(str).str.replace(old_val, new_val, regex=False)
-    code = f"df['{col}'] = df['{col}'].astype(str).str.replace('{old_val}', '{new_val}', regex=False)"
+    df[col] = _normalize_nulls(df[col].astype(str).str.replace(old_val, new_val, regex=False))
+    code = (f"df['{col}'] = df['{col}'].astype(str).str.replace('{old_val}', '{new_val}', regex=False)\n"
+            f"{_null_code(col)}")
     return df, code
 
 
@@ -185,8 +221,8 @@ def op_change_type(df, params):
         df[col] = pd.to_numeric(df[col], errors="coerce")
         code = f"df['{col}'] = pd.to_numeric(df['{col}'], errors='coerce')"
     else:
-        df[col] = df[col].astype(str)
-        code = f"df['{col}'] = df['{col}'].astype(str)"
+        df[col] = _normalize_nulls(df[col].astype(str))
+        code = f"df['{col}'] = df['{col}'].astype(str)\n{_null_code(col)}"
     return df, code
 
 

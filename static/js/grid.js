@@ -281,8 +281,12 @@ function renderTable(data) {
     html += '<tr><td>' + (i + 1) + '</td>';
     visibleIndices.forEach(idx => {
       const cellVal = row[idx];
-      const rawStr = cellVal !== undefined && cellVal !== null ? String(cellVal) : '';
-      const escaped = escapeHtml(rawStr);
+      // Bug 4: el backend envía JSON null para nulos reales de pandas (NaN)
+      if (cellVal === null || cellVal === undefined) {
+        html += '<td class="cell-null-td"><span class="cell-null" title="Nulo real de pandas (NaN)">null</span></td>';
+        return;
+      }
+      const escaped = escapeHtml(String(cellVal));
       const highlighted = query ? highlightEscaped(escaped, query) : escaped;
       html += '<td title="' + escaped + '">' + highlighted + '</td>';
     });

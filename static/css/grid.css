@@ -34,6 +34,23 @@
     border-right: 1px solid var(--border2);
     user-select: none;
   }
+  /* ── CELDA NULA (Bug 4) ──────────────────────────────── */
+  /* Nulo real de pandas (JSON null). Etiqueta tenue, cursiva, distinguishable
+     de un string vacío legítimo; --text-muted ya es ≥4.6:1 en ambos temas. */
+  .cell-null-td { padding: 0; }
+  .cell-null {
+    display: inline-block;
+    width: 100%;
+    padding: 0.38rem 0.85rem;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-style: italic;
+    color: var(--text-muted);
+    opacity: 0.75;
+    user-select: none;
+  }
+  tbody tr:hover .cell-null { opacity: 1; }
+
   .truncated-msg {
     padding: 0.45rem 1rem;
     font-size: 0.75rem;

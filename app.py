@@ -38,12 +38,18 @@ def df_to_json(df, max_rows=500):
             return "FLOAT"
         return "STR"
 
+    # Filas con nulos reales como JSON null (Bug 4): el front los pinta con
+    # la etiqueta "null" tenue. Antes fillna("") los ocultaba como celda
+    # vacía indistinguible de un string vacío legítimo.
+    rows = [[None if pd.isna(v) else str(v) for v in row]
+            for row in preview.itertuples(index=False, name=None)]
+
     return {
         "columns": list(df.columns),
         "dtypes": {col: classify_dtype(df[col]) for col in df.columns},
         "nulls": {col: int(df[col].isna().sum()) for col in df.columns},
         "total_rows": len(df),
-        "data": preview.fillna("").astype(str).values.tolist(),
+        "data": rows,
         "shape": [len(df), len(df.columns)],
         "truncated": len(df) > max_rows
     }
