@@ -145,7 +145,7 @@
         <input type="file" id="file-input" accept=".csv,.xlsx,.xls">
         <div id="sheet-selector">
           <label style="font-size:0.73rem;color:var(--text2);display:block;margin-top:0.5rem;margin-bottom:0.25rem">Seleccionar hoja:</label>
-          <select id="sheet-select"></select>
+          <select id="sheet-select" aria-label="Hoja del archivo Excel a cargar"></select>
           <button class="btn btn-primary" style="width:100%;margin-top:0.5rem;justify-content:center" onclick="loadSheet()">Cargar hoja</button>
         </div>
       </div>
@@ -310,7 +310,7 @@
 
 <!-- ══ MODAL ══════════════════════════════════════════════════════════════ -->
 <div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this)closeModal()">
-  <div class="modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
     <h2 id="modal-title">Operación</h2>
     <div id="modal-body"></div>
     <div class="modal-footer">
@@ -325,8 +325,8 @@
 
 <!-- ══ MODAL VISIBILIDAD DE COLUMNAS (F2.6) ═════════════════════════════════ -->
 <div class="modal-overlay" id="colvis-overlay" onclick="if(event.target===this)closeColVisModal()">
-  <div class="modal" style="width: 440px;">
-    <h2>
+  <div class="modal" style="width: 440px;" role="dialog" aria-modal="true" aria-labelledby="colvis-title">
+    <h2 id="colvis-title">
       <svg class="icon-svg" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
       <span>Visibilidad de Columnas</span>
     </h2>
@@ -350,8 +350,8 @@
 
 <!-- ══ MODAL DATASET PICKER (F2.7) ═══════════════════════════════════════ -->
 <div class="modal-overlay" id="datasetpicker-overlay" onclick="if(event.target===this)closeDatasetPicker()">
-  <div class="modal" style="width: 520px;">
-    <h2>
+  <div class="modal" style="width: 520px;" role="dialog" aria-modal="true" aria-labelledby="ds-title">
+    <h2 id="ds-title">
       <svg class="icon-svg" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
       <span>Fuente de datos</span>
     </h2>
@@ -373,7 +373,7 @@
 </div>
 
 <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
-<div id="col-menu-dropdown" class="col-dropdown-menu" style="display:none"></div>
+<div id="col-menu-dropdown" class="col-dropdown-menu" role="dialog" aria-label="Transformaciones de columna" style="display:none"></div>
 <div id="toast-container" role="region" aria-label="Notificaciones"></div>
 
 <!-- ══ SCRIPT ══════════════════════════════════════════════════════════════ -->

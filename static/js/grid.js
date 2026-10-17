@@ -147,6 +147,7 @@ function openColMenu(event, col) {
   activeColMenuCol = col;
   const dtype = currentDtypes[col] || 'STR';
   dropdown.innerHTML = buildColMenuHtml(col, dtype);
+  dropdown.setAttribute('aria-label', 'Transformaciones para ' + col);
   dropdown.style.display = 'block';
 
   const btn = event.currentTarget;

@@ -17,27 +17,27 @@ function selectAllHtml(containerId) {
 const modalDefs = {
   unpivot: {
     title: icon('move-vertical') + ' Unpivot (Anular dinamización)',
-    body: () => '<label>Columnas ID (se mantienen fijas):</label>'+selectAllHtml('id-cols-check')+'<div class="col-check" id="id-cols-check">'+colOptions(true)+'</div><label>Nombre columna variable:</label><input type="text" id="var-name" value="Variable"><label>Nombre columna valor:</label><input type="text" id="val-name" value="Valor">',
+    body: () => '<label>Columnas ID (se mantienen fijas):</label>'+selectAllHtml('id-cols-check')+'<div class="col-check" id="id-cols-check">'+colOptions(true)+'</div><label>Nombre columna variable:</label><input type="text" id="var-name" aria-label="Nombre de la columna variable" value="Variable"><label>Nombre columna valor:</label><input type="text" id="val-name" aria-label="Nombre de la columna valor" value="Valor">',
     params: () => ({ id_cols: [...document.querySelectorAll('#id-cols-check input:checked')].map(i=>i.value), var_name: document.getElementById('var-name').value, value_name: document.getElementById('val-name').value })
   },
   pivot: {
     title: icon('move-horizontal') + ' Pivot (Dinamizar)',
-    body: () => '<label>Columna índice (filas):</label><select id="pivot-index">'+colOptions()+'</select><label>Columna a pivotar (encabezados):</label><select id="pivot-cols">'+colOptions()+'</select><label>Columna de valores:</label><select id="pivot-vals">'+colOptions()+'</select>',
+    body: () => '<label>Columna índice (filas):</label><select id="pivot-index" aria-label="Columna índice (filas) para pivotar">'+colOptions()+'</select><label>Columna a pivotar (encabezados):</label><select id="pivot-cols" aria-label="Columna a pivotar (nuevos encabezados)">'+colOptions()+'</select><label>Columna de valores:</label><select id="pivot-vals" aria-label="Columna de valores para pivotar">'+colOptions()+'</select>',
     params: () => ({ index: document.getElementById('pivot-index').value, columns: document.getElementById('pivot-cols').value, values: document.getElementById('pivot-vals').value })
   },
   split_column: {
     title: icon('scissors') + ' Separar columna',
-    body: () => '<label>Columna a separar:</label><select id="split-col">'+colOptions()+'</select><label>Delimitador:</label><input type="text" id="split-delim" value=","><label>Prefijo para nuevas columnas:</label><input type="text" id="split-prefix" value="Parte"><p style="font-size:0.75rem;color:var(--text2);margin-top:-0.3rem;margin-bottom:0.5rem">Se crearán columnas <em>Prefijo_1</em>, <em>Prefijo_2</em>, etc., según los fragmentos resultantes.</p><label>¿Cuántas veces separar?</label><select id="split-mode" onchange="document.getElementById(\'split-n-wrap\').style.display=this.value===\'n\'?\'block\':\'none\'"><option value="all">Siempre (todas las ocurrencias)</option><option value="n">N veces</option></select><div id="split-n-wrap" style="display:none;margin-top:0.4rem"><input type="number" id="split-n" value="1" min="1"></div>',
+    body: () => '<label>Columna a separar:</label><select id="split-col" aria-label="Columna a separar en partes">'+colOptions()+'</select><label>Delimitador:</label><input type="text" id="split-delim" aria-label="Delimitador para separar la columna" value=","><label>Prefijo para nuevas columnas:</label><input type="text" id="split-prefix" aria-label="Prefijo para las nuevas columnas" value="Parte"><p style="font-size:0.75rem;color:var(--text2);margin-top:-0.3rem;margin-bottom:0.5rem">Se crearán columnas <em>Prefijo_1</em>, <em>Prefijo_2</em>, etc., según los fragmentos resultantes.</p><label>¿Cuántas veces separar?</label><select id="split-mode" aria-label="Frecuencia de separación" onchange="document.getElementById(\'split-n-wrap\').style.display=this.value===\'n\'?\'block\':\'none\'"><option value="all">Siempre (todas las ocurrencias)</option><option value="n">N veces</option></select><div id="split-n-wrap" style="display:none;margin-top:0.4rem"><input type="number" id="split-n" aria-label="Número de veces a separar" value="1" min="1"></div>',
     params: () => { const mode = document.getElementById('split-mode').value; return { column: document.getElementById('split-col').value, delimiter: document.getElementById('split-delim').value, col_prefix: document.getElementById('split-prefix').value || document.getElementById('split-col').value, max_split: mode === 'n' ? parseInt(document.getElementById('split-n').value) || 1 : 0 }; }
   },
   filter: {
     title: icon('filter') + ' Filtrar filas',
-    body: () => '<label>Columna:</label><select id="filter-col">'+colOptions()+'</select><label>Condición:</label><select id="filter-op"><option value="==">== igual a</option><option value="!=">!= distinto de</option><option value="contiene">contiene</option><option value="no contiene">no contiene</option><option value=">">&gt; mayor que</option><option value="<">&lt; menor que</option></select><label>Valor:</label><input type="text" id="filter-val" placeholder="Escribe el valor...">',
+    body: () => '<label>Columna:</label><select id="filter-col" aria-label="Columna a filtrar">'+colOptions()+'</select><label>Condición:</label><select id="filter-op" aria-label="Condición del filtro"><option value="==">== igual a</option><option value="!=">!= distinto de</option><option value="contiene">contiene</option><option value="no contiene">no contiene</option><option value=">">&gt; mayor que</option><option value="<">&lt; menor que</option></select><label>Valor:</label><input type="text" id="filter-val" aria-label="Valor del filtro" placeholder="Escribe el valor...">',
     params: () => ({ column: document.getElementById('filter-col').value, operator: document.getElementById('filter-op').value, value: document.getElementById('filter-val').value })
   },
   drop_nulls: {
     title: icon('sparkles') + ' Eliminar filas con nulos',
-    body: () => '<label>Columnas (vacío = todas):</label>'+selectAllHtml('nulls-check')+'<div class="col-check" id="nulls-check">'+colOptions(true)+'</div><label>Eliminar fila si:</label><select id="nulls-how"><option value="any">ANY — alguna columna es nula</option><option value="all">ALL — todas las columnas son nulas</option></select>',
+    body: () => '<label>Columnas (vacío = todas):</label>'+selectAllHtml('nulls-check')+'<div class="col-check" id="nulls-check">'+colOptions(true)+'</div><label>Eliminar fila si:</label><select id="nulls-how" aria-label="Condición de eliminación de nulos"><option value="any">ANY — alguna columna es nula</option><option value="all">ALL — todas las columnas son nulas</option></select>',
     params: () => { const c=[...document.querySelectorAll('#nulls-check input:checked')].map(i=>i.value); return { columns: c.length===currentColumns.length?null:c, how: document.getElementById('nulls-how').value }; }
   },
   drop_duplicates: {
@@ -47,12 +47,12 @@ const modalDefs = {
   },
   rename_column: {
     title: icon('pencil') + ' Renombrar columna',
-    body: () => '<label>Columna a renombrar:</label><select id="rename-old">'+colOptions()+'</select><label>Nuevo nombre:</label><input type="text" id="rename-new" placeholder="Nuevo nombre...">',
+    body: () => '<label>Columna a renombrar:</label><select id="rename-old" aria-label="Columna a renombrar">'+colOptions()+'</select><label>Nuevo nombre:</label><input type="text" id="rename-new" aria-label="Nuevo nombre de la columna" placeholder="Nuevo nombre...">',
     params: () => ({ old_name: document.getElementById('rename-old').value, new_name: document.getElementById('rename-new').value })
   },
   drop_column: {
     title: icon('x') + ' Eliminar columna',
-    body: () => '<label>Columna a eliminar:</label><select id="drop-col">'+colOptions()+'</select><p class="modal-warn">'+icon('triangle-alert')+'<span>Puedes deshacer con '+icon('undo-2')+' Deshacer paso</span></p>',
+    body: () => '<label>Columna a eliminar:</label><select id="drop-col" aria-label="Columna a eliminar">'+colOptions()+'</select><p class="modal-warn">'+icon('triangle-alert')+'<span>Puedes deshacer con '+icon('undo-2')+' Deshacer paso</span></p>',
     params: () => ({ column: document.getElementById('drop-col').value })
   },
   trim: {
@@ -62,7 +62,7 @@ const modalDefs = {
   },
   change_case: {
     title: icon('case-sensitive') + ' Formateo de texto',
-    body: () => '<label>Columna:</label><select id="case-col">'+colOptions()+'</select><label>Transformar a:</label><select id="case-type"><option value="lower">minúsculas (lower)</option><option value="upper">MAYÚSCULAS (upper)</option><option value="title">Título Caso (title)</option><option value="capitalize">Primera letra (capitalize)</option></select>',
+    body: () => '<label>Columna:</label><select id="case-col" aria-label="Columna para transformar texto">'+colOptions()+'</select><label>Transformar a:</label><select id="case-type" aria-label="Tipo de transformación de texto"><option value="lower">minúsculas (lower)</option><option value="upper">MAYÚSCULAS (upper)</option><option value="title">Título Caso (title)</option><option value="capitalize">Primera letra (capitalize)</option></select>',
     params: () => ({ column: document.getElementById('case-col').value, case: document.getElementById('case-type').value })
   },
   clean_newlines: {
@@ -72,32 +72,32 @@ const modalDefs = {
   },
   replace: {
     title: icon('refresh-cw') + ' Reemplazar valores',
-    body: () => '<label>Columna:</label><select id="rep-col">'+colOptions()+'</select><label>Valor a reemplazar:</label><input type="text" id="rep-old" placeholder="Texto original..."><label>Reemplazar por:</label><input type="text" id="rep-new" placeholder="Texto nuevo...">',
+    body: () => '<label>Columna:</label><select id="rep-col" aria-label="Columna para reemplazar valores">'+colOptions()+'</select><label>Valor a reemplazar:</label><input type="text" id="rep-old" aria-label="Valor a reemplazar" placeholder="Texto original..."><label>Reemplazar por:</label><input type="text" id="rep-new" aria-label="Valor de reemplazo" placeholder="Texto nuevo...">',
     params: () => ({ column: document.getElementById('rep-col').value, old_value: document.getElementById('rep-old').value, new_value: document.getElementById('rep-new').value })
   },
   change_type: {
     title: icon('tag') + ' Cambiar tipo de dato',
-    body: () => '<label>Columna:</label><select id="type-col">'+colOptions()+'</select><label>Nuevo tipo:</label><select id="type-dtype"><option value="str">Texto (str)</option><option value="int">Número entero (int)</option><option value="float">Número decimal (float)</option><option value="datetime">Fecha/hora (datetime)</option></select>',
+    body: () => '<label>Columna:</label><select id="type-col" aria-label="Columna para cambiar tipo de dato">'+colOptions()+'</select><label>Nuevo tipo:</label><select id="type-dtype" aria-label="Nuevo tipo de dato"><option value="str">Texto (str)</option><option value="int">Número entero (int)</option><option value="float">Número decimal (float)</option><option value="datetime">Fecha/hora (datetime)</option></select>',
     params: () => ({ column: document.getElementById('type-col').value, dtype: document.getElementById('type-dtype').value })
   },
   sort: {
     title: icon('arrow-down-wide-narrow') + ' Ordenar',
-    body: () => '<label>Columna:</label><select id="sort-col">'+colOptions()+'</select><label>Orden:</label><select id="sort-asc"><option value="true">Ascendente (A→Z)</option><option value="false">Descendente (Z→A)</option></select>',
+    body: () => '<label>Columna:</label><select id="sort-col" aria-label="Columna para ordenar">'+colOptions()+'</select><label>Orden:</label><select id="sort-asc" aria-label="Dirección del orden"><option value="true">Ascendente (A→Z)</option><option value="false">Descendente (Z→A)</option></select>',
     params: () => ({ column: document.getElementById('sort-col').value, ascending: document.getElementById('sort-asc').value==='true' })
   },
   split_to_rows: {
     title: icon('arrow-down-to-line') + ' Separar por filas',
-    body: () => '<label>Columna a separar:</label><select id="str-col">'+colOptions()+'</select><label>Delimitador:</label><input type="text" id="str-delim" value=","><p style="font-size:0.75rem;color:var(--text2);margin-top:0.5rem">Cada valor separado por el delimitador se convertirá en una fila nueva.</p>',
+    body: () => '<label>Columna a separar:</label><select id="str-col" aria-label="Columna a separar por filas">'+colOptions()+'</select><label>Delimitador:</label><input type="text" id="str-delim" aria-label="Delimitador para separar por filas" value=","><p style="font-size:0.75rem;color:var(--text2);margin-top:0.5rem">Cada valor separado por el delimitador se convertirá en una fila nueva.</p>',
     params: () => ({ column: document.getElementById('str-col').value, delimiter: document.getElementById('str-delim').value, strip: true })
   },
   drop_rows: {
     title: icon('scissors') + ' Eliminar filas por posición',
-    body: () => '<label>¿Desde dónde?</label><select id="dr-pos"><option value="top">Desde el inicio (primeras filas)</option><option value="bottom">Desde el final (últimas filas)</option></select><label>¿Cuántas filas eliminar?</label><input type="number" id="dr-n" value="1" min="1">',
+    body: () => '<label>¿Desde dónde?</label><select id="dr-pos" aria-label="Posición de las filas a eliminar"><option value="top">Desde el inicio (primeras filas)</option><option value="bottom">Desde el final (últimas filas)</option></select><label>¿Cuántas filas eliminar?</label><input type="number" id="dr-n" aria-label="Cantidad de filas a eliminar" value="1" min="1">',
     params: () => ({ position: document.getElementById('dr-pos').value, n: parseInt(document.getElementById('dr-n').value) || 1 })
   },
   set_header: {
     title: icon('pin') + ' Definir fila como encabezado',
-    body: () => '<label>Índice de la fila (0 = primera fila):</label><input type="number" id="sh-idx" value="0" min="0"><p style="font-size:0.75rem;color:var(--text2);margin-top:0.5rem">Los valores de esa fila se usarán como nombres de columna y la fila será eliminada.</p>',
+    body: () => '<label>Índice de la fila (0 = primera fila):</label><input type="number" id="sh-idx" aria-label="Índice de la fila a usar como encabezado" value="0" min="0"><p style="font-size:0.75rem;color:var(--text2);margin-top:0.5rem">Los valores de esa fila se usarán como nombres de columna y la fila será eliminada.</p>',
     params: () => ({ row_index: parseInt(document.getElementById('sh-idx').value) || 0 })
   },
   group_by: {
