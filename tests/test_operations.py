@@ -62,7 +62,7 @@ def check(resp, expected):
     return payload
 
 
-# ── 17 operaciones (happy path por operación) ─────────────────────────
+# ── Happy path por operación (las 20 del registro OPS) ─────────────────
 
 OP_CASES = [
     pytest.param(
@@ -269,6 +269,59 @@ OP_CASES = [
         "Col1,Col2\nNombre,Valor\nA,1\n",
         {"rows": 1, "cols_in": ["Nombre", "Valor"], "cols_out": ["Col1"]},
         id="set_header",
+    ),
+    pytest.param(
+        "calculated_column",
+        {"name": "Ventas_x2", "expression": "Ventas * 2"},
+        BASE_CSV,
+        {"cols_in": ["Ventas_x2"],
+         "cells": [(0, "Ventas_x2", "200"), (2, "Ventas_x2", "300")],
+         "code": "df['Ventas_x2'] = Ventas * 2"},
+        id="calc_column_arithmetic",
+    ),
+    pytest.param(
+        "calculated_column",
+        {"name": "Saludo", "expression": "Nombre + ' — ' + Ciudad"},
+        BASE_CSV,
+        {"cells": [(0, "Saludo", "Alice — Madrid"), (1, "Saludo", "Bob — Barcelona")]},
+        id="calc_column_string_concat",
+    ),
+    pytest.param(
+        "calculated_column",
+        {"name": "Redondeo", "expression": "round(Ventas / 3, 1)"},
+        BASE_CSV,
+        {"cells": [(0, "Redondeo", "33.3")]},
+        id="calc_column_whitelist_func",
+    ),
+    pytest.param(
+        "calculated_column",
+        {"name": "EsAlto", "expression": "Ventas > 120"},
+        BASE_CSV,
+        {"dtypes": {"EsAlto": "BOOL"},
+         "cells": [(0, "EsAlto", "False"), (1, "EsAlto", "True")]},
+        id="calc_column_boolean",
+    ),
+    pytest.param(
+        "calculated_column",
+        {"name": "Nivel", "expression": "where(Ventas > 120, 'alto', 'bajo')"},
+        BASE_CSV,
+        {"dtypes": {"Nivel": "STR"},
+         "cells": [(0, "Nivel", "bajo"), (1, "Nivel", "alto"), (2, "Nivel", "alto")]},
+        id="calc_column_where_vectorized",
+    ),
+    pytest.param(
+        "calculated_column",
+        {"name": "Etiqueta", "expression": "col('Nombre') + '/' + col('Ciudad')"},
+        BASE_CSV,
+        {"cells": [(0, "Etiqueta", "Alice/Madrid")]},
+        id="calc_column_col_helper",
+    ),
+    pytest.param(
+        "calculated_column",
+        {"name": "Ventas", "expression": "Ventas + 10"},
+        BASE_CSV,
+        {"cells": [(0, "Ventas", "110"), (2, "Ventas", "160")]},
+        id="calc_column_overwrite",
     ),
 ]
 
@@ -477,9 +530,35 @@ def test_stats_top_limits_five_and_bool(client):
     assert top_b["True"] == 5 and top_b["False"] == 2
 
 
+# ── Columna Calculada: sandbox del eval() (op #30) ────────────────────
+
+@pytest.mark.parametrize("name,expression,fragmento", [
+    ("", "Ventas * 2", "necesita un nombre"),
+    ("x", "", "está vacía"),
+    ("x", "Ventas *", "Expresión no válida"),
+    ("x", "NoExiste + 1", "'NoExiste' no es una columna"),
+    ("x", "Ventas.shape", "atributos"),
+    ("x", "().__class__", "atributos"),
+    ("x", "__import__('os')", "lista blanca"),
+    ("x", "[i for i in Ventas]", "comprensiones"),
+    ("x", "(lambda: 1)()", "lambda"),
+    ("x", "col('NoExiste')", "no existe en el dataset"),
+    ("x", "Ventas[0]", "índice"),
+    ("x", "1 / 0", "divide entre cero"),
+])
+def test_calculated_column_sandbox_blocks_and_reports(client, name, expression, fragmento):
+    """El sandbox rechaza la expresión ANTES de ejecutarla, con mensaje
+    descriptivo, y no muta el estado (history intacto tras el fallo)."""
+    upload(client)
+    resp = op(client, "calculated_column", {"name": name, "expression": expression})
+    assert resp.status_code == 500, resp.get_json()
+    assert fragmento in resp.get_json()["error"]
+    assert len(app_module.history) == 1  # solo el upload: sin estado parcial
+
+
 # ── Registro de operaciones (refactor P2) ───────────────────────────
 
-def test_registry_expone_las_19_operaciones():
+def test_registry_expone_las_20_operaciones():
     """El registro define exactamente las ops del contrato UI/API.
 
     Protege contra borrados accidentales al mover handlers en operations.py.
@@ -490,7 +569,7 @@ def test_registry_expone_las_19_operaciones():
         "unpivot", "pivot", "split_column", "split_to_rows", "set_header",
         "drop_nulls", "drop_duplicates", "drop_rows", "trim", "clean_newlines",
         "change_case", "replace", "rename_column", "drop_column", "change_type",
-        "filter", "sort", "group_by", "merge",
+        "filter", "sort", "group_by", "merge", "calculated_column",
     }
     assert set(OPS) == expected
     assert all(callable(fn) for fn in OPS.values())

@@ -7,6 +7,9 @@ operación = añadir una función aquí + una entrada en `OPS` (+ su modal en el
 front). El endpoint no cambia de comportamiento: mismos dataframes, mismos
 strings de código, mismos errores.
 """
+import ast
+
+import numpy as np
 import pandas as pd
 
 
@@ -289,6 +292,120 @@ def op_merge(df, params):
     return merged, code
 
 
+# ── Columna Calculada (op #30) — sandbox del eval() ────────────────────
+# Diseño en context/propuesta_tecnica_mejoras.md (4.6): validar el AST ANTES
+# de ejecutar. Solo pasan operadores, constantes, nombres de columnas y
+# llamadas de la lista blanca. Prohibido acceso a atributos (el vector de
+# escape clásico `().__class__.__bases__`), subíndices, lambdas, comprensiones
+# y f-strings. Se evalúa sin `__builtins__` y con namespace solo de columnas.
+
+_CALC_ALLOWED_NODES = (
+    ast.Expression, ast.BinOp, ast.UnaryOp, ast.BoolOp, ast.Compare,
+    ast.Call, ast.IfExp, ast.Constant, ast.Name, ast.Tuple, ast.List,
+    ast.keyword, ast.Load,
+    ast.Add, ast.Sub, ast.Mult, ast.Div, ast.FloorDiv, ast.Mod, ast.Pow,
+    ast.UAdd, ast.USub, ast.Not,
+    ast.And, ast.Or,
+    ast.Eq, ast.NotEq, ast.Lt, ast.LtE, ast.Gt, ast.GtE, ast.In, ast.NotIn,
+)
+
+# Construcciones con mensaje propio (pase 1) antes del blanqueo genérico.
+_CALC_BLOCKED = {
+    "Attribute": "no se permite el acceso a atributos con '.'",
+    "Subscript": "no se permite el acceso por índice [...]",
+    "Lambda": "no se permiten funciones lambda",
+    "ListComp": "no se permiten comprensiones",
+    "SetComp": "no se permiten comprensiones",
+    "DictComp": "no se permiten comprensiones",
+    "GeneratorExp": "no se permiten comprensiones",
+    "JoinedStr": "no se permiten f-strings",
+}
+
+_CALC_FUNCS = {
+    # "col" se resuelve en op_calculated_column (cierra sobre el df activo):
+    # permite referenciar columnas con espacios: col('Nombre Completo').
+    "col": None,
+    "abs": abs, "round": round, "len": len, "min": min, "max": max,
+    "sum": sum, "int": int, "float": float, "str": str, "bool": bool,
+    "log": np.log, "log10": np.log10, "exp": np.exp, "sqrt": np.sqrt,
+    "floor": np.floor, "ceil": np.ceil, "sign": np.sign, "where": np.where,
+}
+
+
+def _validate_calc_expr(expr, columns):
+    """Parsea y valida la expresión en el sandbox. Devuelve el AST o ValueError."""
+    try:
+        tree = ast.parse(expr, mode="eval")
+    except SyntaxError as e:
+        raise ValueError(f"Expresión no válida: {e.msg}") from None
+
+    # Pase 1: construcciones bloqueadas con mensaje descriptivo.
+    for node in ast.walk(tree):
+        kind = type(node).__name__
+        if kind in _CALC_BLOCKED:
+            raise ValueError(f"Expresión no permitida: {_CALC_BLOCKED[kind]}.")
+
+    # Pase 2: blanqueo de nodos + reglas de nombres y llamadas.
+    allowed = set(_CALC_ALLOWED_NODES)
+    known_names = set(columns) | set(_CALC_FUNCS)
+    for node in ast.walk(tree):
+        if type(node) not in allowed:
+            raise ValueError(
+                f"Expresión no permitida: construcción '{type(node).__name__}' no soportada."
+            )
+        if isinstance(node, ast.Call):
+            if not isinstance(node.func, ast.Name) or node.func.id not in _CALC_FUNCS:
+                raise ValueError(
+                    "Solo se pueden llamar funciones de la lista blanca: "
+                    + ", ".join(sorted(_CALC_FUNCS)) + "."
+                )
+        if isinstance(node, ast.Name) and node.id not in known_names:
+            raise ValueError(
+                f"'{node.id}' no es una columna del dataset ni una función permitida."
+            )
+    return tree
+
+
+def op_calculated_column(df, params):
+    """Columna Calculada (op #30): expresión pandas validada y sandboxeada.
+
+    `name` puede sobrescribir una columna existente (estilo Excel). El código
+    generado usa repr() del nombre para que el script exportado siga válido
+    aunque el nombre contenga comillas.
+    """
+    name = str(params.get("name") or "").strip()
+    expr = str(params.get("expression") or "").strip()
+    if not name:
+        raise ValueError("La columna calculada necesita un nombre.")
+    if not expr:
+        raise ValueError("La expresión está vacía.")
+
+    tree = _validate_calc_expr(expr, df.columns)
+
+    def _col(col_name):
+        if not isinstance(col_name, str) or col_name not in df.columns:
+            raise ValueError(f"La columna '{col_name}' no existe en el dataset.")
+        return df[col_name]
+
+    namespace = {**_CALC_FUNCS, "col": _col, **{c: df[c] for c in df.columns}}
+    try:
+        values = eval(
+            compile(tree, "<calculated_column>", "eval"),
+            {"__builtins__": {}},
+            namespace,
+        )
+    except ZeroDivisionError:
+        raise ValueError("La expresión divide entre cero.") from None
+    except ValueError:
+        raise
+    except Exception as e:
+        raise ValueError(f"Error al evaluar la expresión: {e}") from None
+
+    df[name] = values
+    code = f"df[{name!r}] = {expr}"
+    return df, code
+
+
 # ── Registro (consumido por app.operation()) ────────────────────────────
 
 OPS = {
@@ -315,4 +432,5 @@ OPS = {
     "sort": op_sort,
     "group_by": op_group_by,
     "merge": op_merge,
+    "calculated_column": op_calculated_column,
 }

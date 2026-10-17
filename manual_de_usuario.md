@@ -2,7 +2,7 @@
 
 Bienvenido a **Cat_flip - Studio ETL**, tu plataforma local y ligera para la limpieza, transformación y preparación de datos. Diseñada como una alternativa rápida a herramientas pesadas, Cat_flip te permite construir pipelines de datos visualmente mientras genera código Python por debajo.
 
-Este manual detalla las 25 operaciones de transformación disponibles en la "Caja de Transformaciones" (Panel Izquierdo) de la interfaz.
+Este manual detalla las 20 operaciones de transformación disponibles en la "Caja de Transformaciones" (Panel Izquierdo) de la interfaz.
 
 ---
 
@@ -51,7 +51,7 @@ Operaciones de formato de cadenas y estructura de datos.
 13. **Renombrar Columna:** 
     Cambia el nombre de la cabecera de una columna seleccionada.
 14. **Eliminar Columna:** 
-    Borra completamente una o varias columnas seleccionadas de tu dataset.
+    Borra completamente la columna seleccionada de tu dataset.
 15. **Cambiar Tipo de Dato:** 
     Fuerza a una columna a interpretarse como un tipo de dato específico: Texto (`str`), Número Entero (`int`), Número Decimal (`float`) o Fecha y Hora (`datetime`).
 
@@ -59,12 +59,18 @@ Operaciones de formato de cadenas y estructura de datos.
 
 ## 🧮 D. Reglas & Operaciones
 
-Lógica condicional y ordenamiento.
+Lógica condicional, ordenamiento, agregación y cruce de datasets.
 
 16. **Filtrar Filas:** 
     Mantiene solo las filas que cumplen una condición lógica en una columna específica. Operadores: igual a (`==`), diferente de (`!=`), mayor que (`>`), menor que (`<`), contiene texto (`contiene`), no contiene texto (`no contiene`).
 17. **Ordenar:** 
     Ordena todo el dataset basándose en los valores de una columna seleccionada, ya sea en orden Ascendente (A-Z, 0-9) o Descendente (Z-A, 9-0).
+18. **Group By (Agregación):** 
+    Agrupa las filas por los valores únicos de una columna ("agrupar por") y resume otra columna numérica con una función: suma (`sum`), media (`mean`), conteo (`count`), mínimo (`min`), máximo (`max`), mediana (`median`) o valores únicos (`nunique`).
+19. **Join / Merge (Cruzar datasets):** 
+    Carga un segundo dataset (el "frame derecho") desde el propio modal — con un archivo tuyo o con uno de los demos — y cruza ambos por una columna de clave. Tipos de cruce: `inner` (solo coincidencias), `left` (todas las filas izquierdas), `right` (todas las derechas) y `outer` (unión). Las claves sin coincidir quedan con valores vacíos. Puedes deshacer como cualquier otro paso.
+20. **Columna Calculada:** 
+    Crea (o sobrescribe) una columna a partir de una expresión pandas, por ejemplo `round(Precio * 1.21, 2)`. Puedes usar nombres de columna, operadores (`+`, `-`, `*`, `/`, `**`, `%`), comparaciones y las funciones permitidas: `abs`, `round`, `len`, `min`, `max`, `sum`, `int`, `float`, `str`, `bool`, `log`, `log10`, `exp`, `sqrt`, `floor`, `ceil`, `sign`, `where(cond, a, b)` y `col('Nombre con espacios')` para referenciar columnas cuyo nombre tiene espacios o símbolos. Un sandbox de seguridad valida la expresión antes de ejecutarla: bloquea acceso a atributos (`.`), imports, lambdas y comprensiones, así que nunca se ejecuta código externo — si la expresión no está permitida, verás un mensaje explicando por qué. Nota: para condiciones por fila usa `where(cond, valor_si_true, valor_si_false)` (el ternario de Python no funciona con columnas).
 
 ---
 

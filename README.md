@@ -6,7 +6,7 @@
 
 ## ✨ Características Principales
 
-* 🚀 **29 Operaciones ETL:** Herramientas de limpieza, filtrado, transformación estructural (Pivot/Unpivot) y manejo de texto.
+* 🚀 **30 Operaciones ETL:** Herramientas de limpieza, filtrado, transformación estructural (Pivot/Unpivot) y manejo de texto.
 * 🐍 **Generador de Código en Vivo:** Aprende y audita con el visor que muestra el código de Pandas autogenerado en tiempo real.
 * 🌗 **Kinetic Query Minimal:** Interfaz fluida y minimalista (Glassmorphism) con soporte persistente para modo claro y oscuro.
 * 📊 **Perfilado de Datos:** Diagnóstico estadístico instantáneo de tus columnas (nulos, valores únicos, mínimos, máximos).

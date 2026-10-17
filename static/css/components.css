@@ -776,7 +776,7 @@
     margin-bottom: 0.25rem;
     margin-top: 0.75rem;
   }
-  .modal input[type=text], .modal input[type=number], .modal select {
+  .modal input[type=text], .modal input[type=number], .modal select, .modal textarea {
     width: 100%;
     padding: 0.48rem 0.7rem;
     background: var(--surface2);
@@ -786,10 +786,15 @@
     font-family: var(--font-ui);
     font-size: 0.83rem;
   }
-  .modal input[type=text]:focus, .modal input[type=number]:focus, .modal select:focus {
+  .modal input[type=text]:focus, .modal input[type=number]:focus, .modal select:focus, .modal textarea:focus {
     outline: none;
     border-color: var(--teal);
     box-shadow: 0 0 0 3px rgba(38,124,124,0.10);
+  }
+  .modal textarea {
+    font-family: var(--font-mono);
+    line-height: 1.45;
+    resize: vertical;
   }
   .modal .col-check {
     display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem;

@@ -140,6 +140,16 @@ const modalDefs = {
       refreshRightInfo();
     }
   },
+  calculated_column: {
+    title: icon('calculator') + ' Columna Calculada',
+    body: () => '<label>Nombre de la nueva columna:</label><input type="text" id="calc-name" aria-label="Nombre de la nueva columna" placeholder="ej: Ventas_con_iva"><label>Expresión pandas:</label><textarea id="calc-expr" aria-label="Expresión de la columna calculada" rows="3" placeholder="ej: Ventas * 1.21"></textarea><p style="font-size:0.75rem;color:var(--text2);margin-top:0.5rem">Usa nombres de columna, operadores (+, -, *, /, **, %), comparaciones y funciones: abs, round, log, sqrt, min, max, where(cond, a, b) y col(&#39;Nombre con espacios&#39;). El sandbox bloquea atributos, imports y lambdas.</p>',
+    params: () => ({ name: document.getElementById('calc-name').value.trim(), expression: document.getElementById('calc-expr').value.trim() }),
+    validate: (p) => {
+      if (!p.name) return 'La columna calculada necesita un nombre.';
+      if (!p.expression) return 'Escribe una expresión para la columna.';
+      return null;
+    }
+  },
 };
 
 // ── FRAME DERECHO DEL JOIN/MERGE (op #19) ─────────────────────────────
