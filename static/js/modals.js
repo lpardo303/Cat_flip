@@ -254,6 +254,17 @@ function openModalForCol(op, col) {
 }
 function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); currentOp=null; }
 
+// Éxito compartido de una operación aplicada (confirmModal y el auto-tipado
+// de fechas de api.js). `notify=false` calla el toast (para ráfagas de N ops).
+function handleOpResponse(op, params, data, notify = true) {
+  renderTable(data.data);
+  updateCode(data.code);
+  addPipelineStep(op, params);
+  loadStats();   // refrescar diagnóstico en segundo plano
+  loadLineage(); // refrescar linaje en segundo plano (F3.3)
+  if (notify) toast(op.replace(/_/g, ' ') + ' aplicado');
+}
+
 async function confirmModal() {
   if (!currentOp) return;
   const op = currentOp;
@@ -269,12 +280,7 @@ async function confirmModal() {
     const data = await res.json();
     hideLoading();
     if (data.error) { toast(data.error, 'error'); return; }
-    renderTable(data.data);
-    updateCode(data.code);
-    addPipelineStep(op, params);
-    loadStats(); // refrescar diagnóstico en segundo plano
-    loadLineage(); // refrescar linaje en segundo plano (F3.3)
-    toast(op.replace(/_/g,' ') + ' aplicado');
+    handleOpResponse(op, params, data);
   } catch(e) { hideLoading(); toast('Error al aplicar operación', 'error'); }
 }
 

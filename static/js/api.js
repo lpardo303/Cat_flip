@@ -53,6 +53,7 @@ async function uploadFile(file, sheet) {
 
     renderTable(data.data);
     updateCode(data.code);
+    showDateSuggestions(data.date_suggestions || []);
     pipelineSteps = [];
     renderPipeline();
 
@@ -76,4 +77,63 @@ async function uploadFile(file, sheet) {
     loadStats(); // refrescar diagnóstico en segundo plano
     toast('Archivo cargado: ' + data.data.shape[0] + ' filas × ' + data.data.shape[1] + ' columnas');
   } catch(e) { hideLoading(); toast('Error al cargar el archivo', 'error'); }
+}
+
+// ── DETECCIÓN DE FECHAS AL CARGAR (auto-tipado) ─────────────────────────
+// El backend solo sugiere (campo `date_suggestions` de /upload); aquí se
+// muestran en una barra con chips y la conversión se aplica como pasos
+// `change_type` (uno por columna → receta visible y deshacible con undo).
+let pendingDateSuggestions = [];
+
+function showDateSuggestions(list) {
+  pendingDateSuggestions = Array.isArray(list) ? list : [];
+  const bar = document.getElementById('date-suggest-bar');
+  if (!bar) return;
+  if (pendingDateSuggestions.length === 0) { bar.hidden = true; return; }
+  const chips = document.getElementById('date-suggest-chips');
+  chips.innerHTML = pendingDateSuggestions.map(s =>
+    `<span class="date-chip" title="Ej.: ${escapeHtml(s.sample)} — ${s.pct}% de los valores se convierten con pd.to_datetime">` +
+    `${escapeHtml(s.column)} <span class="date-chip-pct">${s.pct}%</span></span>`
+  ).join('');
+  const applyBtn = document.getElementById('date-suggest-apply');
+  if (applyBtn) {
+    const n = pendingDateSuggestions.length;
+    applyBtn.textContent = n === 1 ? 'Aplicar' : `Aplicar (${n})`;
+  }
+  bar.hidden = false;
+}
+
+async function applyDateSuggestions() {
+  const cols = pendingDateSuggestions.slice();
+  if (cols.length === 0) return;
+  showLoading();
+  let applied = 0;
+  for (const s of cols) {
+    const params = { column: s.column, dtype: 'datetime' };
+    try {
+      const res = await fetch('/operation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operation: 'change_type', params })
+      });
+      const data = await res.json();
+      if (data.error) { toast(data.error, 'error'); break; }
+      handleOpResponse('change_type', params, data, false);
+      applied++;
+    } catch(e) {
+      toast('Error al aplicar el tipado de fecha', 'error');
+      break;
+    }
+  }
+  hideLoading();
+  if (applied > 0 && applied === cols.length) {
+    dismissDateSuggestions();
+    toast(applied === 1 ? '1 columna convertida a fecha' : applied + ' columnas convertidas a fecha');
+  }
+}
+
+function dismissDateSuggestions() {
+  pendingDateSuggestions = [];
+  const bar = document.getElementById('date-suggest-bar');
+  if (bar) bar.hidden = true;
 }

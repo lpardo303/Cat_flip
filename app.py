@@ -5,7 +5,7 @@ import os
 import json
 import base64
 
-from operations import OPS
+from operations import OPS, detect_date_columns
 
 app = Flask(__name__)
 
@@ -93,7 +93,8 @@ def upload():
             "success": True,
             "data": df_to_json(current_df),
             "sheets": [],
-            "code": code_log[-1]
+            "code": code_log[-1],
+            "date_suggestions": detect_date_columns(current_df)
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500

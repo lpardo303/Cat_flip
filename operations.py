@@ -8,6 +8,7 @@ front). El endpoint no cambia de comportamiento: mismos dataframes, mismos
 strings de código, mismos errores.
 """
 import ast
+import re
 
 import numpy as np
 import pandas as pd
@@ -404,6 +405,60 @@ def op_calculated_column(df, params):
     df[name] = values
     code = f"df[{name!r}] = {expr}"
     return df, code
+
+
+# ── Detección de fechas al cargar (auto-tipado) ───────────────────────
+# Roadmap "Detección inteligente de fechas": al subir un dataset, las columnas
+# object/string cuyos valores casan una forma de fecha se reportan como
+# sugerencia de tipado. NO convierte nada: la conversión la decide el usuario
+# en el front (barra de sugerencia → op change_type con dtype datetime).
+
+# Sin grupo `(?x)`: pandas `.str.match()` exige que `pat.flags` coincida con
+# `re.U`, y `VERBOSE` lo rompe (ValueError en pandas ≥2).
+_DATE_SHAPE = re.compile(
+    r"^\s*(?:"
+    r"\d{4}[-/.]\d{1,2}[-/.]\d{1,2}(?:[ T]\d{1,2}:\d{2}(?::\d{2})?)?"  # ISO (+hora opcional)
+    r"|\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}"                                # 31/12/2026, 31.12.26
+    r"|\d{1,2}\s+[A-Za-z]{3,9}(?:\s+\d{2,4})?"                          # 5 ene 2026
+    r"|[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4}"                               # Jan 5, 2026
+    r")\s*$"
+)
+
+
+def detect_date_columns(df, max_sample=200, min_pct=0.9, max_cols=10):
+    """Detecta columnas de texto con pinta de fecha. Devuelve sugerencias.
+
+    Criterio (ambos umbrales contra el sample de hasta `max_sample` valores no
+    nulos): ≥ `min_pct` de valores casan una forma de fecha conocida Y
+    `pd.to_datetime(..., errors='coerce', dayfirst=True)` parsea ≥ `min_pct`
+    sin NaT. El prefiltro por forma evita falsos positivos clásicos: IDs,
+    números-texto ("100"), partes de teléfono y columnas numéricas no llegan
+    nunca al parseo (además, dtype no-object se descarta antes).
+    """
+    suggestions = []
+    for col in df.columns:
+        if len(suggestions) >= max_cols:
+            break
+        series = df[col]
+        if not (pd.api.types.is_object_dtype(series.dtype)
+                or pd.api.types.is_string_dtype(series.dtype)):
+            continue
+        sample = series.dropna().astype(str).head(max_sample)
+        if len(sample) < 2:
+            continue
+        if sample.str.match(_DATE_SHAPE).mean() < min_pct:
+            continue
+        parsed = pd.to_datetime(sample, errors="coerce", dayfirst=True)
+        ok = 1 - (int(parsed.isna().sum()) / len(parsed))
+        if ok < min_pct:
+            continue
+        suggestions.append({
+            "column": str(col),
+            "sample": str(sample.iloc[0]),
+            "pct": int(round(ok * 100)),
+            "suggested_dtype": "datetime",
+        })
+    return suggestions
 
 
 # ── Registro (consumido por app.operation()) ────────────────────────────

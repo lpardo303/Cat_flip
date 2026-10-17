@@ -1014,6 +1014,44 @@
     .ds-grid { grid-template-columns: 1fr; }
   }
 
+  /* ── BARRA DE SUGERENCIA DE FECHAS (auto-tipado al cargar) ── */
+  .date-suggest-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    padding: 0.55rem 0.8rem;
+    margin-bottom: 0.75rem;
+    background: var(--surface-glass);
+    border: 1px solid var(--teal-bd);
+    border-radius: var(--radius2);
+    box-shadow: var(--shadow-glass-sm);
+    font-family: var(--font-ui);
+    font-size: 0.78rem;
+    color: var(--text);
+  }
+  .date-suggest-bar[hidden] { display: none; }
+  .date-suggest-bar > .icon-svg {
+    width: 16px; height: 16px;
+    flex-shrink: 0;
+    fill: none; stroke: var(--teal); stroke-width: 2;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+  .date-suggest-label { font-weight: 600; color: var(--text2); }
+  .date-suggest-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; flex: 1 1 auto; }
+  .date-chip {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    padding: 0.12rem 0.55rem;
+    border-radius: 999px;
+    background: var(--teal-bg);
+    border: 1px solid var(--teal-bd);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--teal);          /* F0.6: --teal ya validada ≥4.6:1 en ambos temas */
+  }
+  .date-chip-pct { color: var(--text-muted); font-size: 0.68rem; }
+  .date-suggest-actions { display: flex; gap: 0.4rem; }
+
   /* ── H1 DEL LOGO (a11y page-has-heading-one) ───────────── */
   .logo-title {
     margin: 0;

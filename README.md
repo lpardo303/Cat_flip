@@ -9,6 +9,7 @@
 * 🚀 **30 Operaciones ETL:** Herramientas de limpieza, filtrado, transformación estructural (Pivot/Unpivot) y manejo de texto.
 * 🐍 **Generador de Código en Vivo:** Aprende y audita con el visor que muestra el código de Pandas autogenerado en tiempo real.
 * 🌗 **Kinetic Query Minimal:** Interfaz fluida y minimalista (Glassmorphism) con soporte persistente para modo claro y oscuro.
+* 📅 **Detección Inteligente de Fechas:** Al cargar un CSV, las columnas con fechas guardadas como texto se detectan automáticamente y una barra te ofrece convertirlas a tipo `datetime` con un clic.
 * 📊 **Perfilado de Datos:** Diagnóstico estadístico instantáneo de tus columnas (nulos, valores únicos, mínimos, máximos).
 * 💻 **100% Local y Privado:** Sin bases de datos ni envíos a la nube; todo el procesamiento ocurre de forma segura en la memoria RAM de tu equipo.
 

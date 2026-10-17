@@ -76,6 +76,10 @@ Lógica condicional, ordenamiento, agregación y cruce de datasets.
 
 ## 🔄 Navegación y Exportación
 
+* **Detección de fechas al cargar (auto-tipado):** Cuando cargas un dataset, Cat_flip analiza las columnas de texto y detecta las que contienen fechas (formato ISO `2026-01-05` con hora opcional, `31/12/2026`, `31.12.2026` o `Jan 5, 2026`). Si al menos el 90% de los valores no nulos de una columna se convierte a fecha, aparece una **barra de sugerencia** sobre el Data Grid con una píldora por columna detectada y su porcentaje de conversión. Dos acciones:
+  - **Aplicar** — convierte todas las columnas sugeridas a tipo `datetime` (Fecha/hora). Cada conversión se registra como un paso de tipo *Cambiar Tipo de Dato* en la receta, así que puedes deshacerla normalmente con **Undo**.
+  - **Descartar** — oculta la sugerencia sin tocar los datos.
+  La conversión usa `pd.to_datetime(...)`: solo se sugiere cuando la conversión es segura (≥90% de valores parseados). Por ejemplo, `5 ene 2026` (mes en español) no genera sugerencia porque pandas no lo convertirá — transforma esos valores a ISO (`2026-01-05`) y usa la operación *Cambiar Tipo de Dato* manualmente.
 * **Deshacer (Undo):** Revierte la última operación aplicada, restaurando el dataset al paso anterior de tu receta.
 * **Estadísticas (Diagnóstico):** En la pestaña central, puedes ver perfiles de cada columna (conteo de nulos, valores únicos, mínimos, máximos). Se actualiza tras cada transformación.
 * **Barra de Calidad de Datos (Data Quality Bar):** Micro-barra de 3px visible en la parte inferior de cada cabecera del Data Grid. Muestra visualmente la proporción de datos válidos (no nulos) frente a nulos en cada columna, con color semántico:
