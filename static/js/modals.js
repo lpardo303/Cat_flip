@@ -194,6 +194,33 @@ const modalDefs = {
       return null;
     }
   },
+  detectar_outliers: {
+    title: icon('activity') + ' Detectar Outliers',
+    body: () => {
+      const numeric = currentColumns.filter(c => currentDtypes[c] === 'INT' || currentDtypes[c] === 'FLOAT');
+      if (!numeric.length) {
+        return '<p class="modal-warn">'+icon('triangle-alert')+'<span>No hay columnas numéricas (INT/FLOAT) en el dataset. Cambia el tipo con Tipo dato para analizar una.</span></p>';
+      }
+      const list = numeric.map(c => '<label><input type="checkbox" value="'+c+'" checked> '+c+'</label>').join('');
+      return '<label>Columnas numéricas a analizar:</label>'+selectAllHtml('do-check')+'<div class="col-check" id="do-check">'+list+'</div>'
+        + '<label>Método:</label><select id="do-method" aria-label="Método de detección de outliers"><option value="zscore">Z-Score — |x − media| / desv. &gt; umbral</option><option value="iqr">IQR — fuera de Q1 − k·IQR … Q3 + k·IQR</option></select>'
+        + '<label>Umbral:</label><input type="number" id="do-threshold" aria-label="Umbral de detección" value="2.5" step="0.1" min="0.1">'
+        + '<p style="font-size:0.75rem;color:var(--text2);margin-top:-0.3rem;margin-bottom:0.5rem">Z-Score por defecto 2.5 (desviación de población); IQR usa k = 1.5. El cambio de método restablece el umbral.</p>'
+        + '<p class="modal-warn">'+icon('triangle-alert')+'<span>La operación <strong>marca</strong> ({col}_outlier: TRUE/FALSE), no elimina filas: filtra después con Filtrar filas o Eliminar filas. Columnas constantes → todo FALSE. Puedes deshacer con '+icon('undo-2')+' Deshacer paso</span></p>';
+    },
+    params: () => ({
+      columns: [...document.querySelectorAll('#do-check input:checked')].map(i=>i.value),
+      method: document.getElementById('do-method').value,
+      threshold: document.getElementById('do-threshold').value
+    }),
+    validate: (p) => (!p.columns.length ? 'Elige al menos una columna numérica.' : null),
+    init: () => {
+      document.getElementById('do-method').addEventListener('change', () => {
+        const m = document.getElementById('do-method').value;
+        document.getElementById('do-threshold').value = m === 'iqr' ? '1.5' : '2.5';
+      });
+    }
+  },
   calculated_column: {
     title: icon('calculator') + ' Columna Calculada',
     body: () => '<label>Nombre de la nueva columna:</label><input type="text" id="calc-name" aria-label="Nombre de la nueva columna" placeholder="ej: Ventas_con_iva"><label>Expresión pandas:</label><textarea id="calc-expr" aria-label="Expresión de la columna calculada" rows="3" placeholder="ej: Ventas * 1.21"></textarea><p style="font-size:0.75rem;color:var(--text2);margin-top:0.5rem">Usa nombres de columna, operadores (+, -, *, /, **, %), comparaciones y funciones: abs, round, log, sqrt, min, max, where(cond, a, b) y col(&#39;Nombre con espacios&#39;). El sandbox bloquea atributos, imports y lambdas.</p>',
@@ -286,7 +313,8 @@ function openModalForCol(op, col) {
       clean_newlines: 'nl-check',
       drop_nulls: 'nulls-check',
       drop_duplicates: 'dup-check',
-      concatenar_columnas: 'cc-check'
+      concatenar_columnas: 'cc-check',
+      detectar_outliers: 'do-check'
     };
 
     const containerId = checkMap[op];

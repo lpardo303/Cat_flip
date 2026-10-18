@@ -62,7 +62,7 @@ def check(resp, expected):
     return payload
 
 
-# ── Happy path por operación (las 22 del registro OPS) ─────────────────
+# ── Happy path por operación (las 23 del registro OPS) ─────────────────
 
 OP_CASES = [
     pytest.param(
@@ -558,7 +558,7 @@ def test_calculated_column_sandbox_blocks_and_reports(client, name, expression, 
 
 # ── Registro de operaciones (refactor P2) ───────────────────────────
 
-def test_registry_expone_las_22_operaciones():
+def test_registry_expone_las_23_operaciones():
     """El registro define exactamente las ops del contrato UI/API.
 
     Protege contra borrados accidentales al mover handlers en operations.py.
@@ -570,7 +570,7 @@ def test_registry_expone_las_22_operaciones():
         "drop_nulls", "drop_duplicates", "drop_rows", "trim", "clean_newlines",
         "change_case", "replace", "rename_column", "drop_column", "change_type",
         "regex_mask", "concatenar_columnas",
-        "filter", "sort", "group_by", "merge", "calculated_column",
+        "filter", "sort", "group_by", "merge", "calculated_column", "detectar_outliers",
     }
     assert set(OPS) == expected
     assert all(callable(fn) for fn in OPS.values())

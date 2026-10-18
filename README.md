@@ -6,7 +6,7 @@
 
 ## ✨ Características Principales
 
-* 🚀 **22 Operaciones ETL:** Herramientas de limpieza, filtrado, transformación estructural (Pivot/Unpivot), manejo de texto, enmascaramiento de PII (Regex Mask) y concatenación de columnas.
+* 🚀 **23 Operaciones ETL:** Herramientas de limpieza, filtrado, transformación estructural (Pivot/Unpivot), manejo de texto, enmascaramiento de PII (Regex Mask), concatenación de columnas y detección de outliers (Z-Score / IQR).
 * 🐍 **Generador de Código en Vivo:** Aprende y audita con el visor que muestra el código de Pandas autogenerado en tiempo real.
 * 🌗 **Kinetic Query Minimal:** Interfaz fluida y minimalista (Glassmorphism) con soporte persistente para modo claro y oscuro.
 * 📅 **Auto-Mapeo de Tipos:** Al cargar un archivo, un motor heurístico analiza cada columna de texto del esquema completo y una barra te ofrece convertirlas con un clic a `datetime`, `int` o `float` cuando ≥90% de los valores lo permiten — cada conversión queda como paso deshacible en la receta.

@@ -587,6 +587,93 @@ def op_calculated_column(df, params):
     return df, code
 
 
+# ── Reglas & Operaciones — Detectar Outliers ───────────────────────────
+_OUTLIER_METHODS = ("zscore", "iqr")
+_OUTLIER_DEFAULT_THRESHOLD = {"zscore": 2.5, "iqr": 1.5}
+
+
+def op_detectar_outliers(df, params):
+    """Marca anomalías numéricas con Z-Score o IQR (op #23).
+
+    Por cada columna seleccionada crea `{col}_outlier` (BOOL nullable):
+    True si el valor cae fuera del umbral — `|x−media|/std(ddof=0) >
+    threshold` en 'zscore', fuera de `[Q1−k·IQR, Q3+k·IQR]` en 'iqr'
+    (k = threshold). El valor nulo produce flag nulo; columna con
+    dispersión 0 → todo False sin dividir entre cero. La op MARCA, no
+    elimina filas (filtra después con filter/drop_rows, deshacible).
+
+    Errores (ValueError → 500): sin columnas, inexistentes, repetidas,
+    no numéricas (bool cuenta como no numérico), método desconocido,
+    threshold no numérico o ≤ 0 y colisión con `{col}_outlier` existente.
+    """
+    cols = [str(c) for c in (params.get("columns") or [])]
+    if not cols:
+        raise ValueError("Elige al menos una columna numérica.")
+    if len(set(cols)) != len(cols):
+        raise ValueError("No repitas columnas: cada columna se analiza una sola vez.")
+    missing = [c for c in cols if c not in df.columns]
+    if missing:
+        raise ValueError(f"La columna {missing!r} no existe en el dataset.")
+    non_numeric = [
+        c for c in cols
+        if not pd.api.types.is_numeric_dtype(df[c].dtype)
+        or pd.api.types.is_bool_dtype(df[c].dtype)
+    ]
+    if non_numeric:
+        raise ValueError(f"Las columnas {non_numeric!r} no son numéricas.")
+    collisions = [f"{c}_outlier" for c in cols if f"{c}_outlier" in df.columns]
+    if collisions:
+        raise ValueError(f"La columna {collisions!r} ya existe. Elimínala antes de volver a marcar.")
+
+    method = str(params.get("method") or "zscore")
+    if method not in _OUTLIER_METHODS:
+        raise ValueError(f"Método no válido: '{method}'. Usa 'zscore' o 'iqr'.")
+
+    raw = params.get("threshold")
+    if raw is None or raw == "":
+        threshold = _OUTLIER_DEFAULT_THRESHOLD[method]
+    else:
+        try:
+            threshold = float(raw)
+        except (TypeError, ValueError):
+            raise ValueError(f"Umbral no numérico: {raw!r}.") from None
+    if not threshold > 0:  # cubre también NaN (NaN > 0 → False)
+        raise ValueError("El umbral debe ser mayor que cero.")
+
+    code_lines = []
+    for col in cols:
+        s = df[col]
+        if method == "zscore":
+            std = s.std(ddof=0)  # población: estable con pocas filas
+            if pd.isna(std) or std == 0:
+                flag = pd.Series(False, index=s.index)
+            else:
+                flag = ((s - s.mean()).abs() / std > threshold)
+            expr = (f"((df[{col!r}] - df[{col!r}].mean()).abs() "
+                    f"/ df[{col!r}].std(ddof=0) > {threshold!r})")
+        else:
+            q1, q3 = s.quantile(0.25), s.quantile(0.75)
+            iqr = q3 - q1
+            if pd.isna(iqr) or iqr == 0:
+                flag = pd.Series(False, index=s.index)
+            else:
+                flag = (s < q1 - threshold * iqr) | (s > q3 + threshold * iqr)
+            expr = (f"((df[{col!r}] < df[{col!r}].quantile(0.25) - {threshold!r} * "
+                    f"(df[{col!r}].quantile(0.75) - df[{col!r}].quantile(0.25))) "
+                    f"| (df[{col!r}] > df[{col!r}].quantile(0.75) + {threshold!r} * "
+                    f"(df[{col!r}].quantile(0.75) - df[{col!r}].quantile(0.25))))")
+        n_flags = int(flag.sum())
+        out = f"{col}_outlier"
+        df[out] = flag.astype("boolean").where(s.notna())
+        # El código generado omite la rama de dispersión 0: 0/0 → NaN →
+        # la comparación es False, mismo resultado final que la rama.
+        code_lines.append(
+            f"df[{out!r}] = ({expr}).astype('boolean').where(df[{col!r}].notna())"
+            f"  # {n_flags} outlier(s)"
+        )
+    return df, "\n".join(code_lines)
+
+
 # ── Auto-mapeo de tipos al cargar (heurística de esquema completo) ─────
 # Roadmap "Auto-Mapear tipos": extiende la detección de fechas a todo el
 # esquema. Para cada columna de texto se prueban, en orden, las tres
@@ -716,4 +803,5 @@ OPS = {
     "group_by": op_group_by,
     "merge": op_merge,
     "calculated_column": op_calculated_column,
+    "detectar_outliers": op_detectar_outliers,
 }

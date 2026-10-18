@@ -2,7 +2,7 @@
 
 Bienvenido a **Cat_flip - Studio ETL**, tu plataforma local y ligera para la limpieza, transformación y preparación de datos. Diseñada como una alternativa rápida a herramientas pesadas, Cat_flip te permite construir pipelines de datos visualmente mientras genera código Python por debajo.
 
-Este manual detalla las 22 operaciones de transformación disponibles en la "Caja de Transformaciones" (Panel Izquierdo) de la interfaz.
+Este manual detalla las 23 operaciones de transformación disponibles en la "Caja de Transformaciones" (Panel Izquierdo) de la interfaz.
 
 ---
 
@@ -75,6 +75,8 @@ Lógica condicional, ordenamiento, agregación y cruce de datasets.
     Carga un segundo dataset (el "frame derecho") desde el propio modal — con un archivo tuyo o con uno de los demos — y cruza ambos por una columna de clave. Tipos de cruce: `inner` (solo coincidencias), `left` (todas las filas izquierdas), `right` (todas las derechas) y `outer` (unión). Las claves sin coincidir quedan con valores vacíos. Puedes deshacer como cualquier otro paso.
 22. **Columna Calculada:** 
     Crea (o sobrescribe) una columna a partir de una expresión pandas, por ejemplo `round(Precio * 1.21, 2)`. Puedes usar nombres de columna, operadores (`+`, `-`, `*`, `/`, `**`, `%`), comparaciones y las funciones permitidas: `abs`, `round`, `len`, `min`, `max`, `sum`, `int`, `float`, `str`, `bool`, `log`, `log10`, `exp`, `sqrt`, `floor`, `ceil`, `sign`, `where(cond, a, b)` y `col('Nombre con espacios')` para referenciar columnas cuyo nombre tiene espacios o símbolos. Un sandbox de seguridad valida la expresión antes de ejecutarla: bloquea acceso a atributos (`.`), imports, lambdas y comprensiones, así que nunca se ejecuta código externo — si la expresión no está permitida, verás un mensaje explicando por qué. Nota: para condiciones por fila usa `where(cond, valor_si_true, valor_si_false)` (el ternario de Python no funciona con columnas).
+23. **Detectar Outliers:** 
+    Analiza columnas numéricas (INT/FLOAT) y crea por cada una una columna de marca `columna_outlier` (TRUE/FALSE) con dos métodos: **Z-Score** marca si `|x − media| / desviación > umbral` (por defecto 2.5, desviación de población) e **IQR** marca si el valor cae fuera de `Q1 − k·IQR … Q3 + k·IQR` (k por defecto 1.5). Los valores nulos producen marca nula y las columnas constantes quedan todas en FALSE. La operación **solo marca, no elimina filas**: filtra después con *Filtrar filas* (por ejemplo `columna_outlier == TRUE`) o *Eliminar filas*. Nota: con pocos datos (menos de ~8 filas) el Z-Score es poco significativo; en columnas muy asimétricas prefiere IQR.
 
 ---
 

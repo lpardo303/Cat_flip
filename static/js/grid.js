@@ -108,6 +108,9 @@ function buildColMenuHtml(col, dtype) {
       <div class="col-menu-item" onclick="handleColMenuAction('replace')">
         ${icon('refresh-cw')}<span>Reemplazar valores</span>
       </div>
+      <div class="col-menu-item" onclick="handleColMenuAction('detectar_outliers')">
+        ${icon('activity')}<span>Detectar outliers</span>
+      </div>
     `;
   }
 
