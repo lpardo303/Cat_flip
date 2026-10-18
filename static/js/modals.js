@@ -254,8 +254,8 @@ function openModalForCol(op, col) {
 }
 function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); currentOp=null; }
 
-// Éxito compartido de una operación aplicada (confirmModal y el auto-tipado
-// de fechas de api.js). `notify=false` calla el toast (para ráfagas de N ops).
+// Éxito compartido de una operación aplicada (confirmModal y el auto-mapeo
+// de tipos de api.js). `notify=false` calla el toast (para ráfagas de N ops).
 function handleOpResponse(op, params, data, notify = true) {
   renderTable(data.data);
   updateCode(data.code);

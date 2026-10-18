@@ -220,14 +220,14 @@
       </div>
       <!-- Data Grid -->
       <div class="tab-content active" id="tab-data">
-        <!-- Sugerencia de tipado automático: fechas detectadas al cargar -->
-        <div class="date-suggest-bar" id="date-suggest-bar" role="status" hidden>
-          <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-          <span class="date-suggest-label">Fechas detectadas como texto:</span>
-          <span class="date-suggest-chips" id="date-suggest-chips"></span>
-          <div class="date-suggest-actions">
-            <button class="btn btn-primary" id="date-suggest-apply" onclick="applyDateSuggestions()">Aplicar</button>
-            <button class="btn btn-secondary" onclick="dismissDateSuggestions()">Descartar</button>
+        <!-- Auto-mapeo de tipos: sugerencias heurísticas al cargar (esquema completo) -->
+        <div class="type-suggest-bar" id="type-suggest-bar" role="status" hidden>
+          <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg>
+          <span class="type-suggest-label">Tipos sugeridos al cargar:</span>
+          <span class="type-suggest-chips" id="type-suggest-chips"></span>
+          <div class="type-suggest-actions">
+            <button class="btn btn-primary" id="type-suggest-apply" onclick="applyTypeSuggestions()">Aplicar</button>
+            <button class="btn btn-secondary" onclick="dismissTypeSuggestions()">Descartar</button>
           </div>
         </div>
         <div class="table-wrap" id="table-wrap"></div>

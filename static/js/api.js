@@ -53,7 +53,7 @@ async function uploadFile(file, sheet) {
 
     renderTable(data.data);
     updateCode(data.code);
-    showDateSuggestions(data.date_suggestions || []);
+    showTypeSuggestions(data.type_suggestions || []);
     pipelineSteps = [];
     renderPipeline();
 
@@ -79,37 +79,41 @@ async function uploadFile(file, sheet) {
   } catch(e) { hideLoading(); toast('Error al cargar el archivo', 'error'); }
 }
 
-// ── DETECCIÓN DE FECHAS AL CARGAR (auto-tipado) ─────────────────────────
-// El backend solo sugiere (campo `date_suggestions` de /upload); aquí se
+// ── AUTO-MAPEO DE TIPOS AL CARGAR (heurística de esquema completo) ─────
+// El backend solo sugiere (campo `type_suggestions` de /upload); aquí se
 // muestran en una barra con chips y la conversión se aplica como pasos
 // `change_type` (uno por columna → receta visible y deshacible con undo).
-let pendingDateSuggestions = [];
+let pendingTypeSuggestions = [];
 
-function showDateSuggestions(list) {
-  pendingDateSuggestions = Array.isArray(list) ? list : [];
-  const bar = document.getElementById('date-suggest-bar');
+// Mismos nombres que los badges de tipo del Data Grid (STR/INT/FLOAT/DATE/BOOL)
+const TYPE_LABELS = { datetime: 'DATE', int: 'INT', float: 'FLOAT' };
+
+function showTypeSuggestions(list) {
+  pendingTypeSuggestions = Array.isArray(list) ? list : [];
+  const bar = document.getElementById('type-suggest-bar');
   if (!bar) return;
-  if (pendingDateSuggestions.length === 0) { bar.hidden = true; return; }
-  const chips = document.getElementById('date-suggest-chips');
-  chips.innerHTML = pendingDateSuggestions.map(s =>
-    `<span class="date-chip" title="Ej.: ${escapeHtml(s.sample)} — ${s.pct}% de los valores se convierten con pd.to_datetime">` +
-    `${escapeHtml(s.column)} <span class="date-chip-pct">${s.pct}%</span></span>`
-  ).join('');
-  const applyBtn = document.getElementById('date-suggest-apply');
+  if (pendingTypeSuggestions.length === 0) { bar.hidden = true; return; }
+  const chips = document.getElementById('type-suggest-chips');
+  chips.innerHTML = pendingTypeSuggestions.map(s => {
+    const target = TYPE_LABELS[s.suggested_dtype] || escapeHtml(s.suggested_dtype);
+    return `<span class="type-chip" title="Ej.: ${escapeHtml(s.sample)} — ${s.pct}% de los valores se convierten a ${target}">` +
+      `${escapeHtml(s.column)} → ${target} <span class="type-chip-pct">${s.pct}%</span></span>`;
+  }).join('');
+  const applyBtn = document.getElementById('type-suggest-apply');
   if (applyBtn) {
-    const n = pendingDateSuggestions.length;
+    const n = pendingTypeSuggestions.length;
     applyBtn.textContent = n === 1 ? 'Aplicar' : `Aplicar (${n})`;
   }
   bar.hidden = false;
 }
 
-async function applyDateSuggestions() {
-  const cols = pendingDateSuggestions.slice();
-  if (cols.length === 0) return;
+async function applyTypeSuggestions() {
+  const suggs = pendingTypeSuggestions.slice();
+  if (suggs.length === 0) return;
   showLoading();
   let applied = 0;
-  for (const s of cols) {
-    const params = { column: s.column, dtype: 'datetime' };
+  for (const s of suggs) {
+    const params = { column: s.column, dtype: s.suggested_dtype };
     try {
       const res = await fetch('/operation', {
         method: 'POST',
@@ -121,19 +125,19 @@ async function applyDateSuggestions() {
       handleOpResponse('change_type', params, data, false);
       applied++;
     } catch(e) {
-      toast('Error al aplicar el tipado de fecha', 'error');
+      toast('Error al aplicar el tipado sugerido', 'error');
       break;
     }
   }
   hideLoading();
-  if (applied > 0 && applied === cols.length) {
-    dismissDateSuggestions();
-    toast(applied === 1 ? '1 columna convertida a fecha' : applied + ' columnas convertidas a fecha');
+  if (applied > 0 && applied === suggs.length) {
+    dismissTypeSuggestions();
+    toast(applied === 1 ? '1 columna ajustada a su tipo sugerido' : applied + ' columnas ajustadas a su tipo sugerido');
   }
 }
 
-function dismissDateSuggestions() {
-  pendingDateSuggestions = [];
-  const bar = document.getElementById('date-suggest-bar');
+function dismissTypeSuggestions() {
+  pendingTypeSuggestions = [];
+  const bar = document.getElementById('type-suggest-bar');
   if (bar) bar.hidden = true;
 }

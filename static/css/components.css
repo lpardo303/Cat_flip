@@ -1014,8 +1014,8 @@
     .ds-grid { grid-template-columns: 1fr; }
   }
 
-  /* ── BARRA DE SUGERENCIA DE FECHAS (auto-tipado al cargar) ── */
-  .date-suggest-bar {
+  /* ── BARRA DE SUGERENCIA DE TIPOS (auto-mapeo de esquema al cargar) ── */
+  .type-suggest-bar {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
@@ -1030,16 +1030,16 @@
     font-size: 0.78rem;
     color: var(--text);
   }
-  .date-suggest-bar[hidden] { display: none; }
-  .date-suggest-bar > .icon-svg {
+  .type-suggest-bar[hidden] { display: none; }
+  .type-suggest-bar > .icon-svg {
     width: 16px; height: 16px;
     flex-shrink: 0;
     fill: none; stroke: var(--teal); stroke-width: 2;
     stroke-linecap: round; stroke-linejoin: round;
   }
-  .date-suggest-label { font-weight: 600; color: var(--text2); }
-  .date-suggest-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; flex: 1 1 auto; }
-  .date-chip {
+  .type-suggest-label { font-weight: 600; color: var(--text2); }
+  .type-suggest-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; flex: 1 1 auto; }
+  .type-chip {
     display: inline-flex; align-items: center; gap: 0.3rem;
     padding: 0.12rem 0.55rem;
     border-radius: 999px;
@@ -1049,8 +1049,8 @@
     font-size: 0.72rem;
     color: var(--teal);          /* F0.6: --teal ya validada ≥4.6:1 en ambos temas */
   }
-  .date-chip-pct { color: var(--text-muted); font-size: 0.68rem; }
-  .date-suggest-actions { display: flex; gap: 0.4rem; }
+  .type-chip-pct { color: var(--text-muted); font-size: 0.68rem; }
+  .type-suggest-actions { display: flex; gap: 0.4rem; }
 
   /* ── H1 DEL LOGO (a11y page-has-heading-one) ───────────── */
   .logo-title {

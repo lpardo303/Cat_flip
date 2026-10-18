@@ -443,11 +443,16 @@ def op_calculated_column(df, params):
     return df, code
 
 
-# ── Detección de fechas al cargar (auto-tipado) ───────────────────────
-# Roadmap "Detección inteligente de fechas": al subir un dataset, las columnas
-# object/string cuyos valores casan una forma de fecha se reportan como
-# sugerencia de tipado. NO convierte nada: la conversión la decide el usuario
-# en el front (barra de sugerencia → op change_type con dtype datetime).
+# ── Auto-mapeo de tipos al cargar (heurística de esquema completo) ─────
+# Roadmap "Auto-Mapear tipos": extiende la detección de fechas a todo el
+# esquema. Para cada columna de texto se prueban, en orden, las tres
+# conversiones que `change_type` sabe aplicar: fecha, entero y decimal.
+# Criterio común: ≥90% del sample (hasta 200 valores no nulos) debe
+# convertirse sin coercionar a nulo — nunca se sugiere algo que pandas no
+# podría convertir de verdad. NO convierte nada: la conversión la decide el
+# usuario (barra de sugerencia → op change_type con el dtype sugerido).
+# Los nombres de columna no participan en la decisión: un nombre sugerente
+# no garantiza que la conversión sea correcta; los valores sí lo prueban.
 
 # Sin grupo `(?x)`: pandas `.str.match()` exige que `pat.flags` coincida con
 # `re.U`, y `VERBOSE` lo rompe (ValueError en pandas ≥2).
@@ -460,16 +465,43 @@ _DATE_SHAPE = re.compile(
     r")\s*$"
 )
 
+# Subforma ISO (año primero): inequívoca, no necesita dayfirst. Ver
+# detect_type_suggestions: con dayfirst=True pandas infiere "%Y-%d-%m" para
+# una columna ISO y las fechas con día > 12 caen a NaT (o se interpretan
+# volteadas) — bug latente desde la detección de fechas original.
+_ISO_SHAPE = re.compile(
+    r"^\s*\d{4}[-/.]\d{1,2}[-/.]\d{1,2}(?:[ T]\d{1,2}:\d{2}(?::\d{2})?)?\s*$"
+)
 
-def detect_date_columns(df, max_sample=200, min_pct=0.9, max_cols=10):
-    """Detecta columnas de texto con pinta de fecha. Devuelve sugerencias.
 
-    Criterio (ambos umbrales contra el sample de hasta `max_sample` valores no
-    nulos): ≥ `min_pct` de valores casan una forma de fecha conocida Y
-    `pd.to_datetime(..., errors='coerce', dayfirst=True)` parsea ≥ `min_pct`
-    sin NaT. El prefiltro por forma evita falsos positivos clásicos: IDs,
-    números-texto ("100"), partes de teléfono y columnas numéricas no llegan
-    nunca al parseo (además, dtype no-object se descarta antes).
+def _numeric_kind(sample, min_pct):
+    """Conversión numérica del sample. Devuelve (dtype, pct) o (None, 0).
+
+    'int' si todos los valores convertidos son integrales, 'float' si algún
+    valor tiene parte decimal. Un porcentaje de convertibles por debajo de
+    `min_pct` descarta la sugerencia entera.
+    """
+    parsed = pd.to_numeric(sample, errors="coerce")
+    ok = 1 - (int(parsed.isna().sum()) / len(parsed))
+    if ok < min_pct:
+        return None, 0
+    valid = parsed.dropna()
+    kind = "int" if (valid % 1 == 0).all() else "float"
+    return kind, int(round(ok * 100))
+
+
+def detect_type_suggestions(df, max_sample=200, min_pct=0.9, max_cols=10):
+    """Heurística de esquema completo: tipos sugeridos para texto (auto-mapeo).
+
+    Devuelve, por columna object/string con ≥2 valores no nulos, la
+    sugerencia de `change_type` más específica que sus valores permiten
+    (primer match gana): datetime (doble filtro: forma de fecha +
+    `pd.to_datetime(..., errors='coerce', dayfirst=True)` sin NaT) y, si no,
+    int/float vía `pd.to_numeric(..., errors='coerce')`. El prefiltro por
+    forma de fecha evita falsos positivos clásicos: IDs, números-texto
+    ("100"), partes de teléfono y columnas ya tipadas por pandas no llegan
+    nunca al parseo (dtype no-texto se descarta antes). Cada sugerencia:
+    {"column", "sample", "pct", "suggested_dtype"}. Máximo `max_cols`.
     """
     suggestions = []
     for col in df.columns:
@@ -482,18 +514,32 @@ def detect_date_columns(df, max_sample=200, min_pct=0.9, max_cols=10):
         sample = series.dropna().astype(str).head(max_sample)
         if len(sample) < 2:
             continue
-        if sample.str.match(_DATE_SHAPE).mean() < min_pct:
-            continue
-        parsed = pd.to_datetime(sample, errors="coerce", dayfirst=True)
-        ok = 1 - (int(parsed.isna().sum()) / len(parsed))
-        if ok < min_pct:
-            continue
-        suggestions.append({
-            "column": str(col),
-            "sample": str(sample.iloc[0]),
-            "pct": int(round(ok * 100)),
-            "suggested_dtype": "datetime",
-        })
+
+        # 1) Fecha: regla más específica, se prueba primero.
+        if sample.str.match(_DATE_SHAPE).mean() >= min_pct:
+            # ISO-dominante → dayfirst=False (formato inequívoco); el resto
+            # (31/12/2026, 5 ene…) sigue siendo day-first.
+            dayfirst = sample.str.match(_ISO_SHAPE).mean() < 0.5
+            parsed = pd.to_datetime(sample, errors="coerce", dayfirst=dayfirst)
+            ok = 1 - (int(parsed.isna().sum()) / len(parsed))
+            if ok >= min_pct:
+                suggestions.append({
+                    "column": str(col),
+                    "sample": str(sample.iloc[0]),
+                    "pct": int(round(ok * 100)),
+                    "suggested_dtype": "datetime",
+                })
+                continue
+
+        # 2) Numérico: entero si todo es integral, decimal si hay fracciones.
+        kind, pct = _numeric_kind(sample, min_pct)
+        if kind:
+            suggestions.append({
+                "column": str(col),
+                "sample": str(sample.iloc[0]),
+                "pct": pct,
+                "suggested_dtype": kind,
+            })
     return suggestions
 
 
