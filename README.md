@@ -8,6 +8,7 @@
 
 * 🚀 **23 Operaciones ETL:** Herramientas de limpieza, filtrado, transformación estructural (Pivot/Unpivot), manejo de texto, enmascaramiento de PII (Regex Mask), concatenación de columnas y detección de outliers (Z-Score / IQR).
 * 🐍 **Generador de Código en Vivo:** Aprende y audita con el visor que muestra el código de Pandas autogenerado en tiempo real.
+* 💾 **Recetas Reproducibles:** Guarda tu pipeline como `.catflip.json` y revívelo con un clic sobre cualquier dataset — reproducción atómica (un paso fallido no toca tus datos) y deshacer paso a paso.
 * 🌗 **Kinetic Query Minimal:** Interfaz fluida y minimalista (Glassmorphism) con soporte persistente para modo claro y oscuro.
 * 📅 **Auto-Mapeo de Tipos:** Al cargar un archivo, un motor heurístico analiza cada columna de texto del esquema completo y una barra te ofrece convertirlas con un clic a `datetime`, `int` o `float` cuando ≥90% de los valores lo permiten — cada conversión queda como paso deshacible en la receta.
 * 📊 **Perfilado de Datos:** Diagnóstico estadístico instantáneo de tus columnas (nulos, valores únicos, mínimos, máximos).

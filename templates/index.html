@@ -301,6 +301,15 @@
             <svg class="icon-svg" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
             <span>Exportar pipeline .py</span>
           </button>
+          <button class="btn btn-secondary" onclick="saveRecipe()" id="btn-recipe" disabled style="width:100%;justify-content:center">
+            <svg class="icon-svg" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            <span>Guardar receta .json</span>
+          </button>
+          <button class="btn btn-secondary" onclick="openRecipePicker()" id="btn-load-recipe" style="width:100%;justify-content:center">
+            <svg class="icon-svg" viewBox="0 0 24 24"><path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
+            <span>Cargar receta</span>
+          </button>
+          <input type="file" id="recipe-file" accept=".json,.catflip.json" hidden onchange="loadRecipeFile(this)">
         </div>
       </div>
 

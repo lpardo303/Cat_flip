@@ -59,6 +59,68 @@ function applyColVis() {
   toast('Visibilidad de columnas actualizada');
 }
 
+// ── Receta JSON (.catflip.json) ─────────────────────────────────────
+// Guardar: exporta op_history vía POST /export_recipe y descarga el blob.
+// Cargar: lee el archivo con FileReader y lo manda a /apply_recipe; si el
+// backend lo aplica (atómico), se repuebla pipelineSteps con la respuesta.
+async function saveRecipe() {
+  try {
+    const res = await fetch('/export_recipe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: 'receta_catflip' })
+    });
+    if (!res.ok) { const err = await res.json(); toast(err.error || 'Error al guardar la receta', 'error'); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'receta_catflip.catflip.json'; a.click();
+    URL.revokeObjectURL(url);
+    toast('Receta guardada: receta_catflip.catflip.json', 'info');
+  } catch (e) { toast('Error al guardar la receta', 'error'); }
+}
+
+function openRecipePicker() {
+  if (!currentColumns.length) {
+    toast('Carga un archivo antes de aplicar una receta', 'info');
+    return;
+  }
+  const input = document.getElementById('recipe-file');
+  if (!input) return;
+  input.value = '';
+  input.click();
+}
+
+async function loadRecipeFile(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  let recipe;
+  try {
+    recipe = JSON.parse(await file.text());
+  } catch (e) {
+    toast('El archivo no es un JSON válido', 'error');
+    return;
+  }
+  showLoading();
+  try {
+    const res = await fetch('/apply_recipe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(recipe)
+    });
+    const data = await res.json();
+    hideLoading();
+    if (!res.ok || data.error) { toast(data.error || 'Error al aplicar la receta', 'error'); return; }
+    renderTable(data.data);
+    updateCode(data.code);
+    pipelineSteps = data.steps.map(s => ({ op: s.op, params: s.params }));
+    renderPipeline();
+    loadStats();   // refrescar diagnóstico en segundo plano
+    loadLineage(); // refrescar linaje en segundo plano (F3.3)
+    toast(`Receta aplicada: ${data.applied} paso(s)`);
+  } catch (e) { hideLoading(); toast('Error al aplicar la receta', 'error'); }
+}
+
 // ── ESTADO ──────────────────────────────────────────────────────────────
 let currentColumns = [];
 let currentDtypes = {};
@@ -80,7 +142,7 @@ function toast(msg, type='success') {
 
 function enableOps() {
   document.querySelectorAll('.op-btn').forEach(b => b.disabled = false);
-  ['btn-undo','btn-csv','btn-xlsx','btn-script'].forEach(id => document.getElementById(id).disabled = false);
+  ['btn-undo','btn-csv','btn-xlsx','btn-script','btn-recipe'].forEach(id => document.getElementById(id).disabled = false);
 }
 
 function switchTab(name) {

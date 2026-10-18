@@ -211,6 +211,111 @@ def undo():
         })
     return jsonify({"error": "No hay más pasos para deshacer."}), 400
 
+@app.route("/export_recipe", methods=["POST"])
+def export_recipe():
+    """Serializa la receta (op_history) a `.catflip.json` descargable.
+
+    Fuente de verdad: `op_history` ({op, params} serializables — los
+    DataFrames nunca entran, ver comentario en operation()). Los
+    fragments de código se regeneran al reproducir, no se guardan.
+    """
+    global current_df, op_history
+    if current_df is None:
+        return jsonify({"error": "No hay datos cargados."}), 400
+    if not op_history:
+        return jsonify({"error": "No hay pasos en la receta para exportar."}), 400
+
+    data = request.get_json(silent=True) or {}
+    filename = str(data.get("filename") or "receta_catflip")
+    filename = filename.removesuffix(".catflip.json").removesuffix(".json") or "receta_catflip"
+
+    recipe = {
+        "version": 1,
+        "app": "catflip",
+        "steps": [{"op": s["op"], "params": s["params"]} for s in op_history],
+    }
+    buf = io.BytesIO(json.dumps(recipe, ensure_ascii=False, indent=2).encode("utf-8"))
+    buf.seek(0)
+    return send_file(
+        buf,
+        mimetype="application/json",
+        as_attachment=True,
+        download_name=f"{filename}.catflip.json",
+    )
+
+@app.route("/apply_recipe", methods=["POST"])
+def apply_recipe():
+    """Reproduce una receta `.catflip.json` sobre el dataset actual.
+
+    Atomicidad: TODA la receta se ejecuta sobre copias de trabajo y los
+    globals (history/code_log/op_history/current_df) solo se escriben si
+    ningún paso falla → imposible dejar estado parcial. Si todo pasa,
+    `history` recibe un snapshot por paso: Deshacer revierte paso a paso
+    y el linaje muestra cada paso individual, igual que ops manuales.
+    """
+    global current_df, history, code_log, op_history
+    if current_df is None:
+        return jsonify({"error": "No hay datos cargados. Carga un archivo antes de aplicar la receta."}), 400
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "La receta no es JSON válido."}), 400
+    if data.get("version") != 1:
+        return jsonify({"error": f"Versión de receta no soportada: {data.get('version')!r} (se espera 1)."}), 400
+    steps = data.get("steps")
+    if not isinstance(steps, list) or not steps:
+        return jsonify({"error": "La receta no contiene pasos válidos ('steps' ausente o vacío)."}), 400
+
+    # Validación estructural ANTES de ejecutar nada: un paso malformado
+    # ni siquiera llega al handler.
+    for i, step in enumerate(steps, 1):
+        if not isinstance(step, dict):
+            return jsonify({"error": f"El paso {i} no es un objeto válido."}), 400
+        sop = step.get("op")
+        if not isinstance(sop, str) or sop not in OPS:
+            return jsonify({"error": f"El paso {i} usa una operación desconocida: {sop!r}."}), 400
+        if not isinstance(step.get("params", {}), dict):
+            return jsonify({"error": f"El paso {i} ({sop}) tiene 'params' que no son un objeto."}), 400
+
+    # Reproducción en copia de trabajo: cero mutación de globals aquí.
+    df_work = current_df
+    snaps, codes, applied = [], [], []
+    for i, step in enumerate(steps, 1):
+        sop = step["op"]
+        params = step.get("params", {})
+        handler = OPS[sop]
+        handler_params = params
+        if sop == "merge":
+            if right_df is None:
+                return jsonify({
+                    "error": f"El paso {i} (merge): No hay frame derecho cargado. Carga un segundo dataset desde el modal de Join."
+                }), 400
+            handler_params = {**params, "right_df": right_df, "right_code": right_code}
+        try:
+            df_work, code = handler(df_work.copy(), handler_params)
+        except Exception as e:
+            # 400: el problema lo trae la receta del cliente, no el servidor
+            return jsonify({"error": f"El paso {i} ({sop}) falló: {e}"}), 400
+        snaps.append(df_work.copy())
+        codes.append(f"# {sop}\n{code}")
+        applied.append({"op": sop, "params": params})
+
+    # Commit único: solo aquí se tocan los globals (ya se validó todo ⇒ no
+    # puede quedar estado parcial por un paso a mitad de camino)
+    history.extend(snaps)
+    op_history.extend(applied)
+    code_log.extend(codes)
+    current_df = df_work
+
+    return jsonify({
+        "success": True,
+        "applied": len(applied),
+        "steps": applied,
+        "data": df_to_json(current_df),
+        "code": "\n\n".join(code_log),
+        "last_code": codes[-1],
+    })
+
 @app.route("/export", methods=["POST"])
 def export():
     global current_df
