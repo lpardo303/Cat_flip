@@ -226,6 +226,92 @@ def op_change_type(df, params):
     return df, code
 
 
+# ── Texto & Tipos — Regex Mask (PII) ─────────────────────────────────────
+# Presets de detección de PII sin grupos de captura: `str.findall` devuelve
+# el texto completo del match y `str.replace` sustituye la coincidencia
+# entera. `custom` usa la regex del usuario (validada al vuelo).
+_MASK_PATTERNS = {
+    "email": r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}",
+    "phone": r"\+?\d(?:[\s().-]?\d){6,14}",  # 7–15 dígitos, separadores opcionales
+    "id": r"\b(?:[A-Za-z]{1,4}-?\d{2,12}|\d{13,19})\b",  # SN-001/X204 o tarjeta
+}
+
+# Marcadores de nulo que `astype(str)` materializa en texto (Bug 4, ampliada):
+# cubre <NA> (pandas StringDtype) y NaT (fechas) además de nan/none/null.
+_MASK_NA_REGEX = r"(?i)^\s*(?:nan|none|null|<na>|nat)\s*$"
+
+_MASK_MAX_CUSTOM_LEN = 500
+
+
+def op_regex_mask(df, params):
+    """Enmascara o extrae PII (email, teléfono, identificador) por regex.
+
+    `mode='mask'` sustituye cada coincidencia en la MISMA columna por
+    `fill` (por defecto '****'; cadena vacía = borrar la coincidencia).
+    `mode='extract'` escribe la PRIMERA coincidencia de cada fila en una
+    columna nueva (`new_column` vacío → `{column}_mask`) y deja la fuente
+    intacta. Los nulos reales sobreviven en ambos modos (regla Bug 4).
+
+    Errores (ValueError → 500): columna inexistente, modo inválido,
+    patrón desconocido, regex que no compila o que case la cadena vacía
+    (enmascararía todo), destino de extracción colisionado y custom > 500.
+    """
+    col = params.get("column")
+    if not isinstance(col, str) or col not in df.columns:
+        raise ValueError(f"La columna '{col}' no existe en el dataset.")
+
+    mode = str(params.get("mode") or "mask")
+    if mode not in ("mask", "extract"):
+        raise ValueError(f"Modo no válido: '{mode}'. Usa 'mask' o 'extract'.")
+
+    pattern_key = str(params.get("pattern") or "email")
+    if pattern_key == "custom":
+        pat = str(params.get("custom_pattern") or "")
+        if not pat:
+            raise ValueError("La regex personalizada está vacía.")
+        if len(pat) > _MASK_MAX_CUSTOM_LEN:
+            raise ValueError(
+                f"La regex personalizada supera los {_MASK_MAX_CUSTOM_LEN} caracteres."
+            )
+    elif pattern_key in _MASK_PATTERNS:
+        pat = _MASK_PATTERNS[pattern_key]
+    else:
+        raise ValueError(f"Patrón desconocido: '{pattern_key}'.")
+
+    try:
+        compiled = re.compile(pat)
+    except re.error as e:
+        raise ValueError(f"Regex no válida: {e}") from None
+    if compiled.search(""):
+        raise ValueError(
+            "La regex coincide con la cadena vacía: enmascararía todo el texto."
+        )
+
+    fill = "****" if params.get("mask") is None else str(params.get("mask"))
+    new_col = str(params.get("new_column") or "").strip()
+    if mode == "extract":
+        if not new_col:
+            new_col = f"{col}_mask"
+        if new_col == col:
+            raise ValueError("La columna de destino no puede ser la original.")
+        if new_col in df.columns:
+            raise ValueError(f"La columna '{new_col}' ya existe. Elige otro nombre.")
+
+    # Orden real: normalizar nulos ANTES de buscar/reemplazar (Bug 4).
+    src = df[col].astype(str).replace(_MASK_NA_REGEX, np.nan, regex=True)
+    if mode == "mask":
+        df[col] = src.str.replace(pat, fill, regex=True)
+        code = (f"df[{col!r}] = (df[{col!r}].astype(str)\n"
+                f"    .replace(r{_MASK_NA_REGEX!r}, float('nan'), regex=True)\n"
+                f"    .str.replace({pat!r}, {fill!r}, regex=True))")
+    else:
+        df[new_col] = src.str.findall(pat).str[0]
+        code = (f"df[{new_col!r}] = (df[{col!r}].astype(str)\n"
+                f"    .replace(r{_MASK_NA_REGEX!r}, float('nan'), regex=True)\n"
+                f"    .str.findall({pat!r}).str[0])")
+    return df, code
+
+
 # ── Reglas & Operaciones ────────────────────────────────────────────────
 
 def op_filter(df, params):
@@ -564,6 +650,7 @@ OPS = {
     "rename_column": op_rename_column,
     "drop_column": op_drop_column,
     "change_type": op_change_type,
+    "regex_mask": op_regex_mask,
     # Reglas & Operaciones
     "filter": op_filter,
     "sort": op_sort,

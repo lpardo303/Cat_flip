@@ -14,6 +14,22 @@ function selectAllHtml(containerId) {
        + '<input type="checkbox" checked onchange="toggleAllChecks(\''+containerId+'\',this.checked)"> Seleccionar todo</label>';
 }
 
+// ── Regex Mask (op #21) — visibilidad condicional del modal ───────────
+// Los selectores cambian qué campos aplican: 'custom' muestra la regex
+// libre; 'extract' cambia el relleno por el nombre de la columna nueva.
+function toggleRegexMaskPattern() {
+  const wrap = document.getElementById('rm-custom-wrap');
+  if (wrap) wrap.style.display = document.getElementById('rm-pattern').value === 'custom' ? 'block' : 'none';
+}
+
+function toggleRegexMaskMode() {
+  const isExtract = document.getElementById('rm-mode').value === 'extract';
+  const fillWrap = document.getElementById('rm-fill-wrap');
+  const newWrap = document.getElementById('rm-newcol-wrap');
+  if (fillWrap) fillWrap.style.display = isExtract ? 'none' : 'block';
+  if (newWrap) newWrap.style.display = isExtract ? 'block' : 'none';
+}
+
 const modalDefs = {
   unpivot: {
     title: icon('move-vertical') + ' Unpivot (Anular dinamización)',
@@ -140,6 +156,29 @@ const modalDefs = {
       refreshRightInfo();
     }
   },
+  regex_mask: {
+    title: icon('eye-off') + ' Enmascarar / extraer PII (Regex Mask)',
+    body: () => '<label>Columna:</label><select id="rm-col" aria-label="Columna para enmascarar o extraer PII">'+colOptions()+'</select>'
+      + '<label>Patrón PII:</label><select id="rm-pattern" aria-label="Patrón de PII a detectar"><option value="email">Email</option><option value="phone">Teléfono</option><option value="id">Identificador (SN-001, X204, tarjeta)</option><option value="custom">Regex personalizada</option></select>'
+      + '<div id="rm-custom-wrap" style="display:none"><label>Regex personalizada:</label><input type="text" id="rm-custom" aria-label="Regex personalizada" placeholder="ej: [A-Z]{2}-\\d{4}"></div>'
+      + '<label>Modo:</label><select id="rm-mode" aria-label="Modo de la operación"><option value="mask">Enmascarar (sustituir en la misma columna)</option><option value="extract">Extraer a columna nueva (1ª coincidencia)</option></select>'
+      + '<div id="rm-fill-wrap"><label>Relleno del enmascaramiento:</label><input type="text" id="rm-fill" aria-label="Texto de relleno para enmascarar" value="****"><p style="font-size:0.75rem;color:var(--text2);margin-top:-0.3rem;margin-bottom:0.5rem">Vacío = borrar la coincidencia.</p></div>'
+      + '<div id="rm-newcol-wrap" style="display:none"><label>Nombre columna nueva:</label><input type="text" id="rm-newcol" aria-label="Nombre de la columna de destino" placeholder="vacío = columna_mask"></div>'
+      + '<p class="modal-warn">'+icon('triangle-alert')+'<span>El patrón se aplica solo sobre la columna elegida. Los nulos reales se conservan; puedes deshacer con '+icon('undo-2')+' Deshacer paso</span></p>',
+    params: () => ({
+      column: document.getElementById('rm-col').value,
+      pattern: document.getElementById('rm-pattern').value,
+      custom_pattern: document.getElementById('rm-custom').value.trim(),
+      mode: document.getElementById('rm-mode').value,
+      mask: document.getElementById('rm-fill').value,
+      new_column: document.getElementById('rm-newcol').value.trim()
+    }),
+    validate: (p) => (p.pattern === 'custom' && !p.custom_pattern) ? 'Escribe la regex personalizada.' : null,
+    init: () => {
+      document.getElementById('rm-pattern').addEventListener('change', toggleRegexMaskPattern);
+      document.getElementById('rm-mode').addEventListener('change', toggleRegexMaskMode);
+    }
+  },
   calculated_column: {
     title: icon('calculator') + ' Columna Calculada',
     body: () => '<label>Nombre de la nueva columna:</label><input type="text" id="calc-name" aria-label="Nombre de la nueva columna" placeholder="ej: Ventas_con_iva"><label>Expresión pandas:</label><textarea id="calc-expr" aria-label="Expresión de la columna calculada" rows="3" placeholder="ej: Ventas * 1.21"></textarea><p style="font-size:0.75rem;color:var(--text2);margin-top:0.5rem">Usa nombres de columna, operadores (+, -, *, /, **, %), comparaciones y funciones: abs, round, log, sqrt, min, max, where(cond, a, b) y col(&#39;Nombre con espacios&#39;). El sandbox bloquea atributos, imports y lambdas.</p>',
@@ -207,7 +246,8 @@ function openModalForCol(op, col) {
       change_case: 'case-col',
       replace: 'rep-col',
       split_column: 'split-col',
-      split_to_rows: 'str-col'
+      split_to_rows: 'str-col',
+      regex_mask: 'rm-col'
     };
 
     const selId = selectMap[op];

@@ -88,6 +88,9 @@ function buildColMenuHtml(col, dtype) {
       <div class="col-menu-item" onclick="handleColMenuAction('replace')">
         ${icon('refresh-cw')}<span>Reemplazar valores</span>
       </div>
+      <div class="col-menu-item" onclick="handleColMenuAction('regex_mask')">
+        ${icon('eye-off')}<span>Enmascarar / extraer PII</span>
+      </div>
       <div class="col-menu-item" onclick="handleColMenuAction('split_column')">
         ${icon('scissors')}<span>Separar en columnas</span>
       </div>
