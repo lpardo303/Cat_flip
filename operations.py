@@ -312,6 +312,64 @@ def op_regex_mask(df, params):
     return df, code
 
 
+# ── Texto & Tipos — Concatenar Columnas ──────────────────────────────────
+# Cubre también los marcadores <NA>/<na>/NaT que `astype(str)` materializa
+# (Bug 4). El `?` final hace que el grupo sea opcional: la cadena vacía y
+# los solo-espacios también son nulo, igual que `_NUL_REGEX`.
+_CONCAT_NA_REGEX = r"(?i)^\s*(?:nan|none|null|<na>|nat)?\s*$"
+
+
+def op_concatenar_columnas(df, params):
+    """Concatena 2+ columnas en una nueva con delimitador (op #22).
+
+    Los nulos se omiten al unir (sin delimitadores huérfanos por un nulo
+    intermedio o lateral); fila toda nula → nulo real. El orden de la
+    unión es el orden de `columns`. `new_name` puede sobrescribir una de
+    las columnas seleccionadas (estilo Excel); `drop_sources` elimina las
+    originales tras calcular la unión.
+
+    Errores (ValueError → 500): menos de 2 columnas, columnas repetidas,
+    columnas inexistentes, nombre vacío y colisión con una columna ajena.
+    """
+    cols = [str(c) for c in (params.get("columns") or [])]
+    delim = params.get("delimiter")
+    delim = " " if delim is None else str(delim)  # default = modal; "" explícito une sin separador
+    new_name = str(params.get("new_name") or "").strip()
+    drop_sources = bool(params.get("drop_sources", False))
+
+    if len(cols) < 2:
+        raise ValueError("Elige al menos 2 columnas para concatenar.")
+    if len(set(cols)) != len(cols):
+        raise ValueError("No repitas columnas: cada columna entra una sola vez.")
+    missing = [c for c in cols if c not in df.columns]
+    if missing:
+        raise ValueError(f"La columna {missing!r} no existe en el dataset.")
+    if not new_name:
+        raise ValueError("La columna nueva necesita un nombre.")
+    if new_name in df.columns and new_name not in cols:
+        raise ValueError(f"La columna '{new_name}' ya existe. Elige otro nombre.")
+
+    # Orden real: normalizar nulos por columna ANTES de unir (Bug 4); el
+    # generador descarta los NaN de cada fila, así nunca quedan
+    # delimitadores huérfanos. `x == x` es el test de no-NaN (NaN != NaN).
+    parts = df[cols].astype(str).replace(_CONCAT_NA_REGEX, np.nan, regex=True)
+    joined = parts.agg(lambda r: delim.join(x for x in r if x == x), axis=1)
+    joined = joined.replace(r"^\s*$", np.nan, regex=True)
+
+    if drop_sources and new_name not in cols:
+        df = df.drop(columns=cols)
+    df[new_name] = joined
+
+    code = (f"_partes = (df[{cols!r}].astype(str)\n"
+            f"    .replace(r{_CONCAT_NA_REGEX!r}, float('nan'), regex=True))\n"
+            f"df[{new_name!r}] = (_partes.agg(\n"
+            f"    lambda r: {delim!r}.join(x for x in r if x == x), axis=1\n"
+            f").replace(r'^\\s*$', float('nan'), regex=True))")
+    if drop_sources and new_name not in cols:
+        code += f"\ndf = df.drop(columns={cols!r})"
+    return df, code
+
+
 # ── Reglas & Operaciones ────────────────────────────────────────────────
 
 def op_filter(df, params):
@@ -651,6 +709,7 @@ OPS = {
     "drop_column": op_drop_column,
     "change_type": op_change_type,
     "regex_mask": op_regex_mask,
+    "concatenar_columnas": op_concatenar_columnas,
     # Reglas & Operaciones
     "filter": op_filter,
     "sort": op_sort,

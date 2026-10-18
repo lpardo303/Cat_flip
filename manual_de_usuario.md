@@ -2,7 +2,7 @@
 
 Bienvenido a **Cat_flip - Studio ETL**, tu plataforma local y ligera para la limpieza, transformación y preparación de datos. Diseñada como una alternativa rápida a herramientas pesadas, Cat_flip te permite construir pipelines de datos visualmente mientras genera código Python por debajo.
 
-Este manual detalla las 21 operaciones de transformación disponibles en la "Caja de Transformaciones" (Panel Izquierdo) de la interfaz.
+Este manual detalla las 22 operaciones de transformación disponibles en la "Caja de Transformaciones" (Panel Izquierdo) de la interfaz.
 
 ---
 
@@ -56,6 +56,8 @@ Operaciones de formato de cadenas y estructura de datos.
     Fuerza a una columna a interpretarse como un tipo de dato específico: Texto (`str`), Número Entero (`int`), Número Decimal (`float`) o Fecha y Hora (`datetime`).
 16. **Enmascarar / Extraer PII (Regex Mask):** 
     Detecta datos personales (emails, teléfonos, identificadores tipo `SN-001`/`X204` o números de tarjeta de 13–19 dígitos) — o cualquier regex personalizada — dentro de una columna y actúa en dos modos: **Enmascarar** sustituye cada coincidencia en la misma columna por un relleno (por defecto `****`; vacío = borrar la coincidencia) y **Extraer a columna nueva** copia la primera coincidencia de cada fila a una columna nueva (`Email_mask` por defecto) dejando la fuente intacta. Los nulos reales se conservan en ambos modos. El patrón solo se aplica sobre la columna elegida; puedes deshacer el paso como cualquier otro.
+17. **Concatenar Columnas:** 
+    Une 2 o más columnas en una sola columna nueva con el delimitador que elijas (por defecto un espacio; vacío = unir sin separador), en el orden en que las marques. Los nulos se **omiten** al unir: no quedan delimitadores sueltos (`Ana` + nulo + `Torres` con espacio → `Ana Torres`, no `Ana  Torres`) y una fila cuyas columnas elegidas son todas nulas produce un nulo real. Puedes eliminar las columnas originales tras la unión (checkbox) o sobrescribir una de las seleccionadas escribiendo su nombre como destino.
 
 ---
 
@@ -63,15 +65,15 @@ Operaciones de formato de cadenas y estructura de datos.
 
 Lógica condicional, ordenamiento, agregación y cruce de datasets.
 
-17. **Filtrar Filas:** 
+18. **Filtrar Filas:** 
     Mantiene solo las filas que cumplen una condición lógica en una columna específica. Operadores: igual a (`==`), diferente de (`!=`), mayor que (`>`), menor que (`<`), contiene texto (`contiene`), no contiene texto (`no contiene`).
-18. **Ordenar:** 
+19. **Ordenar:** 
     Ordena todo el dataset basándose en los valores de una columna seleccionada, ya sea en orden Ascendente (A-Z, 0-9) o Descendente (Z-A, 9-0).
-19. **Group By (Agregación):** 
+20. **Group By (Agregación):** 
     Agrupa las filas por los valores únicos de una columna ("agrupar por") y resume otra columna numérica con una función: suma (`sum`), media (`mean`), conteo (`count`), mínimo (`min`), máximo (`max`), mediana (`median`) o valores únicos (`nunique`).
-20. **Join / Merge (Cruzar datasets):** 
+21. **Join / Merge (Cruzar datasets):** 
     Carga un segundo dataset (el "frame derecho") desde el propio modal — con un archivo tuyo o con uno de los demos — y cruza ambos por una columna de clave. Tipos de cruce: `inner` (solo coincidencias), `left` (todas las filas izquierdas), `right` (todas las derechas) y `outer` (unión). Las claves sin coincidir quedan con valores vacíos. Puedes deshacer como cualquier otro paso.
-21. **Columna Calculada:** 
+22. **Columna Calculada:** 
     Crea (o sobrescribe) una columna a partir de una expresión pandas, por ejemplo `round(Precio * 1.21, 2)`. Puedes usar nombres de columna, operadores (`+`, `-`, `*`, `/`, `**`, `%`), comparaciones y las funciones permitidas: `abs`, `round`, `len`, `min`, `max`, `sum`, `int`, `float`, `str`, `bool`, `log`, `log10`, `exp`, `sqrt`, `floor`, `ceil`, `sign`, `where(cond, a, b)` y `col('Nombre con espacios')` para referenciar columnas cuyo nombre tiene espacios o símbolos. Un sandbox de seguridad valida la expresión antes de ejecutarla: bloquea acceso a atributos (`.`), imports, lambdas y comprensiones, así que nunca se ejecuta código externo — si la expresión no está permitida, verás un mensaje explicando por qué. Nota: para condiciones por fila usa `where(cond, valor_si_true, valor_si_false)` (el ternario de Python no funciona con columnas).
 
 ---

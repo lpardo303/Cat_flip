@@ -91,6 +91,9 @@ function buildColMenuHtml(col, dtype) {
       <div class="col-menu-item" onclick="handleColMenuAction('regex_mask')">
         ${icon('eye-off')}<span>Enmascarar / extraer PII</span>
       </div>
+      <div class="col-menu-item" onclick="handleColMenuAction('concatenar_columnas')">
+        ${icon('text')}<span>Concatenar columnas</span>
+      </div>
       <div class="col-menu-item" onclick="handleColMenuAction('split_column')">
         ${icon('scissors')}<span>Separar en columnas</span>
       </div>

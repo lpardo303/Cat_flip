@@ -179,6 +179,21 @@ const modalDefs = {
       document.getElementById('rm-mode').addEventListener('change', toggleRegexMaskMode);
     }
   },
+  concatenar_columnas: {
+    title: icon('text') + ' Concatenar columnas',
+    body: () => '<label>Columnas (se unen en el orden marcado):</label>'+selectAllHtml('cc-check')+'<div class="col-check" id="cc-check">'+colOptions(true)+'</div><label>Delimitador:</label><input type="text" id="cc-delim" aria-label="Delimitador entre columnas" value=" "><p style="font-size:0.75rem;color:var(--text2);margin-top:-0.3rem;margin-bottom:0.5rem">Vacío = unir sin separador. Los nulos se omiten: sin delimitadores sueltos.</p><label>Nombre columna nueva:</label><input type="text" id="cc-name" aria-label="Nombre de la columna nueva" placeholder="ej: Nombre Completo"><label style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.35rem;font-size:0.78rem;font-weight:600;cursor:pointer"><input type="checkbox" id="cc-drop"> Eliminar columnas originales</label><p class="modal-warn">'+icon('triangle-alert')+'<span>Puedes deshacer con '+icon('undo-2')+' Deshacer paso</span></p>',
+    params: () => ({
+      columns: [...document.querySelectorAll('#cc-check input:checked')].map(i=>i.value),
+      delimiter: document.getElementById('cc-delim').value,
+      new_name: document.getElementById('cc-name').value.trim(),
+      drop_sources: document.getElementById('cc-drop').checked
+    }),
+    validate: (p) => {
+      if (p.columns.length < 2) return 'Elige al menos 2 columnas para concatenar.';
+      if (!p.new_name) return 'La columna nueva necesita un nombre.';
+      return null;
+    }
+  },
   calculated_column: {
     title: icon('calculator') + ' Columna Calculada',
     body: () => '<label>Nombre de la nueva columna:</label><input type="text" id="calc-name" aria-label="Nombre de la nueva columna" placeholder="ej: Ventas_con_iva"><label>Expresión pandas:</label><textarea id="calc-expr" aria-label="Expresión de la columna calculada" rows="3" placeholder="ej: Ventas * 1.21"></textarea><p style="font-size:0.75rem;color:var(--text2);margin-top:0.5rem">Usa nombres de columna, operadores (+, -, *, /, **, %), comparaciones y funciones: abs, round, log, sqrt, min, max, where(cond, a, b) y col(&#39;Nombre con espacios&#39;). El sandbox bloquea atributos, imports y lambdas.</p>',
@@ -270,7 +285,8 @@ function openModalForCol(op, col) {
       trim: 'trim-check',
       clean_newlines: 'nl-check',
       drop_nulls: 'nulls-check',
-      drop_duplicates: 'dup-check'
+      drop_duplicates: 'dup-check',
+      concatenar_columnas: 'cc-check'
     };
 
     const containerId = checkMap[op];
