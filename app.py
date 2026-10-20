@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify, send_file
 import pandas as pd
 import io
 import os
+import re
 import json
 import base64
 
@@ -63,23 +64,57 @@ def index():
     return render_template("index.html")
 
 def read_table(file):
-    """Lee un CSV/XLSX/XLS subido y devuelve (df, expresión pandas).
+    """Lee un CSV/XLSX/XLS subido y devuelve (df, expresión pandas, encoding).
 
     La expresión es el RHS listo para el código generado: en /upload se usa
     como `df = <expr>` y en el cruce como `df_right = <expr>`. El formato lo
-    valida el endpoint que llama; aquí solo se autodetecta el separador del
-    CSV (comas vs punto y coma) o se lee la hoja de Excel.
+    valida el endpoint que llama; aquí se autodetecta el separador del CSV
+    (comas vs punto y coma), la codificación (UTF-8 si el decode pasa; si no,
+    charset-normalizer) o se lee la hoja de Excel.
+
+    `encoding` es la codificación no-utf8 detectada (ej. 'cp1252') o None.
+    El script exportado la incluye para reproducir la misma carga. Fallback:
+    latin-1 (nunca lanza UnicodeDecodeError) si la detección no sirve.
     """
     if file.filename.lower().endswith(".csv"):
         # Intentar detectar el separador automáticamente
         content = file.read()
         file.seek(0)
         sep = "," if content.count(b",") > content.count(b";") else ";"
-        df = pd.read_csv(io.BytesIO(content), sep=sep)
-        return df, f"pd.read_csv('{file.filename}', sep='{sep}')"
+        encoding = None
+        try:
+            # utf-8 estricto: si el decode pasa, no se toca nada (caso normal)
+            text = content.decode("utf-8")
+        except UnicodeDecodeError:
+            # CSV en latin-1/cp1252: sin esto, pandas lanza UnicodeDecodeError
+            # y el upload entero devolvía 500 con texto mojibake o error críptico.
+            from charset_normalizer import detect
+            detected = detect(content) or {}
+            encoding = (detected.get("encoding") or "latin-1")
+            # charset-normalizer confunde las familias windows-125x entre sí
+            # (empate real: el byte 0xF1 es 'ñ' en cp1252 y 'ń' en cp1250).
+            # Este público escribe en español → se normaliza la familia 125x
+            # a cp1252, el mapeo correcto para acentos españoles; el resto de
+            # familias (shift_jis, koi8-r…) se respeta tal cual.
+            if re.fullmatch(r"(?:windows|cp|ibm)?-?125[0-9]", encoding.lower().replace("_", "-")):
+                encoding = "cp1252"
+            try:
+                text = content.decode(encoding)
+            except (UnicodeDecodeError, LookupError):
+                encoding = "latin-1"  # decode total: latin-1 mapea todo byte
+                text = content.decode("latin-1")
+        if encoding:
+            df = pd.read_csv(io.StringIO(text), sep=sep, encoding=encoding)
+            return (
+                df,
+                f"pd.read_csv('{file.filename}', sep='{sep}', encoding={encoding!r})",
+                encoding,
+            )
+        df = pd.read_csv(io.StringIO(text), sep=sep)
+        return df, f"pd.read_csv('{file.filename}', sep='{sep}')", None
     sheet = request.form.get("sheet", 0)
     df = pd.read_excel(file, sheet_name=int(sheet) if str(sheet).isdigit() else sheet)
-    return df, f"pd.read_excel('{file.filename}', sheet_name={repr(sheet)})"
+    return df, f"pd.read_excel('{file.filename}', sheet_name={repr(sheet)})", None
 
 
 @app.route("/upload", methods=["POST"])
@@ -92,7 +127,7 @@ def upload():
         if not filename.endswith((".csv", ".xlsx", ".xls")):
             return jsonify({"error": "Formato no soportado. Usa CSV, XLSX o XLS."}), 400
 
-        current_df, expr = read_table(file)
+        current_df, expr, encoding = read_table(file)
         code = f"df = {expr}"
         
         history = [current_df.copy()]
@@ -106,7 +141,10 @@ def upload():
             "sheets": [],
             "code": code_log[-1],
             "type_suggestions": detect_type_suggestions(current_df),
-            "pii_suggestions": detect_pii_columns(current_df)
+            "pii_suggestions": detect_pii_columns(current_df),
+            # Codificación no-utf8 detectada (ej. cp1252); null en el caso
+            # normal → el front solo avisa cuando hubo una.
+            "detected_encoding": encoding
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -122,7 +160,7 @@ def upload_right():
         return jsonify({"error": "Formato no soportado. Usa CSV, XLSX o XLS."}), 400
 
     try:
-        right_df, right_code = read_table(file)
+        right_df, right_code, _ = read_table(file)
         right_name = file.filename
         return jsonify({
             "success": True,
