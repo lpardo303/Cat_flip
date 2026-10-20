@@ -54,6 +54,7 @@ async function uploadFile(file, sheet) {
     renderTable(data.data);
     updateCode(data.code);
     showTypeSuggestions(data.type_suggestions || []);
+    showPiiSuggestions(data.pii_suggestions || []);
     pipelineSteps = [];
     redoSteps = [];
     const btnRedo0 = document.getElementById('btn-redo');
@@ -143,4 +144,68 @@ function dismissTypeSuggestions() {
   pendingTypeSuggestions = [];
   const bar = document.getElementById('type-suggest-bar');
   if (bar) bar.hidden = true;
+}
+
+// ── ESCANEO DE PII AL CARGAR (heurística sobre los presets de regex_mask) ──
+// El backend solo sugiere (campo `pii_suggestions` de /upload). Enmascarar
+// dispara `regex_mask` en modo mask — un paso de receta por columna, visible
+// en el pipeline y deshacible con Deshacer, igual que Aplicar de tipos.
+let pendingPiiSuggestions = [];
+
+// Mismos `kind` que las claves de _MASK_PATTERNS del backend
+const PII_LABELS = { email: 'EMAIL', phone: 'TELÉFONO', id: 'ID/TARJETA' };
+
+function showPiiSuggestions(list) {
+  pendingPiiSuggestions = Array.isArray(list) ? list : [];
+  const bar = document.getElementById('pii-suggest-bar');
+  if (!bar) return;
+  if (pendingPiiSuggestions.length === 0) { bar.hidden = true; return; }
+  document.getElementById('pii-suggest-chips').innerHTML = pendingPiiSuggestions.map(s => {
+    const kind = PII_LABELS[s.kind] || escapeHtml(s.kind);
+    return `<span class="type-chip" title="Ej.: ${escapeHtml(s.sample)} — ${s.pct}% de los valores casan el patrón de ${kind}">` +
+      `${escapeHtml(s.column)} → ${kind} <span class="type-chip-pct">${s.pct}%</span></span>`;
+  }).join('');
+  const applyBtn = document.getElementById('pii-suggest-apply');
+  if (applyBtn) {
+    const n = pendingPiiSuggestions.length;
+    applyBtn.textContent = n === 1 ? 'Enmascarar' : `Enmascarar (${n})`;
+  }
+  bar.hidden = false;
+}
+
+function dismissPiiSuggestions() {
+  pendingPiiSuggestions = [];
+  const bar = document.getElementById('pii-suggest-bar');
+  if (bar) bar.hidden = true;
+}
+
+async function applyPiiSuggestions() {
+  const suggs = pendingPiiSuggestions.slice();
+  if (suggs.length === 0) return;
+  showLoading();
+  let applied = 0;
+  for (const s of suggs) {
+    const params = { column: s.column, pattern: s.kind, mode: 'mask' };
+    try {
+      const res = await fetch('/operation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operation: 'regex_mask', params })
+      });
+      const data = await res.json();
+      if (data.error) { toast(data.error, 'error'); break; }
+      handleOpResponse('regex_mask', params, data, false);
+      applied++;
+    } catch(e) {
+      toast('Error al enmascarar el PII detectado', 'error');
+      break;
+    }
+  }
+  hideLoading();
+  if (applied > 0 && applied === suggs.length) {
+    dismissPiiSuggestions();
+    toast(applied === 1 ? '1 columna enmascarada (deshazible con Deshacer)' : applied + ' columnas enmascaradas (deshacibles con Deshacer)');
+  } else if (applied > 0) {
+    toast(`Se enmascararon ${applied} de ${suggs.length} columnas`, 'info');
+  }
 }

@@ -851,6 +851,56 @@ def detect_type_suggestions(df, max_sample=200, min_pct=0.9, max_cols=10):
     return suggestions
 
 
+# ── Escaneo de PII al cargar ──────────────────────────────────────────
+# Reutiliza `_MASK_PATTERNS` (misma fuente de verdad que `regex_mask`): la
+# sugerencia y el enmascarrado posterior disparado por el front usan el
+# MISMO patrón, así que lo que se marca es exactamente lo que se enmascara.
+# Solo sugiere — NO toca el df; la acción la decide el usuario desde la
+# barra del front (patrón de los detectores de fecha/tipo).
+
+def detect_pii_columns(df, max_sample=200, min_pct=0.9, max_cols=10):
+    """Detección heurística de PII en columnas de texto.
+
+    Devuelve ``[{column, kind, pct, sample}]`` por cada columna STR/object
+    con ≥2 valores no nulos donde ≥`min_pct` del sample casa el patrón de
+    `kind` (primer tipo de `_MASK_PATTERNS` que cumple el umbral gana;
+    `id` cubre tarjetas de 13–19 dígitos, `SN-001` y `X204`). Los nulos no
+    cuentan en el denominador (regla Bug 4: cadena vacía no es PII).
+    ``sample`` es el primer valor que casa (ejemplo real para el chip).
+    Máximo `max_cols` columnas, en orden del dataset.
+    """
+    findings = []
+    for col in df.columns:
+        if len(findings) >= max_cols:
+            break
+        series = df[col]
+        if not (pd.api.types.is_object_dtype(series.dtype)
+                or pd.api.types.is_string_dtype(series.dtype)):
+            continue
+        sample = series.dropna().astype(str).head(max_sample)
+        if len(sample) < 2:
+            continue
+        for kind, pat in _MASK_PATTERNS.items():
+            hits = sample.str.contains(pat, regex=True, na=False)
+            if kind == "phone":
+                # Falsos positivos clásicos: fechas con separadores
+                # (31/12/2026, 2026-10-01) y grupos de dígitos con guiones
+                # casan la forma de teléfono pero no lo son. Los grupos
+                # puros de 13–19 dígitos son tarjetas, no teléfonos (id).
+                hits &= ~sample.str.match(_DATE_SHAPE)
+                hits &= ~sample.str.fullmatch(r"\d{13,19}")
+            pct = int(round(hits.mean() * 100))
+            if pct >= min_pct * 100:
+                findings.append({
+                    "column": str(col),
+                    "kind": kind,
+                    "pct": pct,
+                    "sample": str(sample[hits].iloc[0]),
+                })
+                break
+    return findings
+
+
 # ── Registro (consumido por app.operation()) ────────────────────────────
 
 OPS = {

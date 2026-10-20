@@ -1051,6 +1051,15 @@
   }
   .type-chip-pct { color: var(--text-muted); font-size: 0.68rem; }
   .type-suggest-actions { display: flex; gap: 0.4rem; }
+  /* Variante PII: misma barra, acento naranja (tokens ya validados ≥4.6:1
+     en ambos temas por F0.6 — sin nuevos colores que auditar). */
+  .pii-suggest-bar { border-color: var(--orange-bd); }
+  .pii-suggest-bar > .icon-svg { stroke: var(--orange); }
+  .pii-suggest-bar .type-chip {
+    background: var(--orange-bg);
+    border-color: var(--orange-bd);
+    color: var(--orange);
+  }
 
   /* ── H1 DEL LOGO (a11y page-has-heading-one) ───────────── */
   .logo-title {
