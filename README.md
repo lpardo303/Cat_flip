@@ -9,6 +9,7 @@
 * 🚀 **24 Operaciones ETL:** Herramientas de limpieza, filtrado, transformación estructural (Pivot/Unpivot), manejo de texto, enmascaramiento de PII (Regex Mask), concatenación de columnas, detección de outliers (Z-Score / IQR) y muestreo reproducible (head/tail/random/stratified con semilla fija).
 * 🐍 **Generador de Código en Vivo:** Aprende y audita con el visor que muestra el código de Pandas autogenerado en tiempo real.
 * 💾 **Recetas Reproducibles:** Guarda tu pipeline como `.catflip.json` y revívelo con un clic sobre cualquier dataset — reproducción atómica (un paso fallido no toca tus datos) y deshacer/rehacer paso a paso (`Ctrl+Z` / `Ctrl+Shift+Z`).
+* 💻 **Modo CLI:** La misma receta corre en terminal, sin navegador: `python cli.py run receta.catflip.json --input datos.csv --output limpio.csv` — autodetección de separador/encoding, salidas `.csv`/`.tsv`/`.xlsx`/`.parquet` con escritura atómica y exit codes para CI.
 * 🌗 **Kinetic Query Minimal:** Interfaz fluida y minimalista (Glassmorphism) con soporte persistente para modo claro y oscuro.
 * 📅 **Auto-Mapeo de Tipos:** Al cargar un archivo, un motor heurístico analiza cada columna de texto del esquema completo y una barra te ofrece convertirlas con un clic a `datetime`, `int` o `float` cuando ≥90% de los valores lo permiten — cada conversión queda como paso deshacible en la receta.
 * 📊 **Perfilado de Datos:** Diagnóstico estadístico instantáneo de tus columnas (nulos, valores únicos, mínimos, máximos).
@@ -69,6 +70,12 @@ Asegúrate de tener **Python 3.10+** instalado en tu sistema.
 
 5. **Abre tu navegador:** Visita `http://127.0.0.1:5050`
 
+> **Modo CLI (sin navegador):**
+> ```bash
+> python cli.py run receta.catflip.json --input datos.csv --output limpio.csv
+> ```
+> Exit codes: `0` OK · `1` receta/datos (cita el paso) · `2` flags. Ver *Modo CLI* en `manual_de_usuario.md`.
+
 > **Nota Windows — PowerShell:** Si al ejecutar `launch.ps1` aparece un error de política de ejecución, corre este comando una sola vez en PowerShell como administrador:
 > ```powershell
 > Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
@@ -82,7 +89,7 @@ El proyecto usa `pytest` con cobertura. Los fixtures de `tests/conftest.py` rese
 pip install -r requirements-dev.txt   # pytest + pytest-cov
 pytest                                # suite completa
 coverage gate (lo que usa CI):
-pytest tests/ --cov=app --cov-report=term-missing --cov-fail-under=93
+pytest tests/ --cov=app --cov=operations --cov=cli --cov-report=term-missing --cov-fail-under=93
 ```
 
 Los tests originales siguen siendo unittest y también corren con `python -m unittest discover -s tests`.

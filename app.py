@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, has_request_context
 import pandas as pd
 import csv
 import io
@@ -109,7 +109,7 @@ def _detect_delimiter(text):
     return best_c if best_n else ","
 
 
-def read_table(file):
+def read_table(file, sheet=None):
     """Lee un CSV/XLSX/XLS subido y devuelve (df, expresión pandas, encoding).
 
     La expresión es el RHS listo para el código generado: en /upload se usa
@@ -121,6 +121,10 @@ def read_table(file):
     `encoding` es la codificación no-utf8 detectada (ej. 'cp1252') o None.
     El script exportado la incluye para reproducir la misma carga. Fallback:
     latin-1 (nunca lanza UnicodeDecodeError) si la detección no sirve.
+
+    `sheet`: hoja de Excel. None (default) = comportamiento histórico:
+    se lee `request.form['sheet']` si hay contexto Flask; sin contexto
+    (modo CLI, cli.py) → hoja 0. El CLI puede pasarla explícita (--sheet).
     """
     if file.filename.lower().endswith((".csv", ".tsv")):
         content = file.read()
@@ -157,7 +161,8 @@ def read_table(file):
             )
         df = pd.read_csv(io.StringIO(text), sep=sep)
         return df, f"pd.read_csv('{file.filename}', sep={sep!r})", None
-    sheet = request.form.get("sheet", 0)
+    if sheet is None:
+        sheet = request.form.get("sheet", 0) if has_request_context() else 0
     df = pd.read_excel(file, sheet_name=int(sheet) if str(sheet).isdigit() else sheet)
     return df, f"pd.read_excel('{file.filename}', sheet_name={repr(sheet)})", None
 
@@ -367,6 +372,67 @@ def export_recipe():
         download_name=f"{filename}.catflip.json",
     )
 
+def validate_recipe(data):
+    """Valida la estructura de una receta `.catflip.json` y devuelve `steps`.
+
+    Compartida por el endpoint /apply_recipe y el modo CLI (cli.py):
+    mensaje idéntico en ambos (los tests de recipe actúan de red de
+    paridad). Lanza ValueError en el primer problema — nada se ejecuta
+    antes de que toda la receta valide.
+    """
+    if not isinstance(data, dict):
+        raise ValueError("La receta no es JSON válido.")
+    if data.get("version") != 1:
+        raise ValueError(
+            f"Versión de receta no soportada: {data.get('version')!r} (se espera 1)."
+        )
+    steps = data.get("steps")
+    if not isinstance(steps, list) or not steps:
+        raise ValueError("La receta no contiene pasos válidos ('steps' ausente o vacío).")
+
+    for i, step in enumerate(steps, 1):
+        if not isinstance(step, dict):
+            raise ValueError(f"El paso {i} no es un objeto válido.")
+        sop = step.get("op")
+        if not isinstance(sop, str) or sop not in OPS:
+            raise ValueError(f"El paso {i} usa una operación desconocida: {sop!r}.")
+        if not isinstance(step.get("params", {}), dict):
+            raise ValueError(f"El paso {i} ({sop}) tiene 'params' que no son un objeto.")
+    return steps
+
+
+def apply_recipe_df(df, steps, right_df=None, right_code=None):
+    """Reproduce `steps` sobre `df` y devuelve (df_final, snaps, codes, applied).
+
+    Ejecuta SOLO sobre copias de trabajo: si un paso falla lanza
+    ValueError citando el paso y no devuelve nada parcial (el caller
+    decide si hay globals que escribir — en el endpoint, nada se toca;
+    en el CLI, no se escribe el archivo de salida).
+    """
+    df_work = df
+    snaps, codes, applied = [], [], []
+    for i, step in enumerate(steps, 1):
+        sop = step["op"]
+        params = step.get("params", {})
+        handler = OPS[sop]
+        handler_params = params
+        if sop == "merge":
+            if right_df is None:
+                raise ValueError(
+                    f"El paso {i} (merge): No hay frame derecho cargado. Carga un segundo dataset desde el modal de Join."
+                )
+            handler_params = {**params, "right_df": right_df, "right_code": right_code}
+        try:
+            df_work, code = handler(df_work.copy(), handler_params)
+        except Exception as e:
+            # 400 en endpoint / exit 1 en CLI: el problema lo trae la receta
+            raise ValueError(f"El paso {i} ({sop}) falló: {e}") from e
+        snaps.append(df_work.copy())
+        codes.append(f"# {sop}\n{code}")
+        applied.append({"op": sop, "params": params})
+    return df_work, snaps, codes, applied
+
+
 @app.route("/apply_recipe", methods=["POST"])
 def apply_recipe():
     """Reproduce una receta `.catflip.json` sobre el dataset actual.
@@ -381,48 +447,16 @@ def apply_recipe():
     if current_df is None:
         return jsonify({"error": "No hay datos cargados. Carga un archivo antes de aplicar la receta."}), 400
 
-    data = request.get_json(silent=True)
-    if not isinstance(data, dict):
-        return jsonify({"error": "La receta no es JSON válido."}), 400
-    if data.get("version") != 1:
-        return jsonify({"error": f"Versión de receta no soportada: {data.get('version')!r} (se espera 1)."}), 400
-    steps = data.get("steps")
-    if not isinstance(steps, list) or not steps:
-        return jsonify({"error": "La receta no contiene pasos válidos ('steps' ausente o vacío)."}), 400
-
     # Validación estructural ANTES de ejecutar nada: un paso malformado
-    # ni siquiera llega al handler.
-    for i, step in enumerate(steps, 1):
-        if not isinstance(step, dict):
-            return jsonify({"error": f"El paso {i} no es un objeto válido."}), 400
-        sop = step.get("op")
-        if not isinstance(sop, str) or sop not in OPS:
-            return jsonify({"error": f"El paso {i} usa una operación desconocida: {sop!r}."}), 400
-        if not isinstance(step.get("params", {}), dict):
-            return jsonify({"error": f"El paso {i} ({sop}) tiene 'params' que no son un objeto."}), 400
-
-    # Reproducción en copia de trabajo: cero mutación de globals aquí.
-    df_work = current_df
-    snaps, codes, applied = [], [], []
-    for i, step in enumerate(steps, 1):
-        sop = step["op"]
-        params = step.get("params", {})
-        handler = OPS[sop]
-        handler_params = params
-        if sop == "merge":
-            if right_df is None:
-                return jsonify({
-                    "error": f"El paso {i} (merge): No hay frame derecho cargado. Carga un segundo dataset desde el modal de Join."
-                }), 400
-            handler_params = {**params, "right_df": right_df, "right_code": right_code}
-        try:
-            df_work, code = handler(df_work.copy(), handler_params)
-        except Exception as e:
-            # 400: el problema lo trae la receta del cliente, no el servidor
-            return jsonify({"error": f"El paso {i} ({sop}) falló: {e}"}), 400
-        snaps.append(df_work.copy())
-        codes.append(f"# {sop}\n{code}")
-        applied.append({"op": sop, "params": params})
+    # ni siquiera llega al motor. Errores → 400 (lo trae la receta del
+    # cliente, no el servidor).
+    try:
+        steps = validate_recipe(request.get_json(silent=True))
+        df_work, snaps, codes, applied = apply_recipe_df(
+            current_df, steps, right_df, right_code
+        )
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
 
     # Commit único: solo aquí se tocan los globals (ya se validó todo ⇒ no
     # puede quedar estado parcial por un paso a mitad de camino)

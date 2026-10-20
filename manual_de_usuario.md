@@ -126,8 +126,36 @@ Lógica condicional, ordenamiento, agregación y cruce de datasets.
       id_vars=['Region', 'Producto'],
       var_name='Mes',
       value_name='Valor'
-  )
-
-  # sort
+  )  # sort
   df = df.sort_values(by='Valor', ascending=False)
   ```
+
+---
+
+## 💻 E. Modo CLI — ejecutar recetas sin navegador
+
+Las recetas `.catflip.json` también se ejecutan desde la terminal, sin abrir la app — misma reproducción atómica que el botón *Cargar receta* (validación completa de la receta antes de ejecutar; si un paso falla sale con código 1 citando el paso y **no se escribe nada**):
+
+```bash
+python cli.py run receta.catflip.json --input datos.csv --output limpio.csv
+```
+
+**Flags:**
+
+* `--input` / `-i` *(obligatorio)* — dataset de entrada: `.csv`, `.tsv`, `.xlsx` o `.xls`. La autodetección de separador (`,` `;` `\t` `|`) y de codificación (UTF-8, cp1252…) es la misma que en la app.
+* `--output` / `-o` — archivo de salida por extensión: `.csv`, `.tsv`, `.xlsx` o `.parquet`. Sin esta flag solo valida la receta (modo verificación, ideal para CI). La escritura es atómica (temporal + rename): o el archivo completo o nada.
+* `--right` — frame derecho para recetas con paso `merge`; sin él, el CLI avisa citando el paso antes de cargar nada.
+* `--sheet` — hoja de un `.xlsx` de entrada (nombre o posición; default 0).
+* `--show-code` — imprime el código pandas generado por cada paso.
+
+**Códigos de salida:** `0` éxito · `1` error de receta o de datos (mensaje citando el paso exacto en stderr) · `2` uso incorrecto de la flag.
+
+**Ejemplo con informe:**
+
+```text
+$ python cli.py run receta.catflip.json -i datos.csv -o limpio.csv
+Entrada: datos.csv → 100×6
+[1/2] change_case 100×6 → 100×6
+[2/2] trim 100×6 → 100×6
+Salida: limpio.csv (100×6)
+```
