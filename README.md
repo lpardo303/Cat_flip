@@ -6,7 +6,7 @@
 
 ## ✨ Características Principales
 
-* 🚀 **23 Operaciones ETL:** Herramientas de limpieza, filtrado, transformación estructural (Pivot/Unpivot), manejo de texto, enmascaramiento de PII (Regex Mask), concatenación de columnas y detección de outliers (Z-Score / IQR).
+* 🚀 **24 Operaciones ETL:** Herramientas de limpieza, filtrado, transformación estructural (Pivot/Unpivot), manejo de texto, enmascaramiento de PII (Regex Mask), concatenación de columnas, detección de outliers (Z-Score / IQR) y muestreo reproducible (head/tail/random/stratified con semilla fija).
 * 🐍 **Generador de Código en Vivo:** Aprende y audita con el visor que muestra el código de Pandas autogenerado en tiempo real.
 * 💾 **Recetas Reproducibles:** Guarda tu pipeline como `.catflip.json` y revívelo con un clic sobre cualquier dataset — reproducción atómica (un paso fallido no toca tus datos) y deshacer paso a paso.
 * 🌗 **Kinetic Query Minimal:** Interfaz fluida y minimalista (Glassmorphism) con soporte persistente para modo claro y oscuro.

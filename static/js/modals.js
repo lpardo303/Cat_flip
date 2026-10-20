@@ -221,6 +221,25 @@ const modalDefs = {
       });
     }
   },
+  sampling: {
+    title: icon('shuffle') + ' Muestreo (Sampling)',
+    body: () => '<label>Modo de muestreo:</label><select id="samp-mode" aria-label="Modo de muestreo"><option value="head">head — primeras N filas</option><option value="tail">tail — últimas N filas</option><option value="random">random — N filas aleatorias</option><option value="stratified">stratified — N filas por estrato de una columna</option></select>'
+      + '<div id="samp-n-wrap"><label>Cantidad de filas:</label><input type="number" id="samp-n" aria-label="Cantidad de filas a muestrear" value="10" min="1"></div>'
+      + '<div id="samp-by-wrap" style="display:none"><label>Columna para estratificar:</label><select id="samp-by" aria-label="Columna para estratificar el muestreo">'+colOptions()+'</select><p style="font-size:0.75rem;color:var(--text2);margin-top:-0.3rem;margin-bottom:0.5rem">Se toman N filas por cada valor distinto de la columna (los nulos cuentan como un estrato más). Un estrato con menos de N filas se toma completo.</p></div>'
+      + '<p style="font-size:0.75rem;color:var(--text2);margin-top:-0.3rem;margin-bottom:0.5rem">El muestreo aleatorio usa una semilla fija (42): la receta y el script exportado reproducen exactamente las mismas filas.</p>'
+      + '<p class="modal-warn">'+icon('triangle-alert')+'<span>Puedes deshacer con '+icon('undo-2')+' Deshacer paso</span></p>',
+    params: () => ({
+      mode: document.getElementById('samp-mode').value,
+      n: parseInt(document.getElementById('samp-n').value) || 1,
+      by: document.getElementById('samp-mode').value === 'stratified' ? document.getElementById('samp-by').value : undefined
+    }),
+    validate: (p) => (p.mode === 'stratified' && !p.by) ? 'Elige la columna para estratificar.' : null,
+    init: () => {
+      document.getElementById('samp-mode').addEventListener('change', e => {
+        document.getElementById('samp-by-wrap').style.display = e.target.value === 'stratified' ? 'block' : 'none';
+      });
+    }
+  },
   calculated_column: {
     title: icon('calculator') + ' Columna Calculada',
     body: () => '<label>Nombre de la nueva columna:</label><input type="text" id="calc-name" aria-label="Nombre de la nueva columna" placeholder="ej: Ventas_con_iva"><label>Expresión pandas:</label><textarea id="calc-expr" aria-label="Expresión de la columna calculada" rows="3" placeholder="ej: Ventas * 1.21"></textarea><p style="font-size:0.75rem;color:var(--text2);margin-top:0.5rem">Usa nombres de columna, operadores (+, -, *, /, **, %), comparaciones y funciones: abs, round, log, sqrt, min, max, where(cond, a, b) y col(&#39;Nombre con espacios&#39;). El sandbox bloquea atributos, imports y lambdas.</p>',

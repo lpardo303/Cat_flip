@@ -674,6 +674,83 @@ def op_detectar_outliers(df, params):
     return df, "\n".join(code_lines)
 
 
+# ── Sampling (op #24) ──────────────────────────────────────────────────
+# Roadmap "Sampling": head, tail, random(n) y stratified(by=col). El seed
+# fijo (42) hace el muestreo determinista: la receta .catflip.json y el
+# script exportado reproducen exactamente las mismas filas.
+_SAMPLING_MODES = ("head", "tail", "random", "stratified")
+_SAMPLING_SEED = 42
+
+
+def op_sampling(df, params):
+    """Muestrea filas del dataset (op #24).
+
+    `mode`:
+      - 'head' / 'tail': primeras/últimas `n` filas (pandas recorta solo
+        si n > filas, consistente con el resto del registro).
+      - 'random': `df.sample(n, random_state=42)` — seed fijo para que la
+        receta sea reproducible; n se recorta al tamaño disponible.
+      - 'stratified': `n` filas POR ESTRATO de la columna `by` (nulos
+        incluidos, `dropna=False`), mismo seed; cada estrato recorta a
+        `min(n, len(estrato))`.
+
+    Errores (ValueError → 500): mode desconocido, n no entero o < 1,
+    'stratified' sin `by` o con columna inexistente.
+    """
+    mode = str(params.get("mode") or "head")
+    if mode not in _SAMPLING_MODES:
+        raise ValueError(
+            f"Modo de muestreo no válido: '{mode}'. "
+            f"Usa 'head', 'tail', 'random' o 'stratified'."
+        )
+    raw_n = params.get("n", 1)
+    try:
+        n = int(raw_n)
+    except (TypeError, ValueError):
+        raise ValueError(f"n debe ser un número entero, no {raw_n!r}.") from None
+    if n < 1:
+        raise ValueError("n debe ser al menos 1.")
+
+    total = len(df)
+    if mode == "head":
+        k = min(n, total)
+        df = df.head(n).reset_index(drop=True)
+        code = f"df = df.head({n})  # primeras {k} de {total} filas"
+    elif mode == "tail":
+        k = min(n, total)
+        df = df.tail(n).reset_index(drop=True)
+        code = f"df = df.tail({n})  # últimas {k} de {total} filas"
+    elif mode == "random":
+        k = min(n, total)
+        df = df.sample(n=k, random_state=_SAMPLING_SEED).reset_index(drop=True)
+        code = (f"df = df.sample(n={k}, random_state={_SAMPLING_SEED})"
+                f"  # {k} de {total} filas, seed fijo { _SAMPLING_SEED } para reproducibilidad")
+    else:  # stratified
+        by = params.get("by")
+        if not by:
+            raise ValueError("El modo 'stratified' requiere la columna por la cual estratificar ('by').")
+        if by not in df.columns:
+            raise ValueError(f"La columna {by!r} no existe en el dataset.")
+        sizes = df.groupby(by, dropna=False).size()
+        if df.empty:
+            return df.copy(), f"# sampling stratified por {by!r}: dataset vacío, nada que muestrear"
+        # pd.concat en vez de groupby().apply(): en pandas 3.0 apply excluye
+        # la columna de agrupación de los grupos (include_groups eliminado).
+        df = pd.concat(
+            [
+                g.sample(n=min(len(g), n), random_state=_SAMPLING_SEED)
+                for _, g in df.groupby(by, dropna=False)
+            ]
+        ).reset_index(drop=True)
+        code = (
+            f"df = pd.concat([g.sample(n=min(len(g), {n}), random_state={_SAMPLING_SEED}) "
+            f"for _, g in df.groupby({by!r}, dropna=False)]).reset_index(drop=True)"
+            f"  # {n} por estrato de {by!r} ({len(sizes)} estrato(s)), "
+            f"{len(df)} filas"
+        )
+    return df, code
+
+
 # ── Auto-mapeo de tipos al cargar (heurística de esquema completo) ─────
 # Roadmap "Auto-Mapear tipos": extiende la detección de fechas a todo el
 # esquema. Para cada columna de texto se prueban, en orden, las tres
@@ -804,4 +881,5 @@ OPS = {
     "merge": op_merge,
     "calculated_column": op_calculated_column,
     "detectar_outliers": op_detectar_outliers,
+    "sampling": op_sampling,
 }

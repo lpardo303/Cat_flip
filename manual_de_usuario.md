@@ -2,7 +2,7 @@
 
 Bienvenido a **Cat_flip - Studio ETL**, tu plataforma local y ligera para la limpieza, transformación y preparación de datos. Diseñada como una alternativa rápida a herramientas pesadas, Cat_flip te permite construir pipelines de datos visualmente mientras genera código Python por debajo.
 
-Este manual detalla las 23 operaciones de transformación disponibles en la "Caja de Transformaciones" (Panel Izquierdo) de la interfaz.
+Este manual detalla las 24 operaciones de transformación disponibles en la "Caja de Transformaciones" (Panel Izquierdo) de la interfaz.
 
 ---
 
@@ -45,7 +45,7 @@ Funciones esenciales para sanear tus datos y remover información basura.
 Operaciones de formato de cadenas y estructura de datos.
 
 11. **May/Min (Cambiar Mayúsculas/Minúsculas):** 
-    Modifica la capitalización de toda una columna de texto. Opciones disponibles: minúsculas (`lower`), MAYÚSCULAS (`upper`), Tipo Título (`title`), o Primera letra mayúscula (`capitalize`). *(Nota: Las opciones title y capitalize cubren la operación #24).*
+    Modifica la capitalización de toda una columna de texto. Opciones disponibles: minúsculas (`lower`), MAYÚSCULAS (`upper`), Tipo Título (`title`), o Primera letra mayúscula (`capitalize`). *(Nota: Las opciones title y capitalize cubren la operación "Title Case" del listado original del proyecto).*
 12. **Reemplazar Valores:** 
     Busca una palabra o fragmento de texto específico dentro de una columna y lo sustituye por otro. 
 13. **Renombrar Columna:** 
@@ -77,6 +77,8 @@ Lógica condicional, ordenamiento, agregación y cruce de datasets.
     Crea (o sobrescribe) una columna a partir de una expresión pandas, por ejemplo `round(Precio * 1.21, 2)`. Puedes usar nombres de columna, operadores (`+`, `-`, `*`, `/`, `**`, `%`), comparaciones y las funciones permitidas: `abs`, `round`, `len`, `min`, `max`, `sum`, `int`, `float`, `str`, `bool`, `log`, `log10`, `exp`, `sqrt`, `floor`, `ceil`, `sign`, `where(cond, a, b)` y `col('Nombre con espacios')` para referenciar columnas cuyo nombre tiene espacios o símbolos. Un sandbox de seguridad valida la expresión antes de ejecutarla: bloquea acceso a atributos (`.`), imports, lambdas y comprensiones, así que nunca se ejecuta código externo — si la expresión no está permitida, verás un mensaje explicando por qué. Nota: para condiciones por fila usa `where(cond, valor_si_true, valor_si_false)` (el ternario de Python no funciona con columnas).
 23. **Detectar Outliers:** 
     Analiza columnas numéricas (INT/FLOAT) y crea por cada una una columna de marca `columna_outlier` (TRUE/FALSE) con dos métodos: **Z-Score** marca si `|x − media| / desviación > umbral` (por defecto 2.5, desviación de población) e **IQR** marca si el valor cae fuera de `Q1 − k·IQR … Q3 + k·IQR` (k por defecto 1.5). Los valores nulos producen marca nula y las columnas constantes quedan todas en FALSE. La operación **solo marca, no elimina filas**: filtra después con *Filtrar filas* (por ejemplo `columna_outlier == TRUE`) o *Eliminar filas*. Nota: con pocos datos (menos de ~8 filas) el Z-Score es poco significativo; en columnas muy asimétricas prefiere IQR.
+24. **Muestreo (Sampling):** 
+    Reduce el dataset a una muestra, con cuatro modos: **head** (primeras N filas), **tail** (últimas N filas), **random** (N filas aleatorias) y **stratified** (N filas *por cada valor* de una columna, por ejemplo 3 empleados de cada Departamento — los nulos cuentan como un estrato más y un estrato con menos de N filas se toma completo). Si N supera el número de filas disponible se recorta al máximo. El modo aleatorio usa una **semilla fija (42)**: la receta `.catflip.json` y el script exportado reproducen exactamente las mismas filas, así que tus resultados son auditables y repetibles. El botón **Muestreo** (icono de flechas cruzadas) está en el panel izquierdo, sección *Limpieza & Filtrado*, junto a *Eliminar filas*.
 
 ---
 
