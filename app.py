@@ -331,6 +331,12 @@ def export():
         current_df.to_excel(buf, index=False, engine="openpyxl")
         mimetype = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         ext = "xlsx"
+    elif fmt == "parquet":
+        # pyarrow escribe el buffer directamente; el mágico PAR1 al inicio y
+        # al final garantiza un archivo legible por pandas.read_parquet.
+        current_df.to_parquet(buf, index=False)
+        mimetype = "application/vnd.apache.parquet"
+        ext = "parquet"
     else:
         current_df.to_csv(buf, index=False)
         mimetype = "text/csv"
