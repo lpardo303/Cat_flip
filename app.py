@@ -27,8 +27,13 @@ right_df = None
 right_name = ""
 right_code = ""
 
-def df_to_json(df, max_rows=500):
-    """Convierte DataFrame a JSON seguro para el frontend."""
+def df_to_json(df, max_rows=5000):
+    """Convierte DataFrame a JSON seguro para el frontend.
+
+    `max_rows=5000` (antes 500): el grid virtualiza el render (F3.6), así
+    que el preview puede ampliarse sin coste de DOM. `truncated` marca si
+    el dataset tiene MÁS filas que este tope.
+    """
     preview = df.head(max_rows)
 
     # Clasificar cada columna en una categoría semántica para los badges del UI

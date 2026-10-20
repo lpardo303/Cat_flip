@@ -1,6 +1,6 @@
 /* Cat_flip Studio ETL — data grid, badges de tipo, quality bars, menú contextual (extraído de templates/index.html, P0 modularización) */
   /* ── DATA GRID ─────────────────────────────────────────── */
-  .table-wrap { flex: 1; overflow: auto; }
+  .table-wrap { flex: 1; overflow: auto; contain: layout paint style; }
   table { border-collapse: collapse; width: 100%; font-family: var(--font-mono); font-size: 0.75rem; }
   thead th {
     background: var(--base2);
@@ -18,8 +18,15 @@
   }
   tbody tr { transition: background 0.1s; }
   tbody tr:hover { background: var(--row-hover); }
-  tbody tr:nth-child(even) { background: var(--row-alt); }
-  tbody tr:nth-child(even):hover { background: var(--row-hover); }
+  /* Paridad por clase (F3.6): nth-child se retiró porque los spacers de
+     la virtualización alterarían el conteo. Las tablas de otras pestañas
+     (schema) también asignan row-alt explícito en su builder. */
+  tbody tr.row-alt { background: var(--row-alt); }
+  tbody tr.row-alt:hover { background: var(--row-hover); }
+  /* Filas spacer de la virtualización: invisible y no interactiva */
+  tbody tr.vs-spacer { background: transparent; pointer-events: none; }
+  tbody tr.vs-spacer:hover { background: transparent; }
+  tbody tr.vs-spacer td { padding: 0; border: none; }
   tbody td {
     padding: 0.38rem 0.85rem;
     border-bottom: 1px solid var(--border2);

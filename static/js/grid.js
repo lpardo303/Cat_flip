@@ -198,6 +198,52 @@ function handleColMenuAction(action) {
   openModalForCol(action, targetCol);
 }
 
+// ── F3.6: VIRTUALIZACIÓN DEL DATA GRID ─────────────────────────────────
+// Con el preview ampliado a 5000 filas, el tbody solo materializa el
+// viewport + buffer de 10 filas por lado. Dos filas spacer (`.vs-spacer`)
+// simulan la altura total: la barra de scroll y el thead sticky quedan
+// correctos. El thead NO se toca entre renders → sin parpadeo y el scroll
+// se conserva al aplicar una operación.
+const GRID_VIRT_MIN = 150;       // por debajo: render directo, sin spacers
+const GRID_ROW_H_FALLBACK = 28;
+const GRID_BUFFER = 10;
+let gridView = null;             // estado del render virtualizado activo
+let gridRafPending = false;
+
+function updateVirtualRows() {
+  const g = gridView;
+  if (!g) return;
+  const wrap = document.getElementById('table-wrap');
+  const tbody = wrap.querySelector('#grid-tbody');
+  if (!tbody) return;
+  const rowH = g.rowH || GRID_ROW_H_FALLBACK;
+  const viewCount = Math.ceil((wrap.clientHeight || 400) / rowH) + 1;
+  let start = Math.floor(wrap.scrollTop / rowH) - GRID_BUFFER;
+  if (start < 0) start = 0;
+  const maxStart = Math.max(0, g.rows.length - viewCount - GRID_BUFFER);
+  if (start > maxStart) start = maxStart;
+  const end = Math.min(g.rows.length, start + viewCount + 2 * GRID_BUFFER);
+  if (start === g.start && end === g.end) return;
+  g.start = start;
+  g.end = end;
+  const topH = start * rowH;
+  const bottomH = (g.rows.length - end) * rowH;
+  const span = g.visibleCols.length + 1;
+  let html = '';
+  if (topH > 0) html += '<tr class="vs-spacer" style="height:' + topH + 'px"><td colspan="' + span + '"></td></tr>';
+  for (let k = start; k < end; k++) html += g.buildRowHtml(g.rows[k]);
+  if (bottomH > 0) html += '<tr class="vs-spacer" style="height:' + bottomH + 'px"><td colspan="' + span + '"></td></tr>';
+  tbody.innerHTML = html;
+}
+
+// Throttle con requestAnimationFrame: recalcular solo cuando el navegador
+// va a pintar; updateVirtualRows es no-op si el rango no cambió.
+function gridOnScroll() {
+  if (!gridView || gridRafPending) return;
+  gridRafPending = true;
+  requestAnimationFrame(() => { gridRafPending = false; updateVirtualRows(); });
+}
+
 function renderTable(data) {
   closeColMenu();
   currentRawData = data;
@@ -266,14 +312,16 @@ function renderTable(data) {
       </div>
     </th>`;
   });
-  html += '</tr></thead><tbody>';
+  html += '</tr></thead>';
+  const theadHtml = html;
 
-  // Filtrado reactivo en Data Grid (F2.5)
+  // ── F3.6: lista de filas a mostrar (filtro de búsqueda, F2.5) ────────
+  // El índice original se preserva para la columna # y para el rayado
+  // alternado (row-alt por clase, no nth-child: los spacers de la
+  // virtualización romperían ese patrón).
   const query = currentSearchQuery.toLowerCase();
-  let renderedRowsCount = 0;
-
+  const rows = [];
   (data.data || []).forEach((row, i) => {
-    // Si hay query, verificar si alguna celda visible coincide
     if (query) {
       let matches = false;
       for (let idx of visibleIndices) {
@@ -285,29 +333,66 @@ function renderTable(data) {
       }
       if (!matches) return;
     }
+    rows.push({ i, row });
+  });
 
-    renderedRowsCount++;
-    html += '<tr><td>' + (i + 1) + '</td>';
+  const wrap = document.getElementById('table-wrap');
+  // Conservar el scroll entre renders (F3.6): reemplazar el innerHTML
+  // resetea el scroll a 0; aplicar una operación ya no salta al inicio.
+  const prevScrollTop = wrap.scrollTop;
+
+  if (rows.length === 0 && query) {
+    wrap.innerHTML = theadHtml
+      + '<tbody><tr><td colspan="' + (visibleCols.length + 1) + '" style="padding:2.5rem;text-align:center;color:var(--text2);font-size:0.8rem">No se encontraron filas que coincidan con "<strong>' + escapeHtml(currentSearchQuery) + '</strong>".<br><button class="btn btn-secondary" style="margin-top:0.75rem" onclick="clearSearch()">Limpiar búsqueda</button></td></tr></tbody></table>';
+    gridView = null;
+    document.getElementById('truncated-msg').style.display = 'none';
+    return;
+  }
+
+  const buildRowHtml = (item) => {
+    let h = '<tr class="' + (item.i % 2 === 1 ? 'row-alt' : '') + '"><td>' + (item.i + 1) + '</td>';
     visibleIndices.forEach(idx => {
-      const cellVal = row[idx];
+      const cellVal = item.row[idx];
       // Bug 4: el backend envía JSON null para nulos reales de pandas (NaN)
       if (cellVal === null || cellVal === undefined) {
-        html += '<td class="cell-null-td"><span class="cell-null" title="Nulo real de pandas (NaN)">null</span></td>';
+        h += '<td class="cell-null-td"><span class="cell-null" title="Nulo real de pandas (NaN)">null</span></td>';
         return;
       }
       const escaped = escapeHtml(String(cellVal));
       const highlighted = query ? highlightEscaped(escaped, query) : escaped;
-      html += '<td title="' + escaped + '">' + highlighted + '</td>';
+      h += '<td title="' + escaped + '">' + highlighted + '</td>';
     });
-    html += '</tr>';
-  });
+    return h + '</tr>';
+  };
 
-  if (renderedRowsCount === 0 && query) {
-    html += `<tr><td colspan="${visibleCols.length + 1}" style="padding:2.5rem;text-align:center;color:var(--text2);font-size:0.8rem">No se encontraron filas que coincidan con "<strong>${escapeHtml(currentSearchQuery)}</strong>".<br><button class="btn btn-secondary" style="margin-top:0.75rem" onclick="clearSearch()">Limpiar búsqueda</button></td></tr>`;
+  if (rows.length <= GRID_VIRT_MIN) {
+    // Caso normal: render directo, DOM idéntico al previo a F3.6
+    gridView = null;
+    wrap.innerHTML = theadHtml + '<tbody>' + rows.map(buildRowHtml).join('') + '</tbody></table>';
+    wrap.scrollTop = prevScrollTop;
+  } else {
+    // Virtualizado: tbody con solo el viewport + buffers, spacers arriba/abajo
+    gridView = { rows, visibleCols, visibleIndices, query, buildRowHtml,
+                 rowH: GRID_ROW_H_FALLBACK, start: 0, end: -1 };
+    wrap.innerHTML = theadHtml + '<tbody id="grid-tbody"></tbody></table>';
+    updateVirtualRows();
+    // Medir la altura real de fila (fraccional: getBoundingClientRect
+    // evita el redondeo de offsetHeight, que acumulaba ~1px de drift por
+    // rango renderizado y temblaba el scroll al cambiar de slice) y
+    // corregir el slice inicial.
+    const first = wrap.querySelector('#grid-tbody tr:not(.vs-spacer)');
+    if (first && first.getBoundingClientRect().height > 0
+        && Math.abs(first.getBoundingClientRect().height - gridView.rowH) > 0.01) {
+      gridView.rowH = first.getBoundingClientRect().height;
+      gridView.end = -1;
+      updateVirtualRows();
+    }
+    if (prevScrollTop > 0) {
+      wrap.scrollTop = prevScrollTop;
+      updateVirtualRows(); // re-slicear el viewport para la nueva posición
+    }
   }
-
-  html += '</tbody></table>';
-  document.getElementById('table-wrap').innerHTML = html;
+  wrap.onscroll = gridOnScroll;
   document.getElementById('truncated-msg').style.display = (data.truncated && !query) ? 'block' : 'none';
 }
 
@@ -484,7 +569,7 @@ async function loadSchema() {
     return 'STR';
   };
   let rows = '';
-  data.columns.forEach(col => {
+  data.columns.forEach((col, ci) => {
     const s = data.stats[col] || {};
     const hasNulls = (s.nulls !== undefined && s.nulls !== null);
     const nulls = hasNulls ? s.nulls : null;
@@ -496,7 +581,9 @@ async function loadSchema() {
     const kind = kindOf(s.dtype);
     const nullCell = !hasNulls ? '–'
       : nulls + ' <span class="schema-pct">(' + nullPct.toFixed(1) + '%)</span>';
-    rows += '<tr>'
+    // Paridad explícita (F3.6): el rayado por nth-child fue retirado del
+    // CSS global porque los spacers del grid lo romperían.
+    rows += '<tr' + (ci % 2 ? ' class="row-alt"' : '') + '>'
       + '<td class="schema-col" title="' + esc(col) + '">' + esc(col) + '</td>'
       + '<td><span class="type-badge ' + kind + '" title="' + esc(s.dtype || '') + '">' + kind + '</span></td>'
       + '<td style="color:' + (nulls > 0 ? 'var(--yellow)' : 'var(--green)') + '">' + nullCell + '</td>'

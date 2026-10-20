@@ -429,12 +429,14 @@ def test_df_to_json_classifies_bool_column(client):
 
 
 def test_df_to_json_truncates_large_datasets(client):
-    csv_text = "n\n" + "".join(f"{i}\n" for i in range(600))
+    # Contrato F3.6: el preview virtualiza el render, así que el tope de
+    # filas subió de 500 a 5000 (df_to_json(max_rows=5000)).
+    csv_text = "n\n" + "".join(f"{i}\n" for i in range(5500))
     resp = upload(client, csv_text)
     data = resp.get_json()["data"]
-    assert data["total_rows"] == 600
+    assert data["total_rows"] == 5500
     assert data["truncated"] is True
-    assert len(data["data"]) == 500
+    assert len(data["data"]) == 5000
 
 
 # ── caminos de error ─────────────────────────────────────────────────
