@@ -14,6 +14,10 @@ current_df = None
 history = []  # Para undo
 code_log = []  # Log de código generado
 op_history = []  # Pasos estructurados {op, params} para el linaje (F3.3)
+# Pila de rehacer: cada entrada es (snapshot_df, code_frag, op_step) popeados
+# por /undo. Se vacía en cualquier avance del pipeline (op nueva, upload,
+# receta) — semántica estándar de redo: solo se rehace lo último deshecho.
+redo_history = []
 
 # Frame derecho para el cruce Join/Merge (op #19): fuente independiente del
 # pipeline (no participa en undo) más su expresión de carga para el script.
@@ -80,7 +84,7 @@ def read_table(file):
 
 @app.route("/upload", methods=["POST"])
 def upload():
-    global current_df, history, code_log, op_history
+    global current_df, history, code_log, op_history, redo_history
     file = request.files["file"]
     filename = file.filename.lower()
     
@@ -94,6 +98,7 @@ def upload():
         history = [current_df.copy()]
         code_log = [f"import pandas as pd\n\n# Cargar archivo\n{code}"]
         op_history = []
+        redo_history = []  # dataset nuevo → la pila de rehacer no aplica
         
         return jsonify({
             "success": True,
@@ -151,7 +156,7 @@ def get_sheets():
 
 @app.route("/operation", methods=["POST"])
 def operation():
-    global current_df, history, code_log, op_history
+    global current_df, history, code_log, op_history, redo_history
     if current_df is None:
         return jsonify({"error": "No hay datos cargados."}), 400
     
@@ -183,6 +188,8 @@ def operation():
         op_history.append({"op": op, "params": history_params})
         current_df = df
         code_log.append(f"# {op}\n{code}")
+        # Avance del pipeline → rama de rehacer descartada (semántica estándar)
+        redo_history = []
         
         return jsonify({
             "success": True,
@@ -196,20 +203,53 @@ def operation():
 
 @app.route("/undo", methods=["POST"])
 def undo():
-    global current_df, history, code_log, op_history
+    """Revierte el último paso y lo guarda en `redo_history` para /redo.
+
+    Los tres registros (snapshot, fragmento de código, paso estructurado)
+    se desapilan juntos: /redo los re-appendea idénticos, así que script,
+    receta y linaje vuelven byte a byte al estado previo.
+    """
+    global current_df, history, code_log, op_history, redo_history
     if len(history) > 1:
-        history.pop()
-        current_df = history[-1].copy()
+        snap = history.pop()
+        code_frag = None
+        op_step = None
         if len(code_log) > 1:
-            code_log.pop()
+            code_frag = code_log.pop()
         if len(op_history) > 0:
-            op_history.pop()
+            op_step = op_history.pop()
+        redo_history.append((snap, code_frag, op_step))
+        current_df = history[-1].copy()
         return jsonify({
             "success": True,
             "data": df_to_json(current_df),
-            "code": "\n\n".join(code_log)
+            "code": "\n\n".join(code_log),
+            "can_undo": len(history) > 1,
+            "can_redo": True,
         })
     return jsonify({"error": "No hay más pasos para deshacer."}), 400
+
+@app.route("/redo", methods=["POST"])
+def redo():
+    """Re-aplica el último paso deshecho (LIFO sobre `redo_history`)."""
+    global current_df, history, code_log, op_history, redo_history
+    if not redo_history:
+        return jsonify({"error": "No hay pasos para rehacer."}), 400
+
+    snap, code_frag, op_step = redo_history.pop()
+    history.append(snap)
+    if code_frag is not None:
+        code_log.append(code_frag)
+    if op_step is not None:
+        op_history.append(op_step)
+    current_df = history[-1].copy()
+    return jsonify({
+        "success": True,
+        "data": df_to_json(current_df),
+        "code": "\n\n".join(code_log),
+        "can_undo": True,
+        "can_redo": len(redo_history) > 0,
+    })
 
 @app.route("/export_recipe", methods=["POST"])
 def export_recipe():
@@ -253,7 +293,7 @@ def apply_recipe():
     `history` recibe un snapshot por paso: Deshacer revierte paso a paso
     y el linaje muestra cada paso individual, igual que ops manuales.
     """
-    global current_df, history, code_log, op_history
+    global current_df, history, code_log, op_history, redo_history
     if current_df is None:
         return jsonify({"error": "No hay datos cargados. Carga un archivo antes de aplicar la receta."}), 400
 
@@ -306,6 +346,7 @@ def apply_recipe():
     op_history.extend(applied)
     code_log.extend(codes)
     current_df = df_work
+    redo_history = []  # avance del pipeline → rama de rehacer descartada
 
     return jsonify({
         "success": True,

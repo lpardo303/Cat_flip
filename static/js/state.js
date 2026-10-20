@@ -114,6 +114,8 @@ async function loadRecipeFile(input) {
     renderTable(data.data);
     updateCode(data.code);
     pipelineSteps = data.steps.map(s => ({ op: s.op, params: s.params }));
+    redoSteps = []; // receta aplicada → avance del pipeline
+    updateUndoRedoButtons(true, false);
     renderPipeline();
     loadStats();   // refrescar diagnóstico en segundo plano
     loadLineage(); // refrescar linaje en segundo plano (F3.3)
@@ -127,6 +129,19 @@ let currentDtypes = {};
 let currentOp = null;
 let currentSheetFile = null;
 let pipelineSteps = [];
+// Pasos rehacibles (popeados por undo, re-aplicados por redo). Se vacía
+// siempre que el pipeline avanza (op nueva, upload, receta) — el backend
+// hace lo mismo con su `redo_history`.
+let redoSteps = [];
+
+// Sincroniza los botones Deshacer/Rehacer con los flags del backend
+// (can_undo/can_redo). Sin flags conocidos, deja el estado actual.
+function updateUndoRedoButtons(canUndo, canRedo) {
+  const btnUndo = document.getElementById('btn-undo');
+  const btnRedo = document.getElementById('btn-redo');
+  if (canUndo !== undefined && btnUndo) btnUndo.disabled = !canUndo;
+  if (canRedo !== undefined && btnRedo) btnRedo.disabled = !canRedo;
+}
 
 function showLoading() { document.getElementById('loading').classList.add('open'); }
 function hideLoading() { document.getElementById('loading').classList.remove('open'); }

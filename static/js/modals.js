@@ -363,6 +363,10 @@ function handleOpResponse(op, params, data, notify = true) {
   renderTable(data.data);
   updateCode(data.code);
   addPipelineStep(op, params);
+  // Avance del pipeline → la rama de rehacer se invalida (el backend
+  // hace lo mismo con su `redo_history`).
+  redoSteps = [];
+  updateUndoRedoButtons(true, false);
   loadStats();   // refrescar diagnóstico en segundo plano
   loadLineage(); // refrescar linaje en segundo plano (F3.3)
   if (notify) toast(op.replace(/_/g, ' ') + ' aplicado');
@@ -394,10 +398,25 @@ async function undo() {
   hideLoading();
   if (data.error) { toast(data.error, 'info'); return; }
   renderTable(data.data); updateCode(data.code);
-  if (pipelineSteps.length > 0) { pipelineSteps.pop(); renderPipeline(); }
+  if (pipelineSteps.length > 0) { redoSteps.push(pipelineSteps.pop()); renderPipeline(); }
+  updateUndoRedoButtons(data.can_undo, data.can_redo);
   loadStats(); // refrescar diagnóstico en segundo plano
   loadLineage(); // refrescar linaje en segundo plano (F3.3)
   toast('Paso deshecho', 'info');
+}
+
+async function redo() {
+  showLoading();
+  const res = await fetch('/redo', {method:'POST'});
+  const data = await res.json();
+  hideLoading();
+  if (data.error) { toast(data.error, 'info'); return; }
+  renderTable(data.data); updateCode(data.code);
+  if (redoSteps.length > 0) { pipelineSteps.push(redoSteps.pop()); renderPipeline(); }
+  updateUndoRedoButtons(data.can_undo, data.can_redo);
+  loadStats(); // refrescar diagnóstico en segundo plano
+  loadLineage(); // refrescar linaje en segundo plano (F3.3)
+  toast('Paso rehecho', 'info');
 }
 
 async function exportData(fmt) {

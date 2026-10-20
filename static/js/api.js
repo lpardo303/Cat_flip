@@ -55,6 +55,9 @@ async function uploadFile(file, sheet) {
     updateCode(data.code);
     showTypeSuggestions(data.type_suggestions || []);
     pipelineSteps = [];
+    redoSteps = [];
+    const btnRedo0 = document.getElementById('btn-redo');
+    if (btnRedo0) btnRedo0.disabled = true;
     renderPipeline();
 
     // Top ribbon breadcrumb & Active Buffer badge (F2.1)

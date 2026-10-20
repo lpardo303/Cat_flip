@@ -284,10 +284,16 @@
           <span>Control de flujo</span>
         </div>
         <div class="actions" style="flex-direction:column; gap:0.4rem">
-          <button class="btn btn-secondary" onclick="undo()" id="btn-undo" disabled style="width:100%;justify-content:center">
-            <svg class="icon-svg" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>
-            <span>Deshacer paso</span>
-          </button>
+          <div style="display:flex;gap:0.4rem;width:100%">
+            <button class="btn btn-secondary" onclick="undo()" id="btn-undo" disabled style="flex:1;justify-content:center" title="Revierte el último paso (Ctrl+Z)">
+              <svg class="icon-svg" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>
+              <span>Deshacer</span>
+            </button>
+            <button class="btn btn-secondary" onclick="redo()" id="btn-redo" disabled style="flex:1;justify-content:center" title="Re-aplica el paso deshecho (Ctrl+Shift+Z)">
+              <svg class="icon-svg" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg>
+              <span>Rehacer</span>
+            </button>
+          </div>
           <div style="display:flex;gap:0.4rem;width:100%">
             <button class="btn btn-danger" onclick="exportData('csv')" id="btn-csv" disabled style="flex:1;justify-content:center">
               <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
