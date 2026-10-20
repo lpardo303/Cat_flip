@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify, send_file
 import pandas as pd
+import csv
 import io
 import os
 import re
@@ -63,24 +64,62 @@ def df_to_json(df, max_rows=500):
 def index():
     return render_template("index.html")
 
+# Separadores candidatos de CSV. El orden es el desempate de la regla de
+# consistencia ("," gana a ";" — conserva el comportamiento histórico).
+_DELIM_CANDIDATES = ",;\t|"
+
+
+def _detect_delimiter(text):
+    """Detecta el separador de un CSV: coma, punto y coma, tab o pipe.
+
+    1) `csv.Sniffer` con lista blanca de candidatos: respeta las comillas
+       (un ';' o ',' dentro de "..." no cuenta como separador).
+    2) Fallback si el Sniffer no puede decidir (pocas líneas, filas
+       irregulares): regla de consistencia — candidato con conteo >0 y el
+       MISMO número de apariciones en ≥60% de las líneas no vacías; gana la
+       mejor consistencia (desempate por orden: ',' antes que ';').
+    3) Último recurso: máximo conteo total (generaliza la regla histórica
+       conteo(',') vs conteo(';')). Sin apariciones → ',' (default).
+    """
+    sample = text[:65536]
+    try:
+        return csv.Sniffer().sniff(sample, delimiters=_DELIM_CANDIDATES).delimiter
+    except csv.Error:
+        pass
+    lines = [ln for ln in sample.splitlines() if ln.strip()]
+    if len(lines) < 2:
+        return ","
+    scores = {}
+    for cand in _DELIM_CANDIDATES:
+        counts = [ln.count(cand) for ln in lines]
+        top = max(counts)
+        scores[cand] = (sum(1 for c in counts if c == top) / len(lines)
+                        if top else 0.0)
+    qualified = [c for c in _DELIM_CANDIDATES if scores[c] >= 0.6]
+    if qualified:
+        # max() con empate se queda con el primero → orden ',':\t|
+        return max(qualified, key=lambda c: scores[c])
+    totals = {c: sum(ln.count(c) for ln in lines) for c in _DELIM_CANDIDATES}
+    best_c, best_n = max(totals.items(), key=lambda kv: kv[1])
+    return best_c if best_n else ","
+
+
 def read_table(file):
     """Lee un CSV/XLSX/XLS subido y devuelve (df, expresión pandas, encoding).
 
     La expresión es el RHS listo para el código generado: en /upload se usa
     como `df = <expr>` y en el cruce como `df_right = <expr>`. El formato lo
     valida el endpoint que llama; aquí se autodetecta el separador del CSV
-    (comas vs punto y coma), la codificación (UTF-8 si el decode pasa; si no,
-    charset-normalizer) o se lee la hoja de Excel.
+    (`,`, `;`, `\t`, `|` vía _detect_delimiter), la codificación (UTF-8 si el
+    decode pasa; si no, charset-normalizer) o se lee la hoja de Excel.
 
     `encoding` es la codificación no-utf8 detectada (ej. 'cp1252') o None.
     El script exportado la incluye para reproducir la misma carga. Fallback:
     latin-1 (nunca lanza UnicodeDecodeError) si la detección no sirve.
     """
-    if file.filename.lower().endswith(".csv"):
-        # Intentar detectar el separador automáticamente
+    if file.filename.lower().endswith((".csv", ".tsv")):
         content = file.read()
         file.seek(0)
-        sep = "," if content.count(b",") > content.count(b";") else ";"
         encoding = None
         try:
             # utf-8 estricto: si el decode pasa, no se toca nada (caso normal)
@@ -103,15 +142,16 @@ def read_table(file):
             except (UnicodeDecodeError, LookupError):
                 encoding = "latin-1"  # decode total: latin-1 mapea todo byte
                 text = content.decode("latin-1")
+        sep = _detect_delimiter(text)
         if encoding:
             df = pd.read_csv(io.StringIO(text), sep=sep, encoding=encoding)
             return (
                 df,
-                f"pd.read_csv('{file.filename}', sep='{sep}', encoding={encoding!r})",
+                f"pd.read_csv('{file.filename}', sep={sep!r}, encoding={encoding!r})",
                 encoding,
             )
         df = pd.read_csv(io.StringIO(text), sep=sep)
-        return df, f"pd.read_csv('{file.filename}', sep='{sep}')", None
+        return df, f"pd.read_csv('{file.filename}', sep={sep!r})", None
     sheet = request.form.get("sheet", 0)
     df = pd.read_excel(file, sheet_name=int(sheet) if str(sheet).isdigit() else sheet)
     return df, f"pd.read_excel('{file.filename}', sheet_name={repr(sheet)})", None
@@ -124,8 +164,8 @@ def upload():
     filename = file.filename.lower()
     
     try:
-        if not filename.endswith((".csv", ".xlsx", ".xls")):
-            return jsonify({"error": "Formato no soportado. Usa CSV, XLSX o XLS."}), 400
+        if not filename.endswith((".csv", ".tsv", ".xlsx", ".xls")):
+            return jsonify({"error": "Formato no soportado. Usa CSV, TSV, XLSX o XLS."}), 400
 
         current_df, expr, encoding = read_table(file)
         code = f"df = {expr}"
@@ -156,8 +196,8 @@ def upload_right():
     file = request.files["file"]
     filename = file.filename.lower()
 
-    if not filename.endswith((".csv", ".xlsx", ".xls")):
-        return jsonify({"error": "Formato no soportado. Usa CSV, XLSX o XLS."}), 400
+    if not filename.endswith((".csv", ".tsv", ".xlsx", ".xls")):
+        return jsonify({"error": "Formato no soportado. Usa CSV, TSV, XLSX o XLS."}), 400
 
     try:
         right_df, right_code, _ = read_table(file)
