@@ -1094,3 +1094,140 @@ function closeCsvRecipe() {
   const overlay = document.getElementById('csvrecipe-overlay');
   if (overlay) overlay.classList.remove('open');
 }
+
+// ── Conectores mock (Destinos demo) ────────────────────────────────────
+// BigQuery, Snowflake y Webhook REST son SIMULACIONES de UI (F3.4 spec:
+// "solo UI, sin integración real"): este bloque NO hace fetch ni toca la
+// red en ningún punto — sirve para ensayar la configuración y ver el
+// paquete que se «enviaría», con aviso de modo demo permanente.
+const CONNECTORS = {
+  bigquery: {
+    name: 'Google BigQuery',
+    fields: [
+      { id: 'bq-project', label: 'Proyecto', placeholder: 'mi-proyecto-42', required: true },
+      { id: 'bq-dataset', label: 'Dataset', placeholder: 'analytics', required: true },
+      { id: 'bq-table', label: 'Tabla destino', placeholder: 'empleados_limpios', required: true },
+      { id: 'bq-format', label: 'Formato del paquete', type: 'select', options: ['JSON Records', 'CSV'] },
+    ],
+  },
+  snowflake: {
+    name: 'Snowflake',
+    fields: [
+      { id: 'sf-account', label: 'Cuenta', placeholder: 'xy12345.es-east-1', required: true },
+      { id: 'sf-db', label: 'Base de datos', placeholder: 'ANALYTICS_DB', required: true },
+      { id: 'sf-schema', label: 'Esquema', placeholder: 'PUBLIC', required: true },
+      { id: 'sf-table', label: 'Tabla destino', placeholder: 'EMPLEADOS_LIMPIOS', required: true },
+      { id: 'sf-format', label: 'Formato del paquete', type: 'select', options: ['CSV', 'JSON Records'] },
+    ],
+  },
+  webhook: {
+    name: 'Webhook REST',
+    fields: [
+      { id: 'wh-url', label: 'URL del endpoint', placeholder: 'https://api.tuservicio.com/datos', required: true, type: 'url' },
+      { id: 'wh-method', label: 'Método', type: 'select', options: ['POST', 'PUT'] },
+      { id: 'wh-secret', label: 'Cabecera de autenticación (opcional)', placeholder: 'Bearer …', type: 'password' },
+      { id: 'wh-format', label: 'Formato del cuerpo', type: 'select', options: ['JSON Records', 'CSV'] },
+    ],
+  },
+};
+
+let cnKind = null;    // conector abierto (para saber qué validar)
+let cnTimer = null;   // animación de la consola
+
+function openConnector(kind) {
+  const cfg = CONNECTORS[kind];
+  if (!cfg) return;
+  if (!currentColumns.length) {
+    toast('Carga un archivo antes de usar un destino', 'info');
+    return;
+  }
+  clearTimeout(cnTimer);
+  cnKind = kind;
+
+  document.getElementById('cn-name').textContent = cfg.name;
+  document.getElementById('cn-form').innerHTML = cfg.fields.map(f => {
+    const input = f.type === 'select'
+      ? `<select id="${f.id}">` + f.options.map(o => `<option>${escapeHtml(o)}</option>`).join('') + '</select>'
+      : `<input type="${f.type || 'text'}" id="${f.id}" placeholder="${escapeHtml(f.placeholder || '')}"${f.required ? ' data-required="1"' : ''}>`;
+    return `<label class="cn-field"><span>${escapeHtml(f.label)}</span>${input}</label>`;
+  }).join('');
+
+  document.getElementById('cn-console').innerHTML = '';
+  document.getElementById('cn-status').textContent = 'Modo demo — nada sale de tu equipo';
+  const send = document.getElementById('cn-send');
+  send.disabled = false;
+  send.querySelector('span').textContent = 'Simular envío';
+  document.getElementById('connector-overlay').classList.add('open');
+  const first = document.querySelector('#cn-form input');
+  if (first) first.focus();
+}
+
+function closeConnector() {
+  clearTimeout(cnTimer);
+  cnKind = null;
+  const overlay = document.getElementById('connector-overlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function cnLog(text, cls) {
+  const box = document.getElementById('cn-console');
+  const line = document.createElement('div');
+  line.className = 'cn-line' + (cls ? ' ' + cls : '');
+  line.textContent = text;  // contenido controlado por la app, sin HTML
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+}
+
+function sendConnector() {
+  const cfg = CONNECTORS[cnKind];
+  if (!cfg) return;
+
+  // Validación de campos obligatorios (mismo estilo que los modales de ops)
+  const required = [...document.querySelectorAll('#cn-form [data-required]')];
+  const missing = required.filter(el => !el.value.trim());
+  if (missing.length) {
+    toast('Completa los campos obligatorios del conector', 'error');
+    missing[0].focus();
+    return;
+  }
+  // El webhook exige una URL http(s) creíble
+  const urlEl = document.getElementById('wh-url');
+  if (urlEl && !/^https?:\/\/\S+$/i.test(urlEl.value.trim())) {
+    toast('La URL del webhook debe empezar por http:// o https://', 'error');
+    urlEl.focus();
+    return;
+  }
+
+  // Simulación animada — NUNCA se abre ninguna conexión (modo demo)
+  const rows = currentRawData ? currentRawData.shape[0] : 0;
+  const fmtEl = document.querySelector('#cn-form select');
+  const fmt = fmtEl ? fmtEl.value : 'JSON Records';
+  const kb = Math.max(1, Math.round(rows * Math.max(1, currentColumns.length) * 0.08));
+  const lines = [
+    `$ catflip send --to ${cnKind} --demo`,
+    'Validando configuración… OK',
+    `Serializando ${rows} fila(s) × ${currentColumns.length} columna(s)…`,
+    `Paquete preparado (${fmt}, ~${kb} KB)`,
+    '✔ Simulación completada — no se envió nada (modo demo)',
+  ];
+
+  const send = document.getElementById('cn-send');
+  send.disabled = true;
+  document.getElementById('cn-console').innerHTML = '';
+  document.getElementById('cn-status').textContent = 'Simulando…';
+
+  let i = 0;
+  const step = () => {
+    const last = i === lines.length - 1;
+    cnLog(lines[i], i === 0 ? 'cn-cmd' : last ? 'cn-ok' : 'cn-dim');
+    i++;
+    if (i < lines.length) {
+      cnTimer = setTimeout(step, 240);
+    } else {
+      document.getElementById('cn-status').textContent = 'Simulación completada (sin envío real)';
+      send.querySelector('span').textContent = 'Simulado ✓';
+      toast(`Simulación completada en ${cfg.name} — sin envío real (modo demo)`, 'info');
+    }
+  };
+  cnTimer = setTimeout(step, 120);
+}
