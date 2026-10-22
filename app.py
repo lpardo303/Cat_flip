@@ -725,6 +725,22 @@ def export():
         current_df.to_parquet(buf, index=False)
         mimetype = "application/vnd.apache.parquet"
         ext = "parquet"
+    elif fmt == "json":
+        # JSON Records: array de objetos (una fila = un objeto). Nulos →
+        # null y fechas en ISO legible (date_format="iso"; el default de
+        # pandas es epoch ms). force_ascii=False conserva ñ/acentos.
+        # Round-trip: pd.read_json(orient="records").
+        json_text = current_df.to_json(orient="records", date_format="iso", force_ascii=False)
+        buf.write(json_text.encode("utf-8"))
+        mimetype = "application/json"
+        ext = "json"
+    elif fmt == "sql":
+        # DDL + INSERT: script portable (Postgres/SQLite) generado del
+        # dtype real de cada columna — ver df_to_sql_script().
+        script = df_to_sql_script(current_df, _sql_ident(filename))
+        buf.write(script.encode("utf-8"))
+        mimetype = "text/sql"
+        ext = "sql"
     else:
         current_df.to_csv(buf, index=False)
         mimetype = "text/csv"
@@ -737,6 +753,104 @@ def export():
         as_attachment=True,
         download_name=f"{filename}.{ext}"
     )
+
+
+# ── Export SQL: DDL + INSERT (F3.4 ampliación) ────────────────────────
+
+def _sql_ident(name):
+    """Normaliza un nombre a identificador SQL seguro (letras/dígitos/_).
+
+    El nombre del archivo lo pide el usuario (prompt del front) — no puede
+    entrar crudo en el DDL. Minúsculas, sin espacios ni símbolos; vacío →
+    'tabla'.
+    """
+    ident = re.sub(r"\W+", "_", str(name).strip()).strip("_").lower()
+    return ident or "tabla"
+
+
+def _sql_type(series):
+    """Mapea el dtype de pandas al tipo SQL más cercano (DDL portable)."""
+    dt = series.dtype
+    if pd.api.types.is_bool_dtype(dt):
+        return "BOOLEAN"
+    if pd.api.types.is_datetime64_any_dtype(dt):
+        return "TIMESTAMP"
+    if pd.api.types.is_integer_dtype(dt):
+        return "BIGINT"
+    if pd.api.types.is_float_dtype(dt):
+        return "DOUBLE PRECISION"
+    return "TEXT"
+
+
+def _sql_literal(v):
+    """Celda → literal SQL: NULL, TRUE/FALSE, número o texto con '' escapado.
+
+    Escalares numpy → Python (mismo truco que `_diff_value`), fechas a ISO
+    con comillas, infinidades → NULL (no son literales SQL estándar) y
+    cualquier cosa no escalar → texto entre comillas con su representación.
+    """
+    try:
+        if pd.isna(v):
+            return "NULL"
+    except (TypeError, ValueError):
+        pass  # valores no escalares → str() abajo
+    if hasattr(v, "item"):
+        try:
+            v = v.item()
+        except Exception:
+            pass
+    if isinstance(v, bool):
+        return "TRUE" if v else "FALSE"
+    if isinstance(v, float) and (v != v or v in (float("inf"), float("-inf"))):
+        return "NULL"  # nan ya sale arriba; inf/-inf no son SQL estándar
+    if isinstance(v, (int, float)):
+        return str(v)
+    s = v.isoformat(sep=" ") if hasattr(v, "isoformat") else str(v)
+    return "'" + s.replace("'", "''") + "'"
+
+
+def df_to_sql_script(df, table, batch=100):
+    """Genera un script DDL + INSERT del DataFrame (F3.4, formato sql).
+
+    Portátil entre Postgres y SQLite: identificadores entrecomillados con
+    `"` (y escapados), tipos derivados del dtype real (TEXT/BIGINT/
+    DOUBLE PRECISION/BOOLEAN/TIMESTAMP) y `INSERT` multi-fila en lotes de
+    `batch` filas. Nulos e infinidades → NULL. Un df de 0 filas genera solo
+    el CREATE TABLE. Solo LEE el DataFrame.
+    """
+    cols = list(df.columns)
+    dquote = '"'
+    quoted = [dquote + str(c).replace(dquote, dquote * 2) + dquote for c in cols]
+    col_list = ", ".join(quoted)
+
+    lines = [
+        "-- ============================================================",
+        "-- Script generado por Cat_flip — Studio ETL (DDL + INSERT)",
+        f"-- Tabla: {table} · {len(df)} fila(s) × {len(cols)} columna(s)",
+        "-- Compatible con PostgreSQL y SQLite",
+        "-- ============================================================",
+        "",
+        f'CREATE TABLE "{table}" (',
+    ]
+    for i, c in enumerate(cols):
+        comma = "," if i < len(cols) - 1 else ""
+        lines.append(f"    {quoted[i]} {_sql_type(df[c])}{comma}")
+    lines.append(");")
+
+    if len(df):
+        values_blocks = []
+        for start in range(0, len(df), batch):
+            chunk = df.iloc[start:start + batch]
+            rows = []
+            for row in chunk.itertuples(index=False, name=None):
+                rows.append("(" + ", ".join(_sql_literal(v) for v in row) + ")")
+            values_blocks.append(
+                f"INSERT INTO \"{table}\" ({col_list}) VALUES\n" + ",\n".join(rows) + ";"
+            )
+        lines.append("")
+        lines.extend(values_blocks)
+
+    return "\n".join(lines) + "\n"
 
 @app.route("/export_script", methods=["POST"])
 def export_script():

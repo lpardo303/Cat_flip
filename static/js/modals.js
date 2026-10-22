@@ -419,9 +419,19 @@ async function redo() {
   toast('Paso rehecho', 'info');
 }
 
+// prompt() no existe en algunos webviews/kioscos (y en el navegador de
+// preview): si no está disponible, se exporta con el nombre por defecto.
+function askFilename(message, fallback) {
+  try {
+    return prompt(message, fallback) || fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+
 async function exportData(fmt) {
   showLoading();
-  const filename = prompt('Nombre del archivo (sin extensión):', 'resultado') || 'resultado';
+  const filename = askFilename('Nombre del archivo (sin extensión):', 'resultado');
   try {
     const res = await fetch('/export', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({format:fmt, filename}) });
     hideLoading();
@@ -435,7 +445,7 @@ async function exportData(fmt) {
 }
 
 async function exportScript() {
-  const filename = prompt('Nombre del script (sin extensión):', 'pipeline_catflip') || 'pipeline_catflip';
+  const filename = askFilename('Nombre del script (sin extensión):', 'pipeline_catflip');
   showLoading();
   try {
     const res = await fetch('/export_script', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename}) });
