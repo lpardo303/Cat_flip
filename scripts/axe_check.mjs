@@ -1,7 +1,8 @@
 // Gate de accesibilidad (F3.4): abre Cat_flip con Playwright, ejecuta axe
-// (WCAG 2.0 A/AA) en tema claro y oscuro — página base y modal «Receta
-// desde CSV» abierto — y escribe violations.json. Sale con código 1 si
-// hay violaciones, así la CI falla sin parsear la consola.
+// (WCAG 2.0 A/AA) en tema claro y oscuro sobre 6 superficies — página
+// base, modal «Receta desde CSV» y modal de conectores demo — y escribe
+// violations.json. Sale con código 1 si hay violaciones, así la CI
+// falla sin parsear la consola.
 //
 // Uso: con el servidor corriendo (python app.py), `npm run test:axe`.
 // Variables: AXE_BASE_URL (default http://127.0.0.1:5050), AXE_OUT.
@@ -82,6 +83,12 @@ try {
     await page.waitForSelector('#csvrecipe-overlay.open');
     await runAxe(page, `modal receta-desde-CSV (${theme})`);
     await page.evaluate(() => closeCsvRecipe());
+
+    // Modal de conectores demo (conectores mock: BigQuery/Snowflake/Webhook)
+    await page.evaluate(() => openConnector('webhook'));
+    await page.waitForSelector('#connector-overlay.open');
+    await runAxe(page, `modal conector-webhook (${theme})`);
+    await page.evaluate(() => closeConnector());
   }
 } catch (err) {
   console.error('Error inesperado del gate de axe:', err);

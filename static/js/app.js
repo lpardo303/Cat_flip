@@ -110,6 +110,7 @@ document.addEventListener('keydown', e => {
     closeExecPipe();
     closeStepDiff();
     closeCsvRecipe();
+    closeConnector();
   }
   if ((e.ctrlKey||e.metaKey) && (e.key==='z' || e.key==='Z')) {
     e.preventDefault();

@@ -1539,3 +1539,111 @@
     .cr-step { grid-template-columns: 1.6rem 1fr; }
     .cr-step-params { grid-column: 2; }
   }
+
+  /* ── Conectores mock «Destinos (demo)» (.cn-*) ───────────── */
+  .cn-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.4rem;
+  }
+  .cn-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.55rem 0.3rem;
+    border-radius: var(--radius2);
+    background: var(--surface2);
+    border: 1px solid var(--border-subtle);
+    color: var(--text2);
+    font-size: 0.68rem;
+    font-family: var(--font-ui);
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, box-shadow 0.15s;
+  }
+  .cn-card .icon-svg { width: 16px; height: 16px; }
+  .cn-card:hover {
+    border-color: var(--teal-bd);
+    color: var(--teal2);
+    box-shadow: var(--shadow-glass-sm);
+  }
+  .cn-card:focus-visible {
+    outline: 2px solid var(--teal);
+    outline-offset: 1px;
+  }
+
+  .cn-demo-badge {
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    background: var(--orange-bg);
+    border: 1px solid var(--orange-bd);
+    color: var(--orange);
+  }
+
+  .cn-warn {
+    font-size: 0.72rem;
+    color: var(--yellow);
+    background: rgba(0, 0, 0, 0);
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 0.45rem 0.6rem;
+    margin-bottom: 0.8rem;
+  }
+
+  .cn-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 0.8rem;
+  }
+  .cn-field {
+    display: grid;
+    grid-template-columns: 11rem 1fr;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.74rem;
+    color: var(--text2);
+  }
+  .cn-field input,
+  .cn-field select {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    padding: 0.35rem 0.5rem;
+    border-radius: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .cn-field input:focus,
+  .cn-field select:focus {
+    outline: none;
+    border-color: var(--teal);
+  }
+
+  .cn-console {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    line-height: 1.6;
+    min-height: 96px;
+    max-height: 160px;
+    overflow-y: auto;
+    padding: 0.55rem 0.7rem;
+    border-radius: 8px;
+    background: var(--base2);
+    border: 1px solid var(--border-subtle);
+    color: var(--text2);
+  }
+  .cn-line { white-space: pre-wrap; word-break: break-word; }
+  .cn-cmd { color: var(--teal2); }
+  .cn-dim { color: var(--text-muted); }
+  .cn-ok { color: var(--green); }
+
+  .cn-status { margin-right: auto; font-size: 0.72rem; color: var(--text2); }
+
+  @media (max-width: 640px) {
+    .cn-grid { grid-template-columns: 1fr; }
+    .cn-field { grid-template-columns: 1fr; gap: 0.2rem; }
+  }
