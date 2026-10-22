@@ -634,3 +634,195 @@ if (dsDropzone) {
     if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
   });
 }
+
+// ── ExecutePipelineModal (F3.5) ─────────────────────────────────────────
+// "Cargar receta" ya no aplica en silencio: el modal primero hace un
+// dry-run en el servidor (POST /recipe_preview — corre la receta sobre
+// una copia, sin tocar ningún global) y luego reproduce los logs paso a
+// paso con la barra de progreso. /apply_recipe SOLO se emite cuando la
+// barra llega al 100%: Cancelar o Escape a mitad de animación cierran el
+// modal sin aplicar nada, así que jamás queda estado parcial.
+let epRecipe = null;      // receta pendiente (null al cerrar)
+let epFilename = '';      // nombre del archivo, para la consola
+let epRunning = false;    // animación en curso
+let epCancelled = false;  // abort de la animación en vuelo
+let epTimer = null;       // setTimeout de la animación
+
+function openExecPipeline(recipe, filename) {
+  if (!currentColumns.length) {
+    toast('Carga un archivo antes de aplicar una receta', 'info');
+    return;
+  }
+  epRecipe = recipe;
+  epFilename = filename || 'receta.catflip.json';
+  epRunning = false;
+  epCancelled = false;
+  clearTimeout(epTimer);
+
+  const fileEl = document.getElementById('ep-file');
+  fileEl.textContent = epFilename;
+  fileEl.title = epFilename;
+  const n = Array.isArray(recipe.steps) ? recipe.steps.length : 0;
+  document.getElementById('ep-steps').textContent = n + (n === 1 ? ' paso' : ' pasos');
+  document.getElementById('ep-shape').textContent = '…';
+  document.getElementById('ep-console').innerHTML = '';
+  setEpStatus('');
+  setEpAction('Cancelar', false);
+  setEpProgress(0);
+  document.getElementById('execpipe-overlay').classList.add('open');
+  runRecipePreview(n);
+}
+
+function closeExecPipe() {
+  epCancelled = true;
+  epRunning = false;
+  epRecipe = null;
+  clearTimeout(epTimer);
+  const overlay = document.getElementById('execpipe-overlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function setEpProgress(pct) {
+  const bar = document.getElementById('ep-progress');
+  if (!bar) return;
+  const v = Math.max(0, Math.min(100, Math.round(pct)));
+  document.getElementById('ep-progress-fill').style.width = v + '%';
+  document.getElementById('ep-pct').textContent = v + '%';
+  bar.setAttribute('aria-valuenow', String(v));
+}
+
+function setEpStatus(text, kind) {
+  const el = document.getElementById('ep-status');
+  el.textContent = text || '';
+  el.className = 'ep-status' + (kind ? ' ' + kind : '');
+}
+
+function setEpAction(label, disabled) {
+  const btn = document.getElementById('ep-action');
+  btn.textContent = label;
+  btn.disabled = !!disabled;
+}
+
+function epLog(html, cls) {
+  const box = document.getElementById('ep-console');
+  const line = document.createElement('div');
+  line.className = 'ep-line' + (cls ? ' ' + cls : '');
+  line.innerHTML = html;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+}
+
+// Params de la receta → `column=Nombre case=title`. El archivo .catflip.json
+// es contenido no confiable: todo lo que se imprime va por escapeHtml.
+function formatEpParams(params) {
+  return Object.entries(params || {}).map(([k, v]) => {
+    const val = Array.isArray(v) ? '[' + v.join(', ') + ']' : v;
+    return escapeHtml(k) + '=' + escapeHtml(String(val));
+  }).join(' ');
+}
+
+async function runRecipePreview(nSteps) {
+  epLog('$ catflip run <span class="ep-dim">' + escapeHtml(epFilename) + '</span>', 'ep-cmd');
+  if (!nSteps) { epFail('La receta no contiene pasos válidos.'); return; }
+  try {
+    const res = await fetch('/recipe_preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(epRecipe)
+    });
+    const data = await res.json();
+    if (epCancelled) return;
+    if (!res.ok || data.error) { epFail(data.error || 'Error al ejecutar la receta'); return; }
+    epAnimate(data);
+  } catch (e) {
+    if (!epCancelled) epFail('Error al ejecutar la receta');
+  }
+}
+
+// Reproduce los logs reales del backend uno a uno. El delay se adapta al
+// número de pasos: 260 ms con 3 pasos, 60 ms con 30 → nunca pasa de ~1,4 s.
+function epAnimate(preview) {
+  epRunning = true;
+  document.getElementById('ep-shape').textContent =
+    preview.input_shape[0] + '×' + preview.input_shape[1] + ' → ' +
+    preview.output_shape[0] + '×' + preview.output_shape[1];
+
+  const logs = preview.logs;
+  const delay = Math.max(60, Math.min(260, Math.round(900 / logs.length)));
+  let i = 0;
+
+  const step = () => {
+    if (epCancelled) return;
+    const log = logs[i];
+    const params = formatEpParams(log.params);
+    epLog(
+      '<span class="ep-idx">[' + log.i + '/' + log.n + ']</span> ' +
+      '<span class="ep-op">' + escapeHtml(log.op.replace(/_/g, ' ')) + '</span>' +
+      (params ? '  <span class="ep-dim">' + params + '</span>' : '') +
+      '  <span class="ep-shape">' + log.rows_in + '×' + log.cols_in +
+      ' → ' + log.rows_out + '×' + log.cols_out + '</span>' +
+      '  <span class="ep-dim">' + log.ms + ' ms</span>'
+    );
+    setEpProgress((log.i / log.n) * 100);
+    i++;
+    if (i < logs.length) {
+      epTimer = setTimeout(step, delay);
+    } else {
+      epFinish(preview);
+    }
+  };
+  epTimer = setTimeout(step, delay);
+}
+
+// Barra al 100% → AHORA sí se aplica la receta (única llamada mutante)
+function epFinish(preview) {
+  epRunning = false;
+  setEpAction('Cerrar', false);
+  setEpStatus('Aplicando…');
+  epApply(preview);
+}
+
+async function epApply(preview) {
+  try {
+    const res = await fetch('/apply_recipe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(epRecipe)
+    });
+    const data = await res.json();
+    if (epCancelled) return;
+    if (!res.ok || data.error) { epFail(data.error || 'Error al aplicar la receta'); return; }
+    epLog(
+      '<span class="ep-ok">✔</span> Receta aplicada: ' + data.applied +
+      ' paso(s) · ' + preview.output_shape[0] + '×' + preview.output_shape[1] +
+      ' · ' + preview.total_ms + ' ms',
+      'ep-summary'
+    );
+    setEpStatus('Completado', 'ep-ok');
+    applyRecipeResult(data);
+  } catch (e) {
+    if (!epCancelled) epFail('Error al aplicar la receta');
+  }
+}
+
+function epFail(msg) {
+  epRunning = false;
+  epCancelled = true;
+  clearTimeout(epTimer);
+  epLog('<span class="ep-err">✘ ' + escapeHtml(msg) + '</span>', 'ep-err');
+  setEpStatus('Sin cambios', 'ep-err');
+  setEpAction('Cerrar', false);
+}
+
+// Éxito de /apply_recipe, compartido por el modal (F3.5) y reutilizable
+function applyRecipeResult(data) {
+  renderTable(data.data);
+  updateCode(data.code);
+  pipelineSteps = data.steps.map(s => ({ op: s.op, params: s.params }));
+  redoSteps = []; // receta aplicada → avance del pipeline
+  updateUndoRedoButtons(true, false);
+  renderPipeline();
+  loadStats();   // refrescar diagnóstico en segundo plano
+  loadLineage(); // refrescar linaje en segundo plano (F3.3)
+  toast(`Receta aplicada: ${data.applied} paso(s)`);
+}

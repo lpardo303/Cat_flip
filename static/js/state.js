@@ -61,8 +61,9 @@ function applyColVis() {
 
 // ── Receta JSON (.catflip.json) ─────────────────────────────────────
 // Guardar: exporta op_history vía POST /export_recipe y descarga el blob.
-// Cargar: lee el archivo con FileReader y lo manda a /apply_recipe; si el
-// backend lo aplica (atómico), se repuebla pipelineSteps con la respuesta.
+// Cargar: lee el archivo con FileReader y lo abre en el
+// ExecutePipelineModal (F3.5), que hace dry-run en el servidor y aplica
+// al llegar al 100%.
 async function saveRecipe() {
   try {
     const res = await fetch('/export_recipe', {
@@ -101,26 +102,10 @@ async function loadRecipeFile(input) {
     toast('El archivo no es un JSON válido', 'error');
     return;
   }
-  showLoading();
-  try {
-    const res = await fetch('/apply_recipe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(recipe)
-    });
-    const data = await res.json();
-    hideLoading();
-    if (!res.ok || data.error) { toast(data.error || 'Error al aplicar la receta', 'error'); return; }
-    renderTable(data.data);
-    updateCode(data.code);
-    pipelineSteps = data.steps.map(s => ({ op: s.op, params: s.params }));
-    redoSteps = []; // receta aplicada → avance del pipeline
-    updateUndoRedoButtons(true, false);
-    renderPipeline();
-    loadStats();   // refrescar diagnóstico en segundo plano
-    loadLineage(); // refrescar linaje en segundo plano (F3.3)
-    toast(`Receta aplicada: ${data.applied} paso(s)`);
-  } catch (e) { hideLoading(); toast('Error al aplicar la receta', 'error'); }
+  // F3.5: no se aplica en silencio — el modal muestra la ejecución paso
+  // a paso (preview del backend + barra de progreso + consola) y llama a
+  // /apply_recipe solo cuando la barra llega al 100%.
+  openExecPipeline(recipe, file.name);
 }
 
 // ── ESTADO ──────────────────────────────────────────────────────────────
