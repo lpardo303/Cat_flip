@@ -161,7 +161,7 @@ function toast(msg, type='success') {
 
 function enableOps() {
   document.querySelectorAll('.op-btn').forEach(b => b.disabled = false);
-  ['btn-undo','btn-csv','btn-xlsx','btn-parquet','btn-script','btn-recipe','btn-recipe-py'].forEach(id => document.getElementById(id).disabled = false);
+  ['btn-undo','btn-csv','btn-xlsx','btn-parquet','btn-json','btn-sql','btn-script','btn-recipe','btn-recipe-py'].forEach(id => document.getElementById(id).disabled = false);
 }
 
 function switchTab(name) {
