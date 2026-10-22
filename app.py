@@ -706,5 +706,175 @@ def lineage():
     return jsonify({"nodes": nodes, "edges": edges})
 
 
+# ── Diff entre dos estados del pipeline (roadmap "¿Qué cambió este paso?") ─
+
+
+def _diff_value(v):
+    """Celda o etiqueta → valor JSON seguro (null para nulos, str para el resto).
+
+    Mismo criterio visible que `df_to_json` (el grid muestra strings), con
+    los escalares numpy convertidos a Python para que `jsonify` no truene.
+    """
+    try:
+        if pd.isna(v):
+            return None
+    except (TypeError, ValueError):
+        pass  # valores no escalares (listas, arrays) → str() abajo
+    if hasattr(v, "item"):
+        try:
+            v = v.item()
+        except Exception:
+            pass
+    if isinstance(v, (bool, int, float, str)):
+        return v
+    return str(v)
+
+
+def diff_snapshots(before, after, max_sample=20):
+    """Resume qué cambió entre dos snapshots consecutivos de `history[]`.
+
+    Alineación por etiqueta de índice: las operaciones de filtrado/limpieza
+    conservan el índice original del upload, así que comparar por posición
+    inventaría cambios en filas que solo se movieron de sitio. Con índice no
+    único en alguno de los dos frames no hay alineación honesta posible →
+    `aligned: false` y solo resumen de columnas (sin diff fila a fila).
+
+    Devuelve: formas, filas/columnas añadidas y quitadas, deltas por columna
+    (tipo, nulos, únicos, celdas cambiadas) y hasta `max_sample` celdas
+    realmente cambiadas con su valor antes/después. Solo LEE los frames.
+    """
+    b_rows, b_cols = before.shape
+    a_rows, a_cols = after.shape
+
+    b_colset, a_colset = set(before.columns), set(after.columns)
+    common_cols = [c for c in before.columns if c in a_colset]
+    columns_added = [str(c) for c in after.columns if c not in b_colset]
+    columns_removed = [str(c) for c in before.columns if c not in a_colset]
+
+    aligned = bool(before.index.is_unique and after.index.is_unique)
+    rows_added = rows_removed = None
+    reordered = False
+    columns = []
+    columns_unchanged = 0
+    changed_cells = None
+    sample = []
+    sample_truncated = False
+
+    if aligned:
+        common_idx = before.index.intersection(after.index)
+        rows_removed = int(len(before.index.difference(after.index)))
+        rows_added = int(len(after.index.difference(before.index)))
+        # Mismo conjunto de filas pero en otro orden → solo reordenamiento
+        reordered = (rows_added == 0 and rows_removed == 0
+                     and not before.index.equals(after.index))
+        b_part = before.loc[common_idx, common_cols]
+        a_part = after.loc[common_idx, common_cols]
+        changed_cells = 0
+
+    for col in common_cols:
+        b_s, a_s = before[col], after[col]
+        entry = {
+            "column": str(col),
+            "dtype_before": str(b_s.dtype),
+            "dtype_after": str(a_s.dtype),
+            "nulls_before": int(b_s.isna().sum()),
+            "nulls_after": int(a_s.isna().sum()),
+            "unique_before": _nunique_safe(b_s),
+            "unique_after": _nunique_safe(a_s),
+            "changed": None,
+        }
+        if aligned:
+            bc, ac = b_part[col], a_part[col]
+            try:
+                same = bc.eq(ac).fillna(False) | (bc.isna() & ac.isna())
+            except (TypeError, ValueError):
+                # Tipos incompatibles para == (p.ej. datetime vs str):
+                # se comparan sus representaciones textuales.
+                same = (bc.astype(str).eq(ac.astype(str)).fillna(False)
+                        | (bc.isna() & ac.isna()))
+            n = int((~same).sum())
+            entry["changed"] = n
+            changed_cells += n
+            if n and len(sample) < max_sample:
+                labels = (~same)[~same].index[: max_sample - len(sample)]
+                for lab in labels:
+                    sample.append({
+                        "row": _diff_value(lab),
+                        "column": str(col),
+                        "before": _diff_value(bc.loc[lab]),
+                        "after": _diff_value(ac.loc[lab]),
+                    })
+        differs = (entry["dtype_before"] != entry["dtype_after"]
+                   or entry["nulls_before"] != entry["nulls_after"]
+                   or entry["unique_before"] != entry["unique_after"]
+                   or (entry["changed"] or 0) > 0)
+        if differs:
+            columns.append(entry)
+        else:
+            columns_unchanged += 1
+
+    if changed_cells is not None:
+        sample_truncated = changed_cells > len(sample)
+
+    return {
+        "before_shape": [int(b_rows), int(b_cols)],
+        "after_shape": [int(a_rows), int(a_cols)],
+        "aligned": aligned,
+        "reordered": reordered,
+        "rows_added": rows_added,
+        "rows_removed": rows_removed,
+        "columns_added": columns_added,
+        "columns_removed": columns_removed,
+        "columns": columns,
+        "columns_unchanged": columns_unchanged,
+        "changed_cells": changed_cells,
+        "sample": sample,
+        "sample_truncated": sample_truncated,
+    }
+
+
+def _nunique_safe(series):
+    """Únicos con el mismo fallback anti-tipos-mixtos que /stats."""
+    try:
+        return int(series.nunique())
+    except TypeError:
+        try:
+            return int(series.astype(str).nunique())
+        except Exception:
+            return None
+
+
+@app.route("/step_diff", methods=["POST"])
+def step_diff():
+    """Diff entre el estado antes y después de un paso del pipeline.
+
+    `index` (base 0) es la posición del paso en `op_history` — la misma que
+    muestran las tarjetas del panel derecho. Compara `history[index]`
+    (antes) con `history[index + 1]` (después): esos snapshots ya existen
+    para el undo, así que no se guarda estado extra. SOLO LEE — consultar
+    el diff jamás altera el pipeline.
+    """
+    global current_df
+    if current_df is None:
+        return jsonify({"error": "No hay datos cargados."}), 400
+
+    data = request.get_json(silent=True) or {}
+    index = data.get("index")
+    if isinstance(index, bool) or not isinstance(index, int):
+        return jsonify({"error": "Se requiere el índice del paso (entero)."}), 400
+    if index < 0 or index >= len(op_history) or index + 1 >= len(history):
+        return jsonify({"error": f"El paso {index + 1} no existe en el historial."}), 400
+
+    step = op_history[index]
+    result = diff_snapshots(history[index], history[index + 1])
+    result.update({
+        "success": True,
+        "index": index,
+        "op": step.get("op", "?"),
+        "params": step.get("params", {}) or {},
+    })
+    return jsonify(result)
+
+
 if __name__ == "__main__":
     app.run(debug=False, port=5050, host="127.0.0.1")

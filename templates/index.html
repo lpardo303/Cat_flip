@@ -447,6 +447,47 @@
   </div>
 </div>
 
+<!-- ══ MODAL DIFF DE PASO — «¿Qué cambió este paso?» ═══════════════════════ -->
+<div class="modal-overlay" id="stepdiff-overlay" onclick="if(event.target===this)closeStepDiff()">
+  <div class="modal sd-modal" style="width: 680px;" role="dialog" aria-modal="true" aria-labelledby="sd-title">
+    <h2 id="sd-title">
+      <svg class="icon-svg" viewBox="0 0 24 24"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><path d="M11 18H8a2 2 0 0 1-2-2V9"/></svg>
+      <span>¿Qué cambió este paso?</span>
+    </h2>
+
+    <div class="sd-meta">
+      <span class="sd-step-badge" id="sd-step-badge">Paso 1</span>
+      <span class="sd-op" id="sd-op">—</span>
+      <span class="sd-params" id="sd-params"></span>
+    </div>
+
+    <div class="sd-summary" id="sd-summary">
+      <div class="sd-sum-item"><span class="sd-sum-label">Forma</span><span class="sd-sum-value sd-mono" id="sd-shape">—</span></div>
+      <div class="sd-sum-item"><span class="sd-sum-label">Filas</span><span class="sd-sum-value sd-mono" id="sd-rows">—</span></div>
+      <div class="sd-sum-item"><span class="sd-sum-label">Columnas</span><span class="sd-sum-value sd-mono" id="sd-cols-sum">—</span></div>
+      <div class="sd-sum-item"><span class="sd-sum-label">Celdas cambiadas</span><span class="sd-sum-value sd-mono" id="sd-changed">—</span></div>
+    </div>
+
+    <div class="sd-cols-wrap" id="sd-cols-wrap"></div>
+
+    <div class="sd-sample-title" id="sd-sample-title">Celdas cambiadas</div>
+    <div class="sd-sample" id="sd-sample" role="table" aria-label="Muestra de celdas cambiadas">
+      <div class="sd-sample-head" role="row">
+        <span role="columnheader">Fila</span>
+        <span role="columnheader">Columna</span>
+        <span role="columnheader">Antes</span>
+        <span role="columnheader">Después</span>
+      </div>
+      <div id="sd-sample-body"></div>
+    </div>
+
+    <div class="modal-footer">
+      <span class="sd-status" id="sd-status"></span>
+      <button class="btn btn-secondary" onclick="closeStepDiff()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
 <div id="col-menu-dropdown" class="col-dropdown-menu" role="dialog" aria-label="Transformaciones de columna" style="display:none"></div>
 <div id="toast-container" role="region" aria-label="Notificaciones"></div>

@@ -175,7 +175,10 @@ function renderPipeline() {
     const card = document.createElement('div');
     card.className = 'pipeline-step';
     const detail = Object.entries(s.params).map(([k,v]) => `${k}: ${Array.isArray(v)?v.join(','):v}`).join(' · ');
-    card.innerHTML = `<div class="step-num">${i+1}</div><div class="step-info"><div class="step-name">${s.op.replace(/_/g,' ')}</div><div class="step-detail" title="${detail}">${detail}</div></div>`;
+    // El detalle puede traer params de una receta ajena → escapar (F: diff)
+    const detailSafe = escapeHtml(detail);
+    card.innerHTML = `<div class="step-num">${i+1}</div><div class="step-info"><div class="step-name">${escapeHtml(s.op.replace(/_/g,' '))}</div><div class="step-detail" title="${detailSafe}">${detailSafe}</div></div>`
+      + `<button type="button" class="step-diff-btn" onclick="openStepDiff(${i})" aria-label="Ver qué cambió el paso ${i+1}" title="¿Qué cambió este paso?">${icon('git-compare')}</button>`;
     list.appendChild(card);
   });
 }
