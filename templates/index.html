@@ -415,6 +415,38 @@
   </div>
 </div>
 
+<!-- ══ MODAL EJECUTAR PIPELINE (F3.5) ═════════════════════════════════════ -->
+<div class="modal-overlay" id="execpipe-overlay" onclick="if(event.target===this)closeExecPipe()">
+  <div class="modal ep-modal" style="width: 640px;" role="dialog" aria-modal="true" aria-labelledby="ep-title">
+    <h2 id="ep-title">
+      <svg class="icon-svg" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+      <span>Ejecutar pipeline</span>
+    </h2>
+
+    <div class="ep-meta">
+      <span class="ep-meta-file" id="ep-file">receta.catflip.json</span>
+      <span class="ep-meta-sep" aria-hidden="true">·</span>
+      <span id="ep-steps">— pasos</span>
+      <span class="ep-meta-sep" aria-hidden="true">·</span>
+      <span class="ep-shape" id="ep-shape">—</span>
+    </div>
+
+    <div class="ep-progress-row">
+      <div class="ep-progress" id="ep-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Progreso de la ejecución de la receta">
+        <div class="ep-progress-fill" id="ep-progress-fill"></div>
+      </div>
+      <span class="ep-pct" id="ep-pct">0%</span>
+    </div>
+
+    <div class="ep-console" id="ep-console" role="log" aria-live="polite" tabindex="0" aria-label="Consola de ejecución de la receta"></div>
+
+    <div class="modal-footer">
+      <span class="ep-status" id="ep-status"></span>
+      <button class="btn btn-secondary" id="ep-action" onclick="closeExecPipe()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
 <div id="col-menu-dropdown" class="col-dropdown-menu" role="dialog" aria-label="Transformaciones de columna" style="display:none"></div>
 <div id="toast-container" role="region" aria-label="Notificaciones"></div>

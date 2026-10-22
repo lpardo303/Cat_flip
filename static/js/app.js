@@ -106,6 +106,7 @@ document.addEventListener('keydown', e => {
     closeColVisModal();
     closeColMenu();
     closeDatasetPicker();
+    closeExecPipe();
   }
   if ((e.ctrlKey||e.metaKey) && (e.key==='z' || e.key==='Z')) {
     e.preventDefault();

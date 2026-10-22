@@ -6,6 +6,7 @@ import os
 import re
 import json
 import base64
+import time
 
 from operations import OPS, detect_pii_columns, detect_type_suggestions
 
@@ -401,13 +402,21 @@ def validate_recipe(data):
     return steps
 
 
-def apply_recipe_df(df, steps, right_df=None, right_code=None):
+def apply_recipe_df(df, steps, right_df=None, right_code=None, on_step=None):
     """Reproduce `steps` sobre `df` y devuelve (df_final, snaps, codes, applied).
 
     Ejecuta SOLO sobre copias de trabajo: si un paso falla lanza
     ValueError citando el paso y no devuelve nada parcial (el caller
     decide si hay globals que escribir — en el endpoint, nada se toca;
     en el CLI, no se escribe el archivo de salida).
+
+    `on_step` (opcional, F3.5) se invoca tras cada paso con
+    `(i, op, params, shape_in, shape_out, ms)` para alimentar la consola
+    del ExecutePipelineModal. Dos reglas:
+      * `params` es el de la receta (serializable), nunca `handler_params`,
+        que en `merge` arrastra el DataFrame derecho;
+      * el tiempo solo se mide si hay callback, así /apply_recipe y el
+        CLI siguen costando exactamente lo que costaban.
     """
     df_work = df
     snaps, codes, applied = [], [], []
@@ -422,15 +431,74 @@ def apply_recipe_df(df, steps, right_df=None, right_code=None):
                     f"El paso {i} (merge): No hay frame derecho cargado. Carga un segundo dataset desde el modal de Join."
                 )
             handler_params = {**params, "right_df": right_df, "right_code": right_code}
+        shape_in = df_work.shape
+        started = time.perf_counter() if on_step is not None else None
         try:
             df_work, code = handler(df_work.copy(), handler_params)
         except Exception as e:
             # 400 en endpoint / exit 1 en CLI: el problema lo trae la receta
             raise ValueError(f"El paso {i} ({sop}) falló: {e}") from e
+        if on_step is not None:
+            on_step(
+                i, sop, params, shape_in, df_work.shape,
+                round((time.perf_counter() - started) * 1000, 1),
+            )
         snaps.append(df_work.copy())
         codes.append(f"# {sop}\n{code}")
         applied.append({"op": sop, "params": params})
     return df_work, snaps, codes, applied
+
+
+@app.route("/recipe_preview", methods=["POST"])
+def recipe_preview():
+    """Dry-run de una receta: ejecuta en copia y devuelve un log por paso.
+
+    Alimenta la consola del ExecutePipelineModal (F3.5). Repite la misma
+    validación y los mismos mensajes de error que /apply_recipe porque
+    comparte `validate_recipe` y `apply_recipe_df`, pero NUNCA escribe los
+    globals: no puede dejar estado parcial. El front solo llama a
+    /apply_recipe cuando la barra de progreso llega al 100%.
+    """
+    global current_df
+    if current_df is None:
+        return jsonify({"error": "No hay datos cargados. Carga un archivo antes de aplicar la receta."}), 400
+
+    # Misma validación estructural que /apply_recipe → mismo mensaje
+    try:
+        steps = validate_recipe(request.get_json(silent=True))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    in_rows, in_cols = current_df.shape
+    logs = []
+
+    def collect(i, op, params, shape_in, shape_out, ms):
+        logs.append({
+            "i": i,
+            "n": len(steps),
+            "op": op,
+            "params": params,
+            "rows_in": int(shape_in[0]),
+            "cols_in": int(shape_in[1]),
+            "rows_out": int(shape_out[0]),
+            "cols_out": int(shape_out[1]),
+            "ms": ms,
+        })
+
+    # Mismo ValueError del motor ("El paso N (op) falló: …") → 400
+    try:
+        df_work, *_ = apply_recipe_df(current_df, steps, right_df, right_code, on_step=collect)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    return jsonify({
+        "success": True,
+        "steps": len(logs),
+        "input_shape": [int(in_rows), int(in_cols)],
+        "output_shape": [int(df_work.shape[0]), int(df_work.shape[1])],
+        "total_ms": round(sum(l["ms"] for l in logs), 1),
+        "logs": logs,
+    })
 
 
 @app.route("/apply_recipe", methods=["POST"])
