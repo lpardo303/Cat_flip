@@ -8,7 +8,9 @@
 
 * 🚀 **24 Operaciones ETL:** Herramientas de limpieza, filtrado, transformación estructural (Pivot/Unpivot), manejo de texto, enmascaramiento de PII (Regex Mask), concatenación de columnas, detección de outliers (Z-Score / IQR) y muestreo reproducible (head/tail/random/stratified con semilla fija).
 * 🐍 **Generador de Código en Vivo:** Aprende y audita con el visor que muestra el código de Pandas autogenerado en tiempo real.
-* 💾 **Recetas Reproducibles:** Guarda tu pipeline como `.catflip.json` y revívelo con un clic sobre cualquier dataset — el ExecutePipelineModal muestra consola y barra de progreso paso a paso, y la receta se aplica sola al llegar al 100% (reproducción atómica: un paso fallido o un Cancelar a mitad no toca tus datos), con deshacer/rehacer paso a paso (`Ctrl+Z` / `Ctrl+Shift+Z`).
+* 💾 **Recetas Reproducibles:** Guarda tu pipeline como `.catrecipe` y revívelo con un clic sobre cualquier dataset — el ExecutePipelineModal muestra consola y barra de progreso paso a paso, y la receta se aplica sola al llegar al 100% (reproducción atómica: un paso fallido o un Cancelar a mitad no toca tus datos), con deshacer/rehacer paso a paso (`Ctrl+Z` / `Ctrl+Shift+Z`). Un `.catrecipe` arrastrado al grid abre el mismo modal.
+* 📥 **Receta desde CSV:** Elige un CSV sucio y Cat_flip **propone** una receta de limpieza (quitar espacios, filas con nulos, cambio de tipo donde todas las celdas casan, duplicados al final — máx. 4 pasos); el modal de preview lista pasos y avisos, y solo «Aplicar» la ejecuta vía el ExecutePipelineModal con dry-run previo.
+* 🐍 **Receta como `.py` portátil:** Exporta la receta como script con argumentos de línea de comandos (`python pipeline.py entrada.xlsx salida.xlsx`), pasos numerados con nombre legible y código idéntico al que ejecutó la app (mismo generador, incluido el frame derecho de un `merge`).
 * 🔍 **Diff por Paso:** Pregunta «¿Qué cambió este paso?» a cualquier tarjeta de tu pipeline: formas antes/después, columnas altas/bajas, deltas de nulos y únicos por columna, y una muestra de hasta 20 celdas realmente cambiadas (antes tachado, después en verde) — comparación por etiqueta de fila y 100% de solo lectura.
 * 💻 **Modo CLI:** La misma receta corre en terminal, sin navegador: `python cli.py run receta.catflip.json --input datos.csv --output limpio.csv` — autodetección de separador/encoding, salidas `.csv`/`.tsv`/`.xlsx`/`.parquet` con escritura atómica y exit codes para CI.
 * 🌗 **Kinetic Query Minimal:** Interfaz fluida y minimalista (Glassmorphism) con soporte persistente para modo claro y oscuro.
@@ -95,7 +97,12 @@ pytest tests/ --cov=app --cov=operations --cov=cli --cov-report=term-missing --c
 
 Los tests originales siguen siendo unittest y también corren con `python -m unittest discover -s tests`.
 
-El workflow de CI (`.github/workflows/ci.yml`) ejecuta la suite con el gate de cobertura y añade `node --check` sobre los 5 módulos de `static/js/` en cada push/PR a `main`.
+El workflow de CI (`.github/workflows/ci.yml`) ejecuta la suite con el gate de cobertura y añade `node --check` sobre los 5 módulos de `static/js/` en cada push/PR a `main`. Un segundo job (**axe**) levanta la app, la abre con Playwright y ejecuta [axe-core](https://github.com/dequelabs/axe-core) (WCAG 2.0 A/AA) sobre la página base y el modal *Receta desde CSV* en tema claro y oscuro; si hay violaciones el job falla y sube `violations.json` como artefacto. Para correrlo localmente (con la app en `127.0.0.1:5050`):
+
+```bash
+npm ci && npx playwright install chromium
+npm run test:axe
+```
 
 ## 🛠️ Arquitectura
 

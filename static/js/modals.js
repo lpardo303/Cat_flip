@@ -989,3 +989,98 @@ function sdCellValue(v) {
   if (v === null) return '<span class="sd-nullcell">null</span>';
   return escapeHtml(String(v));
 }
+
+// ── Receta desde CSV (F3.4) ────────────────────────────────────────────
+// La heurística csvToRecipe() (grid.js) PROPONE pasos a partir del CSV
+// elegido; aquí se listan en un modal de preview y SOLO «Aplicar» los
+// ejecuta — vía el ExecutePipelineModal (F3.5), así que también pasan por
+// el dry-run del servidor antes de tocarse un dato.
+let crRecipe = null; // receta propuesta (null al cerrar)
+
+// Mismas ops que la heurística puede proponer (todas del registro OPS)
+const CR_STEP_LABELS = {
+  trim: 'Quitar espacios',
+  drop_nulls: 'Eliminar filas con nulos',
+  change_type: 'Cambio de tipo',
+  drop_duplicates: 'Quitar duplicados',
+};
+
+async function openCsvRecipe(input) {
+  const file = input.files && input.files[0];
+  input.value = ''; // permitir volver a elegir el mismo archivo
+  if (!file) return;
+  const name = file.name.toLowerCase();
+  if (!name.endsWith('.csv') && !name.endsWith('.tsv')) {
+    toast('La receta desde CSV solo acepta archivos .csv o .tsv', 'error');
+    return;
+  }
+  if (!currentColumns.length) {
+    toast('Carga un archivo antes de generar una receta desde CSV', 'info');
+    return;
+  }
+
+  let text;
+  try {
+    text = await file.text();
+  } catch (e) {
+    toast('No se pudo leer el archivo', 'error');
+    return;
+  }
+  const result = csvToRecipe(text);
+  if (result.error) { toast(result.error, 'error'); return; }
+
+  crRecipe = { version: 1, steps: result.steps };
+  document.getElementById('cr-file').textContent = file.name;
+  document.getElementById('cr-file').title = file.name;
+  renderCsvRecipeSteps(result);
+  document.getElementById('csvrecipe-overlay').classList.add('open');
+}
+
+function renderCsvRecipeSteps(result) {
+  const list = document.getElementById('cr-steps');
+  const warningsEl = document.getElementById('cr-warnings');
+  const applyBtn = document.getElementById('cr-apply');
+  const n = result.steps.length;
+
+  document.getElementById('cr-steps-count').textContent =
+    n === 0 ? 'Sin pasos' : n + (n === 1 ? ' paso propuesto' : ' pasos propuestos');
+
+  if (n === 0) {
+    list.innerHTML = '<div class="cr-empty">Sin cambios sugeridos: el CSV parece limpio.</div>';
+  } else {
+    list.innerHTML = result.steps.map((s, i) => {
+      const label = CR_STEP_LABELS[s.op] || s.op;
+      const params = Object.entries(s.params || {}).map(([k, v]) => {
+        const val = Array.isArray(v) ? v.join(', ') : v;
+        return escapeHtml(k) + '=' + escapeHtml(String(val));
+      }).join(' ');
+      return '<div class="cr-step" role="listitem">'
+        + '<span class="cr-step-num">' + (i + 1) + '</span>'
+        + '<span class="cr-step-op">' + escapeHtml(label)
+        + ' <span class="cr-step-registry">(' + escapeHtml(s.op) + ')</span></span>'
+        + '<span class="cr-step-params">' + params + '</span>'
+        + '</div>';
+    }).join('');
+  }
+
+  warningsEl.innerHTML = (result.warnings || [])
+    .map(w => '<div class="cr-warn">' + escapeHtml(w) + '</div>').join('');
+  applyBtn.disabled = n === 0;
+  document.getElementById('cr-status').textContent =
+    'Solo una propuesta — nada se aplica hasta que confirmes';
+}
+
+function applyCsvRecipe() {
+  const recipe = crRecipe;
+  closeCsvRecipe();
+  if (!recipe || !recipe.steps.length) return;
+  // Reutiliza el ExecutePipelineModal: dry-run en servidor + barra de
+  // progreso; /apply_recipe SOLO al 100% (cancelar = cero cambios)
+  openExecPipeline(recipe, 'receta_desde_csv.catrecipe');
+}
+
+function closeCsvRecipe() {
+  crRecipe = null;
+  const overlay = document.getElementById('csvrecipe-overlay');
+  if (overlay) overlay.classList.remove('open');
+}

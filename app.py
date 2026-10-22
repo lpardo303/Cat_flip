@@ -449,6 +449,167 @@ def apply_recipe_df(df, steps, right_df=None, right_code=None, on_step=None):
     return df_work, snaps, codes, applied
 
 
+# ── F3.4: exportar la receta como script Python reproducible ────────────
+
+# Nombre legible de cada op para el comentario de cabecera del script.
+# Claves exactas del registro OPS (operations.py); el fallback en el
+# generador es el nombre crudo de la op para que una op futura sin etiqueta
+# no rompa la exportación.
+_OP_LABELS = {
+    "unpivot": "Unpivot",
+    "pivot": "Pivot",
+    "split_column": "Separar en columnas",
+    "split_to_rows": "Separar por filas",
+    "set_header": "Fijar cabecera",
+    "drop_nulls": "Eliminar filas con nulos",
+    "drop_duplicates": "Quitar duplicados",
+    "drop_rows": "Eliminar filas",
+    "trim": "Quitar espacios",
+    "clean_newlines": "Limpiar saltos de línea",
+    "change_case": "Cambio de mayúsculas/minúsculas",
+    "replace": "Reemplazar valores",
+    "rename_column": "Renombrar columna",
+    "drop_column": "Eliminar columna",
+    "change_type": "Cambio de tipo",
+    "regex_mask": "Enmascarar / extraer PII",
+    "concatenar_columnas": "Concatenar columnas",
+    "filter": "Filtrar filas",
+    "sort": "Ordenar",
+    "group_by": "Agrupar",
+    "merge": "Cruce Join/Merge",
+    "calculated_column": "Columna calculada",
+    "detectar_outliers": "Detectar outliers",
+    "sampling": "Muestreo",
+}
+
+
+def _load_line_with_argv(load_line):
+    """Reescribe la carga para leer de `entrada` (argv[1]) en vez del nombre grabado.
+
+    Conserva el resto de argumentos detectados (sep, encoding, sheet_name):
+    solo se sustituye el primer parámetro (la ruta) por la variable `entrada`
+    del guion, que es lo que hace el script portable entre máquinas.
+    """
+    return re.sub(
+        r"^(df = )pd\.(read_csv|read_excel)\(\s*(?:'[^']*'|\"[^\"]*\")",
+        r"\1pd.\2(entrada",
+        load_line,
+    )
+
+
+def receta_a_codigo(steps, load_code="df = pd.read_csv(entrada)"):
+    """Traduce `steps` (ya validados) a un script pandas autocontenido.
+
+    Reutiliza el MISMO generador de código que /operation y /apply_recipe
+    (llama a cada handler de OPS encadenando sobre una copia que arranca
+    en el snapshot original), así que cada paso ve el mismo df que vio al
+    ejecutarse y lo que sale aquí es exactamente lo que la app ejecutó —
+    si un paso genera código, ese código está en el script. Un paso que
+    truene al regenerar (p.ej. merge sin frame derecho o params que ya no
+    aplican) lanza ValueError citando el paso, con el mismo estilo que
+    apply_recipe_df.
+
+    El script NUNCA lleva rutas absolutas: la carga usa un nombre de
+    archivo relativo (basename) para que sea portable entre máquinas.
+    """
+    header = (
+        "# ============================================================\n"
+        "# Pipeline generado por Cat_flip — Studio ETL\n"
+        "# Reproduce la receta exacta que ejecutaste en la app.\n"
+        "# Requiere: pandas (+ openpyxl para leer .xlsx)\n"
+        "# Uso: python pipeline_catflip.py datos_entrada.xlsx salida_resultante.xlsx\n"
+        "# ============================================================\n\n"
+        "import sys\n\n"
+        "import pandas as pd\n\n"
+        "# Argumentos: [entrada] [salida] — valores por defecto solo para pruebas\n"
+        "entrada = sys.argv[1] if len(sys.argv) > 1 else 'datos_entrada.xlsx'\n"
+        "salida = sys.argv[2] if len(sys.argv) > 2 else 'salida_resultante.xlsx'\n\n"
+        "# Cargar archivo (nombre relativo: el script es portable entre máquinas)\n"
+        f"{load_code}\n"
+    )
+    # Cuerpo: un bloque por paso, con el fragmento de código REAL del
+    # handler. La cadena arranca en el snapshot del upload (history[0]):
+    # ops con comentarios dependientes del estado (drop_duplicates cuenta
+    # los duplicados que quitó) solo son paridad exacta si cada paso ve el
+    # mismo df que vio al ejecutarse por primera vez.
+    df_work = history[0].copy() if history else current_df.copy()
+    body = []
+    for i, step in enumerate(steps, 1):
+        sop = step["op"]
+        params = step.get("params", {})
+        handler = OPS[sop]
+        handler_params = params
+        if sop == "merge":
+            if right_df is None:
+                raise ValueError(
+                    f"El paso {i} (merge): No hay frame derecho cargado. Carga un segundo dataset desde el modal de Join."
+                )
+            handler_params = {**params, "right_df": right_df, "right_code": right_code}
+        try:
+            df_work, op_code = handler(df_work.copy(), handler_params)
+        except Exception as e:
+            # 400 citando el paso, mismo estilo que apply_recipe_df
+            raise ValueError(f"El paso {i} ({sop}) falló: {e}") from e
+        label = _OP_LABELS.get(sop, sop)
+        # Sin indentar: cada línea debe ser BYTE A BYTE el mismo código que
+        # ejecutó la app (code_log), así la paridad es comprobable en tests
+        body.append(f"# {i}. {label} ({sop})\n{op_code}")
+
+    footer = "\n# Guardar resultado\ndf.to_excel(salida, index=False)\nprint(f'Listo: {salida} — {df.shape[0]} filas × {df.shape[1]} columnas')\n"
+    return header + "\n\n".join(body) + "\n\n" + footer
+
+
+@app.route("/recipe_export", methods=["POST"])
+def recipe_export():
+    """Exporta la receta del pipeline como script Python (F3.4).
+
+    Misma validación estructural que /apply_recipe (validate_recipe →
+    mensajes idénticos), pero sin ejecutar nada sobre los datos: solo
+    regenera el código de cada op con el MISMO generador que la app.
+    /recipe_preview sigue siendo el gate de reproducibilidad; aquí lo que
+    se descarga es la traducción a pandas para ejecutar fuera de Cat_flip.
+    """
+    global current_df
+    if current_df is None:
+        return jsonify({"error": "No hay datos cargados."}), 400
+    if not op_history:
+        return jsonify({"error": "No hay pasos en la receta para exportar."}), 400
+
+    # La receta sale de op_history (la fuente de verdad del pipeline)
+    payload = {
+        "version": 1,
+        "steps": [{"op": s["op"], "params": s.get("params", {})} for s in op_history],
+    }
+    try:
+        steps = validate_recipe(payload)
+        # La carga del guion sale del code_log del upload (mismo detector de
+        # sep/encoding/sheet) reescrita para leer de argv[1]
+        load_line = "df = pd.read_csv(entrada)"
+        if code_log:
+            for line in code_log[0].splitlines():
+                if line.startswith("df = "):
+                    load_line = _load_line_with_argv(line)
+                    break
+        script = receta_a_codigo(steps, load_code=load_line)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    data = request.get_json(silent=True) or {}
+    # download_name viene del cliente → sin separadores de ruta (basename
+    # tras normalizar '\\'; vacío → nombre por defecto)
+    filename = os.path.basename(
+        str(data.get("filename") or "pipeline_catflip").replace("\\", "/")
+    ) or "pipeline_catflip"
+    buf = io.BytesIO(script.encode("utf-8"))
+    buf.seek(0)
+    return send_file(
+        buf,
+        mimetype="text/x-python",
+        as_attachment=True,
+        download_name=f"{filename}.py",
+    )
+
+
 @app.route("/recipe_preview", methods=["POST"])
 def recipe_preview():
     """Dry-run de una receta: ejecuta en copia y devuelve un log por paso.

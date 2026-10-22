@@ -324,13 +324,22 @@
           </button>
           <button class="btn btn-secondary" onclick="saveRecipe()" id="btn-recipe" disabled style="width:100%;justify-content:center">
             <svg class="icon-svg" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-            <span>Guardar receta .json</span>
+            <span>Exportar receta .catrecipe</span>
+          </button>
+          <button class="btn btn-secondary" onclick="downloadRecipe()" id="btn-recipe-py" disabled style="width:100%;justify-content:center">
+            <svg class="icon-svg" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/><line x1="12" x2="2" y1="4" y2="20"/></svg>
+            <span>Exportar receta .py</span>
           </button>
           <button class="btn btn-secondary" onclick="openRecipePicker()" id="btn-load-recipe" style="width:100%;justify-content:center">
             <svg class="icon-svg" viewBox="0 0 24 24"><path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
             <span>Cargar receta</span>
           </button>
-          <input type="file" id="recipe-file" accept=".json,.catflip.json" hidden onchange="loadRecipeFile(this)">
+          <button class="btn btn-secondary" onclick="openCsvRecipePicker()" id="btn-csv-recipe" style="width:100%;justify-content:center">
+            <svg class="icon-svg" viewBox="0 0 24 24"><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="m3 15 2 2 4-4"/></svg>
+            <span>Receta desde CSV…</span>
+          </button>
+          <input type="file" id="recipe-file" accept=".catrecipe,.json,.catflip.json" hidden onchange="loadRecipeFile(this)">
+          <input type="file" id="csv-recipe-file" accept=".csv,.tsv" hidden onchange="openCsvRecipe(this)">
         </div>
       </div>
 
@@ -484,6 +493,34 @@
     <div class="modal-footer">
       <span class="sd-status" id="sd-status"></span>
       <button class="btn btn-secondary" onclick="closeStepDiff()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL RECETA DESDE CSV (F3.4) ════════════════════════════════════ -->
+<div class="modal-overlay" id="csvrecipe-overlay" onclick="if(event.target===this)closeCsvRecipe()">
+  <div class="modal cr-modal" style="width: 600px;" role="dialog" aria-modal="true" aria-labelledby="cr-title">
+    <h2 id="cr-title">
+      <svg class="icon-svg" viewBox="0 0 24 24"><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="m3 15 2 2 4-4"/></svg>
+      <span>Receta propuesta desde CSV</span>
+    </h2>
+
+    <div class="cr-meta">
+      <span class="cr-file" id="cr-file">data.csv</span>
+      <span class="cr-steps-count" id="cr-steps-count">— pasos propuestos</span>
+    </div>
+
+    <div class="cr-steps" id="cr-steps" role="list" aria-label="Pasos propuestos"></div>
+
+    <div class="cr-warnings" id="cr-warnings" role="note"></div>
+
+    <div class="modal-footer">
+      <span class="cr-status" id="cr-status"></span>
+      <button class="btn btn-secondary" onclick="closeCsvRecipe()">Cancelar</button>
+      <button class="btn btn-primary" id="cr-apply" onclick="applyCsvRecipe()">
+        <svg class="icon-svg" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+        <span>Aplicar receta</span>
+      </button>
     </div>
   </div>
 </div>

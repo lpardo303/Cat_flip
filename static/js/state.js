@@ -59,11 +59,13 @@ function applyColVis() {
   toast('Visibilidad de columnas actualizada');
 }
 
-// ── Receta JSON (.catflip.json) ─────────────────────────────────────
-// Guardar: exporta op_history vía POST /export_recipe y descarga el blob.
+// ── Receta (.catrecipe / .catflip.json) ──────────────────────────────
+// Exportar: «Exportar receta .catrecipe» → saveRecipe() (POST
+// /export_recipe → JSON con los pasos del pipeline); «Exportar .py» →
+// downloadRecipe() en api.js (POST /recipe_export → script reproducible).
 // Cargar: lee el archivo con FileReader y lo abre en el
 // ExecutePipelineModal (F3.5), que hace dry-run en el servidor y aplica
-// al llegar al 100%.
+// al llegar al 100%. Un .catrecipe arrastrado al grid sigue aquí (F3.4).
 async function saveRecipe() {
   try {
     const res = await fetch('/export_recipe', {
@@ -75,9 +77,9 @@ async function saveRecipe() {
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'receta_catflip.catflip.json'; a.click();
+    a.href = url; a.download = 'receta_catflip.catrecipe'; a.click();
     URL.revokeObjectURL(url);
-    toast('Receta guardada: receta_catflip.catflip.json', 'info');
+    toast('Receta guardada: receta_catflip.catrecipe', 'info');
   } catch (e) { toast('Error al guardar la receta', 'error'); }
 }
 
@@ -92,9 +94,26 @@ function openRecipePicker() {
   input.click();
 }
 
-async function loadRecipeFile(input) {
+function loadRecipeFile(input) {
   const file = input.files && input.files[0];
-  if (!file) return;
+  if (file) loadRecipeFromFile(file);
+}
+
+// «Receta desde CSV…» (F3.4): la heurística csvToRecipe() de grid.js
+// propone pasos a partir del CSV elegido; el modal de preview los lista
+// y solo «Aplicar» los ejecuta (vía ExecutePipelineModal, con dry-run).
+function openCsvRecipePicker() {
+  if (!currentColumns.length) {
+    toast('Carga un archivo antes de generar una receta desde CSV', 'info');
+    return;
+  }
+  const input = document.getElementById('csv-recipe-file');
+  if (!input) return;
+  input.value = '';
+  input.click();
+}
+
+async function loadRecipeFromFile(file) {
   let recipe;
   try {
     recipe = JSON.parse(await file.text());
@@ -142,7 +161,7 @@ function toast(msg, type='success') {
 
 function enableOps() {
   document.querySelectorAll('.op-btn').forEach(b => b.disabled = false);
-  ['btn-undo','btn-csv','btn-xlsx','btn-parquet','btn-script','btn-recipe'].forEach(id => document.getElementById(id).disabled = false);
+  ['btn-undo','btn-csv','btn-xlsx','btn-parquet','btn-script','btn-recipe','btn-recipe-py'].forEach(id => document.getElementById(id).disabled = false);
 }
 
 function switchTab(name) {

@@ -14,6 +14,12 @@ document.getElementById('file-input').addEventListener('change', e => {
 async function handleFile(file) {
   closeDatasetPicker();
   const name = file.name.toLowerCase();
+  // F3.4: un .catrecipe/.catflip.json suelto NO es un dataset — se abre
+  // directamente en el ExecutePipelineModal (mismo flujo que «Cargar receta»)
+  if (name.endsWith('.catrecipe') || name.endsWith('.catflip.json')) {
+    loadRecipeFromFile(file);
+    return;
+  }
   if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
     showLoading();
     const fd = new FormData(); fd.append('file', file);
@@ -211,5 +217,41 @@ async function applyPiiSuggestions() {
     toast(applied === 1 ? '1 columna enmascarada (deshazible con Deshacer)' : applied + ' columnas enmascaradas (deshacibles con Deshacer)');
   } else if (applied > 0) {
     toast(`Se enmascararon ${applied} de ${suggs.length} columnas`, 'info');
+  }
+}
+
+// ── EXPORTAR RECETA COMO SCRIPT PYTHON (F3.4) ─────────────────────────
+// Pide al backend el .py reproducible (POST /recipe_export) y lo descarga
+// con el nombre del header Content-Disposition del servidor.
+async function downloadRecipe() {
+  showLoading();
+  try {
+    const res = await fetch('/recipe_export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    if (!res.ok) {
+      let msg = 'Error al exportar la receta';
+      try { msg = (await res.json()).error || msg; } catch (e) { /* body no-JSON */ }
+      hideLoading();
+      toast(msg, 'error');
+      return;
+    }
+    const blob = await res.blob();
+    hideLoading();
+    // Nombre sugerido por el backend (ascii y UTF-8-encodeURIComponent)
+    let name = 'pipeline_catflip.py';
+    const cd = res.headers.get('Content-Disposition') || '';
+    const m = /filename\*=UTF-8''([^;]+)/i.exec(cd) || /filename="?([^";]+)"?/i.exec(cd);
+    if (m) name = decodeURIComponent(m[1].trim());
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name; a.click();
+    URL.revokeObjectURL(url);
+    toast('Receta exportada: ' + name);
+  } catch (e) {
+    hideLoading();
+    toast('Error al exportar la receta', 'error');
   }
 }
