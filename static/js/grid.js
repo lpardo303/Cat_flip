@@ -616,3 +616,111 @@ window.addEventListener('scroll', e => {
   if (dropdown && dropdown.contains(e.target)) return;
   closeColMenu();
 }, true);
+
+// ── RECETA DESDE CSV (F3.4: «Receta desde CSV…») ───────────────────────
+// Heurística determinista que PROPONE una receta a partir de un CSV
+// elegido por el usuario. Reglas: propone solo (nada se aplica sin pasar
+// por el ExecutePipelineModal de F3.5), evita ops destructivas a medias
+// (drop_duplicates SIEMPRE al final), no adivina tipos (INT/FLOAT solo si
+// TODAS las celdas no vacías casan el patrón), y cada op propuesta es
+// válida en el registro del backend — la receta resultante se puede
+// exportar (.catrecipe), ejecutar en la app o exportar como script .py.
+
+function _parseDelimited(text, delim) {
+  // Parser RFC-4180 mínimo: comillas escapadas ("") y saltos de línea
+  // dentro de campos entrecomillados. Filas 100% vacías se descartan.
+  const rows = [];
+  let row = [], cell = '', quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quoted) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { cell += '"'; i++; }
+        else quoted = false;
+      } else cell += ch;
+    } else if (ch === '"') {
+      quoted = true;
+    } else if (ch === delim) {
+      row.push(cell); cell = '';
+    } else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i++;
+      row.push(cell); cell = '';
+      rows.push(row); row = [];
+    } else {
+      cell += ch;
+    }
+  }
+  if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter(r => r.some(c => c.trim() !== ''));
+}
+
+// La vista previa analiza hasta estas filas; el AVISO aclara que la receta
+// propuesta se aplica al dataset completo aunque el análisis sea parcial.
+const CSV_RECIPE_MAX_PREVIEW_ROWS = 5000;
+
+function csvToRecipe(text) {
+  if (!text || !text.trim()) return { error: 'El archivo está vacío.' };
+  // Mismo desempate de separador que el backend: gana la coma (solo se
+  // cambia a ';' si la cabecera tiene más ';' que ',')
+  const firstLine = text.split(/\r?\n/).find(l => l.trim()) || '';
+  const delim = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ';' : ',';
+  const rows = _parseDelimited(text, delim);
+  if (rows.length < 2) return { error: 'El CSV necesita una cabecera y al menos una fila de datos.' };
+  const headers = rows[0].map(h => h.trim());
+  if (headers.some(h => !h)) return { error: 'Hay columnas sin nombre en la cabecera del CSV.' };
+  const allRows = rows.slice(1);
+  const body = allRows.slice(0, CSV_RECIPE_MAX_PREVIEW_ROWS);
+  const steps = [];
+  const warnings = [];
+  const cellOf = (r, ci) => (r[ci] === undefined ? '' : String(r[ci]).trim());
+
+  // 1) Quitar espacios (trim): solo si ALGUNA celda de la columna tiene
+  //    espacios sobrantes (mismo criterio visible que la op trim)
+  const trimCols = headers.filter((h, ci) =>
+    body.some(r => r[ci] !== undefined && String(r[ci]) !== cellOf(r, ci)));
+  if (trimCols.length) steps.push({ op: 'trim', params: { columns: trimCols } });
+
+  // 2) Filas con huecos → drop_nulls (how='any', todas las columnas)
+  const nullRows = body.filter(r => headers.some((h, ci) => cellOf(r, ci) === '')).length;
+  if (nullRows > 0) steps.push({ op: 'drop_nulls', params: { columns: [], how: 'any' } });
+
+  // 3) Tipos: INT solo si TODAS las celdas no vacías casan ^-?\d+$;
+  //    FLOAT si todas casan número decimal. DATE nunca (irreversible en
+  //    el roundtrip y con formato local ambiguo).
+  const intCols = [], floatCols = [];
+  headers.forEach((h, ci) => {
+    const vals = body.map(r => cellOf(r, ci)).filter(v => v !== '');
+    if (!vals.length) return;
+    if (vals.every(v => /^-?\d+$/.test(v))) intCols.push(h);
+    else if (vals.every(v => /^-?\d+(\.\d+)?$/.test(v))) floatCols.push(h);
+  });
+  intCols.forEach(col => steps.push({ op: 'change_type', params: { column: col, dtype: 'int' } }));
+  floatCols.forEach(col => steps.push({ op: 'change_type', params: { column: col, dtype: 'float' } }));
+
+  // 4) Duplicados exactos → drop_duplicates SIEMPRE al final: la única op
+  //    que puede perder filas no puede quedar antes de las limpiezas
+  const seen = new Set();
+  let dupes = 0;
+  for (const r of body) {
+    const key = headers.map((h, ci) => cellOf(r, ci)).join('\u0000');
+    if (seen.has(key)) dupes++; else seen.add(key);
+  }
+  if (dupes > 0) steps.push({ op: 'drop_duplicates', params: { columns: headers } });
+
+  if (!steps.length) {
+    return { steps: [], warnings: ['Sin cambios sugeridos: el CSV no muestra espacios, huecos, duplicados ni tipos detectables.'] };
+  }
+  if (allRows.length > body.length) {
+    warnings.push(`Vista previa limitada a las primeras ${body.length.toLocaleString('es')} filas; la receta se aplica al dataset completo.`);
+  }
+  if (nullRows > 0) {
+    warnings.push(`${nullRows} fila(s) con celdas vacías → se eliminarán con drop_nulls.`);
+  }
+  if (dupes > 0) {
+    warnings.push(`${dupes} fila(s) duplicada(s) → se eliminarán con drop_duplicates (al final).`);
+  }
+  if (intCols.length + floatCols.length > 0) {
+    warnings.push('Cambio de tipo propuesto solo donde TODAS las celdas casan: ' + intCols.concat(floatCols).join(', ') + '.');
+  }
+  return { steps, warnings };
+}

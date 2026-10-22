@@ -1442,3 +1442,100 @@
     .sd-summary { grid-template-columns: repeat(2, 1fr); }
     .sd-sample-head, .sd-sample-row { grid-template-columns: 2.4rem 1fr 1fr 1fr; }
   }
+
+  /* ── Modal «Receta propuesta desde CSV» (F3.4 — .cr-*) ─────── */
+  .cr-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.8rem;
+    font-size: 0.78rem;
+    color: var(--text2);
+  }
+  .cr-file {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 6px;
+    background: var(--teal-bg);
+    border: 1px solid var(--teal-bd);
+    color: var(--teal2);
+    max-width: 60%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cr-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    max-height: 260px;
+    overflow-y: auto;
+    margin-bottom: 0.7rem;
+  }
+  .cr-step {
+    display: grid;
+    grid-template-columns: 1.6rem auto 1fr;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.4rem 0.55rem;
+    border-radius: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border-subtle);
+    font-size: 0.76rem;
+  }
+  .cr-step-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 50%;
+    background: var(--teal-bg);
+    border: 1px solid var(--teal-bd);
+    color: var(--teal2);
+    font-size: 0.68rem;
+    font-weight: 600;
+  }
+  .cr-step-op { font-weight: 600; color: var(--text); white-space: nowrap; }
+  .cr-step-registry { color: var(--text-muted); font-family: var(--font-mono); font-size: 0.68rem; font-weight: 400; }
+  .cr-step-params {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--text2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cr-empty {
+    padding: 0.8rem;
+    text-align: center;
+    font-size: 0.78rem;
+    color: var(--text2);
+    background: var(--surface2);
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+  }
+
+  .cr-warnings { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.4rem; }
+  .cr-warn {
+    font-size: 0.72rem;
+    color: var(--yellow);
+    padding-left: 1.2rem;
+    position: relative;
+  }
+  .cr-warn::before {
+    content: '!';
+    position: absolute;
+    left: 0.2rem;
+    top: 0;
+    font-weight: 700;
+  }
+
+  .cr-status { margin-right: auto; font-size: 0.72rem; color: var(--text2); }
+
+  @media (max-width: 640px) {
+    .cr-step { grid-template-columns: 1.6rem 1fr; }
+    .cr-step-params { grid-column: 2; }
+  }
