@@ -826,3 +826,166 @@ function applyRecipeResult(data) {
   loadLineage(); // refrescar linaje en segundo plano (F3.3)
   toast(`Receta aplicada: ${data.applied} paso(s)`);
 }
+
+// ── Diff de paso — «¿Qué cambió este paso?» (roadmap) ─────────────────────
+// Botón en cada tarjeta del pipeline → POST /step_diff {index} (solo
+// lectura: compara history[index] contra history[index+1]) → resumen
+// (formas, filas/columnas, celdas cambiadas) + muestra de hasta 20 celdas
+// reales antes/después. Indexados por etiqueta de fila: un sort puro no
+// cuenta como cambio de valores.
+
+function closeStepDiff() {
+  const overlay = document.getElementById('stepdiff-overlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+async function openStepDiff(index) {
+  const overlay = document.getElementById('stepdiff-overlay');
+  document.getElementById('sd-step-badge').textContent = 'Paso ' + (index + 1);
+  document.getElementById('sd-op').textContent = '…';
+  document.getElementById('sd-params').textContent = '';
+  ['sd-shape', 'sd-rows', 'sd-cols-sum', 'sd-changed'].forEach(id => {
+    document.getElementById(id).textContent = '…';
+  });
+  document.getElementById('sd-cols-wrap').innerHTML = '';
+  document.getElementById('sd-sample-body').innerHTML = '';
+  document.getElementById('sd-sample-title').textContent = 'Celdas cambiadas';
+  setSdStatus('');
+  overlay.classList.add('open');
+
+  try {
+    const res = await fetch('/step_diff', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ index })
+    });
+    const d = await res.json();
+    if (!res.ok || d.error) {
+      closeStepDiff();
+      toast(d.error || 'Error al calcular el diff', 'error');
+      return;
+    }
+    renderStepDiff(d);
+  } catch (e) {
+    closeStepDiff();
+    toast('Error al calcular el diff', 'error');
+  }
+}
+
+function setSdStatus(text, kind) {
+  const el = document.getElementById('sd-status');
+  el.textContent = text || '';
+  el.className = 'sd-status' + (kind ? ' ' + kind : '');
+}
+
+function renderStepDiff(d) {
+  document.getElementById('sd-op').textContent = d.op.replace(/_/g, ' ');
+  const params = Object.entries(d.params || {})
+    .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+    .join(' · ');
+  document.getElementById('sd-params').textContent = params;
+
+  // ── Chips de resumen
+  const [br, bc] = d.before_shape, [ar, ac] = d.after_shape;
+  document.getElementById('sd-shape').textContent = `${br}×${bc} → ${ar}×${ac}`;
+
+  const rowsEl = document.getElementById('sd-rows');
+  if (!d.aligned) {
+    rowsEl.textContent = '—';
+  } else if (d.rows_removed || d.rows_added) {
+    rowsEl.innerHTML = '';
+    if (d.rows_removed) rowsEl.appendChild(sdDelta(`−${d.rows_removed}`, 'sd-neg'));
+    if (d.rows_added) rowsEl.appendChild(sdDelta(`+${d.rows_added}`, 'sd-pos'));
+  } else if (d.reordered) {
+    rowsEl.textContent = 'reordenadas';
+    rowsEl.classList.add('sd-warn');
+  } else {
+    rowsEl.textContent = 'iguales';
+  }
+
+  const colsEl = document.getElementById('sd-cols-sum');
+  colsEl.innerHTML = '';
+  if (d.columns_removed.length) colsEl.appendChild(sdDelta(`−${d.columns_removed.join(', ')}`, 'sd-neg'));
+  if (d.columns_added.length) colsEl.appendChild(sdDelta(`+${d.columns_added.join(', ')}`, 'sd-pos'));
+  if (!colsEl.children.length) colsEl.textContent = 'iguales';
+
+  document.getElementById('sd-changed').textContent =
+    d.changed_cells === null ? 'no comparable' : String(d.changed_cells);
+
+  // ── Deltas por columna (solo las que cambiaron)
+  const wrap = document.getElementById('sd-cols-wrap');
+  wrap.innerHTML = '';
+  if (d.columns.length) {
+    const list = document.createElement('div');
+    list.className = 'sd-cols-list';
+    list.setAttribute('role', 'list');
+    d.columns.forEach(c => {
+      const item = document.createElement('div');
+      item.className = 'sd-col-item';
+      item.setAttribute('role', 'listitem');
+      const bits = [];
+      bits.push(`<span class="sd-col-name">${escapeHtml(c.column)}</span>`);
+      if (c.dtype_before !== c.dtype_after) {
+        bits.push(`<span class="sd-tag sd-tag-type">${escapeHtml(c.dtype_before)} → ${escapeHtml(c.dtype_after)}</span>`);
+      }
+      if (c.nulls_before !== c.nulls_after) {
+        bits.push(`<span class="sd-tag ${c.nulls_after < c.nulls_before ? 'sd-pos' : 'sd-neg'}">nulos ${c.nulls_before} → ${c.nulls_after}</span>`);
+      }
+      if (c.unique_before !== c.unique_after) {
+        bits.push(`<span class="sd-tag">únicos ${c.unique_before} → ${c.unique_after}</span>`);
+      }
+      if (c.changed) bits.push(`<span class="sd-tag sd-tag-cells">${c.changed} celda(s)</span>`);
+      item.innerHTML = bits.join('');
+      list.appendChild(item);
+    });
+    wrap.appendChild(list);
+  }
+  if (d.columns_unchanged) {
+    const more = document.createElement('div');
+    more.className = 'sd-unchanged';
+    more.textContent = `${d.columns_unchanged} columna(s) sin cambios`;
+    wrap.appendChild(more);
+  }
+
+  // ── Muestra de celdas
+  const body = document.getElementById('sd-sample-body');
+  body.innerHTML = '';
+  const title = document.getElementById('sd-sample-title');
+  if (!d.sample.length) {
+    title.textContent = d.changed_cells === null
+      ? 'Celdas cambiadas — no comparable (índice duplicado)'
+      : 'Sin cambios de valores en las filas comunes';
+    document.getElementById('sd-sample').style.display = 'none';
+  } else {
+    title.textContent = d.sample_truncated
+      ? `Celdas cambiadas (primeras ${d.sample.length} de ${d.changed_cells})`
+      : `Celdas cambiadas (${d.sample.length})`;
+    document.getElementById('sd-sample').style.display = '';
+    d.sample.forEach(s => {
+      const row = document.createElement('div');
+      row.className = 'sd-sample-row';
+      row.setAttribute('role', 'row');
+      row.innerHTML =
+        `<span class="sd-mono sd-dim" role="cell">${escapeHtml(String(s.row))}</span>`
+        + `<span class="sd-mono" role="cell">${escapeHtml(s.column)}</span>`
+        + `<span class="sd-mono sd-before" role="cell">${sdCellValue(s.before)}</span>`
+        + `<span class="sd-mono sd-after" role="cell">${sdCellValue(s.after)}</span>`;
+      body.appendChild(row);
+    });
+  }
+
+  setSdStatus('Solo lectura — no modifica tus datos');
+}
+
+function sdDelta(text, cls) {
+  const s = document.createElement('span');
+  s.className = 'sd-delta ' + cls;
+  s.textContent = text;
+  return s;
+}
+
+// Celda para la tabla antes/después: null → etiqueta tenue, resto escapado
+function sdCellValue(v) {
+  if (v === null) return '<span class="sd-nullcell">null</span>';
+  return escapeHtml(String(v));
+}
