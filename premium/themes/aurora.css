@@ -1,0 +1,78 @@
+/* Cat_flip Premium — tema «Aurora» (paleta violeta, Open Core).
+   Define el set COMPLETO de tokens bajo [data-theme="aurora"]: el botón
+   de tema lo aplica como paleta fija (independiente del sistema) y el
+   fichero se sirve desde /premium/themes/aurora.css SOLO con licencia. */
+[data-theme="aurora"] {
+  color-scheme: light; /* widgets nativos → tema claro */
+
+  /* Escala violeta (sustituye la teal del core) */
+  --teal-50:  #f5f2fd;
+  --teal-100: #eae3fc;
+  --teal-200: #d0c0f6;
+  --teal-300: #b19bee;
+  --teal-400: #8a63e0;
+  --teal-500: #5f3bbf;   /* ≥4.6:1 sobre los tintes violeta */
+  --teal-600: #4f31a3;
+
+  /* Superficies y canvas */
+  --bg-main: #f6f4fc;
+  --base:    #f6f4fc;
+  --base2:   #efebfa;
+  --surface:         rgba(255,255,255,0.72);
+  --surface-elevated: rgba(255,255,255,0.88);
+  --surface-glass:   rgba(240,235,252,0.60);
+  --surface2:        rgba(255,255,255,0.52);
+  --glass:           rgba(240,235,252,0.60);
+
+  /* Acento */
+  --teal:    var(--teal-500);
+  --teal2:   var(--teal-600);
+  --teal-bg: rgba(110,74,214,0.08);
+  --teal-bd: rgba(110,74,214,0.22);
+
+  /* Semánticos (mismos valores AA del core: naranja/verde/rojo/ámbar) */
+  --orange:        #a5500a;
+  --orange-bg:     rgba(226,109,13,0.10);
+  --orange-bd:     rgba(226,109,13,0.30);
+  --color-mutation:#a5500a;
+  --green:         #21754f;
+  --red:           #af4040;
+  --red-bg:        rgba(175,64,64,0.10);
+  --red-bd:        rgba(175,64,64,0.35);
+  --yellow:        #8c6513;
+
+  /* Logo */
+  --logo-disc: var(--teal);
+  --logo-cat:  #ffffff;
+
+  /* Texto (≥4.6:1 sobre #f6f4fc) */
+  --text-primary:   #241b3d;
+  --text-secondary: #554977;
+  --text-muted:     #5e5386;
+  --text:  var(--text-primary);
+  --text2: var(--text-secondary);
+
+  /* Bordes */
+  --border-subtle: rgba(110,74,214,0.08);
+  --border:  rgba(110,74,214,0.15);
+  --border2: rgba(110,74,214,0.08);
+
+  /* Sombras glass */
+  --shadow-glass:        0 8px 32px rgba(110,74,214,0.06), 0 2px 8px rgba(0,0,0,0.02);
+  --shadow-glass-sm:     0 4px 16px rgba(110,74,214,0.04);
+  --shadow-glass-hover:  0 12px 36px rgba(110,74,214,0.12);
+  --shadow-glass-active: 0 4px 18px rgba(110,74,214,0.22);
+  --shadow:  var(--shadow-glass);
+  --shadow2: 0 8px 32px rgba(110,74,214,0.12);
+
+  /* Tabla */
+  --row-alt:   rgba(240,235,252,0.40);
+  --row-hover: rgba(110,74,214,0.10);
+}
+
+/* Orbes del body en clave violeta (más específico que `body` de base.css) */
+[data-theme="aurora"] body {
+  background-image:
+    radial-gradient(ellipse 80% 50% at 20% 0%, rgba(110,74,214,0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(240,235,252,0.9) 0%, transparent 60%);
+}

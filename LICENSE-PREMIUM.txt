@@ -1,0 +1,51 @@
+LICENCIA COMERCIAL DE CAT_FLIP — BORRADOR
+==========================================
+
+AVISO: este documento es un BORRADOR de trabajo para el modelo Open Core
+de Cat_flip. Debe ser revisado por un abogado antes de ofrecerse o
+aceptarse comercialmente.
+
+1. SUPERPOSICIÓN CON LA LICENCIA MIT
+------------------------------------
+
+El código de Cat_flip distribuido en este repositorio se ofrece bajo la
+licencia MIT (archivo LICENSE). Mientras no exista un Acuerdo de Licencia
+Comercial firmado entre el titular del copyright (lpardo303) y una
+persona jurídica, la licencia MIT es la única aplicable.
+
+2. LICENCIA COMERCIAL (OPCIONAL)
+
+Cualquier persona jurídica que desee utilizar Cat_flip de las siguientes
+maneras debe adquirir una Licencia Comercial:
+
+  a) Incrustar Cat_flip (total o parcialmente) en un producto
+     propietario que se distribuya a terceros.
+  b) Distribuir binarios modificados de Cat_flip (por ejemplo, builds
+     firmados del paquete premium/) sin publicar su código fuente.
+  c) Ofrecer Cat_flip como servicio gestionado (SaaS) a terceros.
+
+3. ALCANCE DE LA LICENCIA COMERCIAL
+
+Sujeto al pago correspondiente y a los términos del Acuerdo, el titular
+concede a la persona jurídica una licencia no exclusiva, transferible y
+libre de regalías para usar, modificar y distribuir Cat_flip, incluido
+el paquete premium/, según los límites acordados en el Acuerdo.
+
+4. CONTACTO
+
+Solicitudes de Licencia Comercial:
+  - GitHub Sponsors: https://github.com/sponsors/lpardo303
+  - Ko-fi:           https://ko-fi.com/lpardo303
+
+5. GARANTÍA
+
+La Licencia Comercial se ofrece "TAL CUAL", sin garantía de ningún tipo,
+en la misma medida que la licencia MIT, salvo lo estipulado
+expresamente por escrito en el Acuerdo.
+
+6. DURACIÓN Y TERMINACIÓN
+
+La Licencia Comercial termina automáticamente si los términos del
+Acuerdo se incumplen. En tal caso, el uso debe cesar y el código
+volverá a regirse únicamente por la licencia MIT para usos que esta
+permite.

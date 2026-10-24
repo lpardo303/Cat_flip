@@ -9,6 +9,21 @@ siguiente corte.
 
 ## [Sin publicar]
 
+### Añadido
+
+- **Open Core — paquete `premium/`** con gating server-side (env var
+  `CATFLIP_PREMIUM_KEY` o fichero `premium.key`): endpoints
+  `/premium/status` y `/premium/themes/<id>.css` (lista vacía y 404 sin
+  licencia, id validado contra el manifiesto) y los primeros features
+  premium — **temas Aurora y Solar**: el botón de tema amplía su ciclo a
+  Claro → Oscuro → Automático → Aurora → Solar, con CSS servido solo
+  desde el servidor.
+- **Licencia dual**: `LICENSE-PREMIUM.txt` (borrador de licencia
+  comercial para uso empresarial embebido) y nota al pie de `LICENSE`;
+  el texto MIT queda intacto.
+- Gate de axe ampliado a **13 corridas** (paletas Aurora y Solar con el
+  servidor licenciado — la CI levanta con `CATFLIP_PREMIUM_KEY`).
+
 ## [1.0.0] - 2026-10-23
 
 Primera versión completa: ETL local con recetas reproducibles, CLI,

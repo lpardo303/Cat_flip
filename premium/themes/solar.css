@@ -1,0 +1,78 @@
+/* Cat_flip Premium — tema «Solar» (paleta ámbar cálida, Open Core).
+   Define el set COMPLETO de tokens bajo [data-theme="solar"]: el botón
+   de tema lo aplica como paleta fija (independiente del sistema) y el
+   fichero se sirve desde /premium/themes/solar.css SOLO con licencia. */
+[data-theme="solar"] {
+  color-scheme: light; /* widgets nativos → tema claro */
+
+  /* Escala ámbar (sustituye la teal del core) */
+  --teal-50:  #fdf8ef;
+  --teal-100: #fbeed4;
+  --teal-200: #f4d9a5;
+  --teal-300: #eabf6d;
+  --teal-400: #cf9426;
+  --teal-500: #8a5608;   /* ≥4.6:1 incluso sobre el tinte del badge (medido: 5.06:1) */
+  --teal-600: #744906;
+
+  /* Superficies y canvas */
+  --bg-main: #fdf9f2;
+  --base:    #fdf9f2;
+  --base2:   #f9f1e3;
+  --surface:         rgba(255,255,255,0.72);
+  --surface-elevated: rgba(255,255,255,0.88);
+  --surface-glass:   rgba(253,244,228,0.60);
+  --surface2:        rgba(255,255,255,0.52);
+  --glass:           rgba(253,244,228,0.60);
+
+  /* Acento */
+  --teal:    var(--teal-500);
+  --teal2:   var(--teal-600);
+  --teal-bg: rgba(190,130,40,0.08);
+  --teal-bd: rgba(190,130,40,0.22);
+
+  /* Semánticos (mismos valores AA del core) */
+  --orange:        #a5500a;
+  --orange-bg:     rgba(226,109,13,0.10);
+  --orange-bd:     rgba(226,109,13,0.30);
+  --color-mutation:#a5500a;
+  --green:         #21754f;
+  --red:           #af4040;
+  --red-bg:        rgba(175,64,64,0.10);
+  --red-bd:        rgba(175,64,64,0.35);
+  --yellow:        #8c6513;
+
+  /* Logo */
+  --logo-disc: var(--teal);
+  --logo-cat:  #ffffff;
+
+  /* Texto (≥4.6:1 sobre #fdf9f2) */
+  --text-primary:   #2f2512;
+  --text-secondary: #6a5533;
+  --text-muted:     #77613e;
+  --text:  var(--text-primary);
+  --text2: var(--text-secondary);
+
+  /* Bordes */
+  --border-subtle: rgba(190,130,40,0.08);
+  --border:  rgba(190,130,40,0.15);
+  --border2: rgba(190,130,40,0.08);
+
+  /* Sombras glass */
+  --shadow-glass:        0 8px 32px rgba(190,130,40,0.06), 0 2px 8px rgba(0,0,0,0.02);
+  --shadow-glass-sm:     0 4px 16px rgba(190,130,40,0.04);
+  --shadow-glass-hover:  0 12px 36px rgba(190,130,40,0.12);
+  --shadow-glass-active: 0 4px 18px rgba(190,130,40,0.22);
+  --shadow:  var(--shadow-glass);
+  --shadow2: 0 8px 32px rgba(190,130,40,0.12);
+
+  /* Tabla */
+  --row-alt:   rgba(249,241,227,0.40);
+  --row-hover: rgba(190,130,40,0.10);
+}
+
+/* Orbes del body en clave ámbar (más específico que `body` de base.css) */
+[data-theme="solar"] body {
+  background-image:
+    radial-gradient(ellipse 80% 50% at 20% 0%, rgba(190,130,40,0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(253,244,228,0.9) 0%, transparent 60%);
+}

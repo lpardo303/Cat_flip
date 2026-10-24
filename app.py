@@ -8,6 +8,10 @@ import json
 import base64
 import time
 
+# Open Core: gating de features premium (la licencia decide qué sirve
+# /premium/status y /premium/themes/<id>.css — sin ella, 404/lista vacía)
+import premium as premium_pkg
+
 from operations import (
     OPS,
     detect_pii_columns,
@@ -1278,6 +1282,32 @@ def benchmark():
         "steps": steps,
         "total_ms": round(sum(st["ms"] for st in steps), 2),
     })
+
+
+# ── OPEN CORE / PREMIUM ───────────────────────────────────────────────
+@app.route("/premium/status", methods=["GET"])
+def premium_status():
+    """Licencia premium y manifiesto de temas (Open Core).
+
+    Sin licencia devuelve la lista vacía: el front no puede ni conocer los
+    ids, y el CSS se niega aparte en /premium/themes/<id>.css. SOLO LEE.
+    """
+    if premium_pkg.is_licensed():
+        return jsonify({"licensed": True, "themes": premium_pkg.theme_manifest()})
+    return jsonify({"licensed": False, "themes": []})
+
+
+@app.route("/premium/themes/<theme_id>.css", methods=["GET"])
+def premium_theme_css(theme_id):
+    """CSS de un tema premium — 404 sin licencia o con id desconocido.
+
+    `premium.theme_css` valida el id contra el manifiesto antes de leer
+    el fichero (la ruta sale del manifiesto, nunca del usuario).
+    """
+    css = premium_pkg.theme_css(theme_id)
+    if css is None:
+        return jsonify({"error": "No encontrado."}), 404
+    return css, 200, {"Content-Type": "text/css; charset=utf-8"}
 
 
 if __name__ == "__main__":

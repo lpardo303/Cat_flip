@@ -1,15 +1,18 @@
-// Gate de accesibilidad (F3.4 + dark mode automático): abre Cat_flip con
-// Playwright y ejecuta axe (WCAG 2.0 A/AA) en 11 corridas — la página base
-// en modo Automático con el sistema en oscuro (prefers-color-scheme, perfil
-// sin localStorage) y después tema claro y oscuro explícitos sobre 5
-// superficies: página base, modal «Receta desde CSV», modal de conectores
-// demo, modal de validación de esquema y la pestaña Diagnóstico con el
-// heatmap de correlaciones. Además verifica que el cambio en vivo del
+// Gate de accesibilidad (F3.4 + dark mode automático + Open Core): abre
+// Cat_flip con Playwright y ejecuta axe (WCAG 2.0 A/AA) en 13 corridas —
+// la página base en modo Automático con el sistema en oscuro
+// (prefers-color-scheme, perfil sin localStorage); tema claro y oscuro
+// explícitos sobre 5 superficies (página base, modal «Receta desde CSV»,
+// modal de conectores demo, modal de validación de esquema y la pestaña
+// Diagnóstico con el heatmap); y las 2 paletas premium (Aurora, Solar)
+// con el servidor licenciado. Además verifica que el cambio en vivo del
 // sistema re-aplica el tema (listener del matchMedia en modo 'auto') y
 // escribe violations.json. Sale con código 1 si hay fallos o
 // violaciones, así la CI falla sin parsear la consola.
 //
 // Uso: con el servidor corriendo (python app.py), `npm run test:axe`.
+// El servidor debe levantar CON licencia premium (CATFLIP_PREMIUM_KEY)
+// si no, las corridas premium fallan — la CI lo hace así.
 // Variables: AXE_BASE_URL (default http://127.0.0.1:5050), AXE_OUT.
 import { chromium } from 'playwright';
 import { createRequire } from 'node:module';
@@ -158,6 +161,48 @@ try {
     await page.waitForSelector('#corr-grid table');
     await runAxe(page, `diagnóstico-correlaciones (${theme})`);
     await page.evaluate(() => switchTab('data'));
+  }
+
+  // ── Superficies premium (Open Core): Aurora y Solar ─────────────────
+  // Usa el mismo mecanismo que el usuario (themeMode + applyTheme + link
+  // /premium/themes/<id>.css). Sin licencia en el servidor, FALLO: el
+  // gate de CI siempre levanta con CATFLIP_PREMIUM_KEY, así las 13
+  // corridas son reales y nunca se omiten en silencio.
+  const premium = await page.evaluate(() =>
+    fetch('/premium/status').then(r => r.json()).catch(() => null));
+  if (!(premium && premium.licensed && premium.themes.length)) {
+    console.log('temas premium: FALLO — servidor sin licencia (levántalo con CATFLIP_PREMIUM_KEY)');
+    results.push({ label: 'temas-premium', violations: [], error: 'servidor sin licencia premium' });
+    failures += 1;
+  } else {
+    for (const t of premium.themes) {
+      await page.evaluate(async (id) => {
+        themeMode = id;
+        applyTheme();
+        await new Promise(resolve => {
+          const link = document.getElementById('premium-theme-css');
+          if (!link) return resolve();
+          if (link.sheet) return resolve();
+          link.addEventListener('load', resolve, { once: true });
+          link.addEventListener('error', resolve, { once: true });
+          setTimeout(resolve, 3000);
+        });
+      }, t.id);
+      const applied = await page.evaluate(id => ({
+        mode: document.documentElement.getAttribute('data-theme-mode') === id,
+        theme: document.documentElement.getAttribute('data-theme') === id,
+        css: !!(document.getElementById('premium-theme-css') || {}).sheet,
+      }), t.id);
+      if (!applied.mode || !applied.theme || !applied.css) {
+        console.log(`tema premium ${t.name}: FALLO — no aplicó (${JSON.stringify(applied)})`);
+        results.push({ label: `tema-premium-${t.id}`, violations: [], error: 'tema premium no aplicado' });
+        failures += 1;
+      } else {
+        await runAxe(page, `tema premium ${t.name}`);
+      }
+    }
+    // Deja el DOM como lo dejó el bucle de claro/oscuro
+    await page.evaluate(() => { themeMode = 'light'; applyTheme(); });
   }
 } catch (err) {
   console.error('Error inesperado del gate de axe:', err);

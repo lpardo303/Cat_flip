@@ -1,37 +1,96 @@
 // Cat_flip — tema, paneles colapsables, init, listeners globales
-// ── TEMA (light | dark | auto — prefers-color-scheme) ────────────────────────────────────────────────────────────────
-// Tres estados: 'light' y 'dark' son elección manual persistida; 'auto'
-// (valor por defecto y resultado de no tener clave guardada) sigue la
-// preferencia del sistema `prefers-color-scheme` y se re-aplica en vivo
-// cuando el SO cambia. El ciclo del botón es Claro → Oscuro → Automático.
-const THEME_NEXT  = { light: 'dark', dark: 'auto', auto: 'light' };
-const THEME_LABEL = { light: 'Oscuro', dark: 'Auto', auto: 'Claro' };       // texto del botón = siguiente estado
-const THEME_NAME  = { light: 'Claro', dark: 'Oscuro', auto: 'Automático' }; // nombre del estado actual (aria/title)
+// ── TEMA (light | dark | auto | temas premium Open Core) ─────────────────────────────────────────────────────────
+// 'light' y 'dark' son elección manual persistida; 'auto' (por defecto y
+// resultado de no tener clave guardada) sigue `prefers-color-scheme` con
+// re-aplicación en vivo. Los ids premium ('aurora', 'solar', …) llegan de
+// /premium/status — solo existen con licencia y el CSS se inyecta desde
+// /premium/themes/<id>.css. Ciclo del botón sin licencia:
+// Claro → Oscuro → Automático; con licencia se amplía tras Automático con
+// cada tema del manifiesto y vuelta a Claro.
+const THEME_SHORT = { light: 'Claro', dark: 'Oscuro', auto: 'Auto' };
+const THEME_NAME  = { light: 'Claro', dark: 'Oscuro', auto: 'Automático' };
 let themeMode = 'auto';
+let premiumThemes = [];   // [{id, name}] del servidor — vacío sin licencia
 const schemeMQ = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+
+function premiumThemeById(id) {
+  return premiumThemes.find(t => t.id === id) || null;
+}
+
+function themeOrder() {
+  return ['light', 'dark', 'auto'].concat(premiumThemes.map(t => t.id));
+}
+
+function themeNext(mode) {
+  const order = themeOrder();
+  const i = order.indexOf(mode);
+  return order[(i + 1) % order.length]; // id desconocido (−1) → 'light'
+}
+
+function themeDisplayName(mode) {
+  const p = premiumThemeById(mode);
+  return p ? p.name : (THEME_NAME[mode] || THEME_NAME.auto);
+}
+
+function ensurePremiumCss(id) {
+  const href = '/premium/themes/' + encodeURIComponent(id) + '.css';
+  let link = document.getElementById('premium-theme-css');
+  if (!link) {
+    link = document.createElement('link');
+    link.id = 'premium-theme-css';
+    link.rel = 'stylesheet';
+    document.head.appendChild(link);
+  }
+  if (link.getAttribute('href') !== href) link.setAttribute('href', href);
+}
 
 function applyTheme() {
   const html = document.documentElement;
+  const premium = premiumThemeById(themeMode);
   const dark = themeMode === 'dark' || (themeMode === 'auto' && !!(schemeMQ && schemeMQ.matches));
   html.setAttribute('data-theme-mode', themeMode);
-  if (dark) html.setAttribute('data-theme', 'dark');
-  else html.removeAttribute('data-theme');
+  if (premium) {
+    ensurePremiumCss(premium.id);       // paleta fija, ignora el sistema
+    html.setAttribute('data-theme', premium.id);
+  } else if (dark) {
+    html.setAttribute('data-theme', 'dark');
+  } else {
+    html.removeAttribute('data-theme');
+  }
+  const next = themeNext(themeMode);
+  const nextPremium = premiumThemeById(next);
   const label = document.getElementById('theme-label');
-  if (label) label.textContent = THEME_LABEL[themeMode];
+  if (label) label.textContent = nextPremium ? nextPremium.name : THEME_SHORT[next];
   const btn = document.getElementById('theme-toggle');
   if (btn) {
-    btn.title = 'Cambiar tema (actual: ' + THEME_NAME[themeMode] + ')';
-    btn.setAttribute('aria-label', 'Cambiar tema — actual: ' + THEME_NAME[themeMode]);
+    const name = themeDisplayName(themeMode);
+    btn.title = 'Cambiar tema (actual: ' + name + ')';
+    btn.setAttribute('aria-label', 'Cambiar tema — actual: ' + name);
   }
 }
 
 (function initTheme() {
   let saved = null;
   try { saved = localStorage.getItem('catflip-theme'); } catch (e) {}
-  // Clave ausente o legada → 'auto': nuevas visitas siguen el sistema
-  themeMode = (saved === 'light' || saved === 'dark') ? saved : 'auto';
+  // Se respeta cualquier valor guardado (los ids premium se confirman
+  // contra /premium/status justo después); sin clave → 'auto'.
+  themeMode = saved || 'auto';
   applyTheme();
 })();
+
+// Licencia premium (Open Core): confirma/corrige el modo guardado y
+// amplía el ciclo del botón con los temas del manifiesto del servidor.
+// Un id premium guardado sin licencia degrada a 'auto' aquí mismo.
+async function initPremiumThemes() {
+  try {
+    const res = await fetch('/premium/status');
+    const data = await res.json();
+    premiumThemes = (data.licensed && Array.isArray(data.themes)) ? data.themes : [];
+  } catch (e) { premiumThemes = []; }
+  if (themeOrder().indexOf(themeMode) === -1) themeMode = 'auto';
+  applyTheme();
+}
+initPremiumThemes();
 
 // Cambios del sistema: solo re-aplican si el usuario no forzó claro/oscuro
 if (schemeMQ) {
@@ -41,7 +100,7 @@ if (schemeMQ) {
 }
 
 function toggleTheme() {
-  themeMode = THEME_NEXT[themeMode];
+  themeMode = themeNext(themeMode);
   try { localStorage.setItem('catflip-theme', themeMode); } catch (e) {}
   applyTheme();
 }

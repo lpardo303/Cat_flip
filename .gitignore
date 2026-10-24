@@ -67,3 +67,6 @@ htmlcov/
 # Node (gate de axe en CI, F3.4)
 node_modules/
 violations.json
+
+# Licencia premium local (Open Core) — nunca subir
+premium.key
