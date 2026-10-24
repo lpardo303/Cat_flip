@@ -325,12 +325,54 @@
   .layout {
     display: grid;
     grid-template-columns: var(--panel-left-w) 1fr var(--panel-right-w);
-    height: calc(100vh - var(--ribbon-total));
+    /* header = --ribbon-total + 1px de border-bottom; sin ese píxel la suma
+       excedía 100vh y la página siempre tuvo 1px de scroll */
+    height: calc(100vh - var(--ribbon-total) - 1px - var(--footer-h));
     transition: grid-template-columns 0.28s ease;
   }
   .layout.left-collapsed  { grid-template-columns: var(--rail-w) 1fr var(--panel-right-w); }
   .layout.right-collapsed { grid-template-columns: var(--panel-left-w) 1fr var(--rail-w); }
   .layout.both-collapsed  { grid-template-columns: var(--rail-w) 1fr var(--rail-w); }
+
+  /* ── FOOTER DE APOYO (roadmap: Ko-fi / GitHub Sponsors) ── */
+  .app-footer {
+    height: var(--footer-h);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0 0.9rem;
+    background: var(--glass);
+    backdrop-filter: blur(12px) saturate(1.4);
+    -webkit-backdrop-filter: blur(12px) saturate(1.4);
+    border-top: 1px solid var(--border-subtle);
+    font-size: 0.74rem;
+    color: var(--text-muted);   /* F0.6: ≥4.6:1 en ambos temas */
+    position: relative;
+    z-index: 1;                 /* por encima de los orbes fixed (z-index: 0) */
+  }
+  .app-footer .footer-brand { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .app-footer .footer-support { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+  .app-footer .footer-link { color: var(--text-secondary); text-decoration: underline; text-underline-offset: 2px; }
+  .app-footer .footer-link:hover { color: var(--teal); }
+  .app-footer .footer-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.15rem 0.6rem;
+    border-radius: var(--radius2);
+    border: 1px solid var(--teal-bd);
+    background: var(--teal-bg);
+    color: var(--teal);        /* teal-500 sobre tinte: ≥4.6:1 validado en F0.6 */
+    font-weight: 600;
+    text-decoration: none;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .app-footer .footer-btn:hover { background: var(--teal); color: var(--base); }
+  .app-footer .footer-btn:focus-visible, .app-footer .footer-link:focus-visible {
+    outline: 2px solid var(--teal);
+    outline-offset: 2px;
+  }
 
   /* ── PANEL SHARED STYLES ───────────────────────────────── */
   .panel {

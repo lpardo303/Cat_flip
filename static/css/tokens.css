@@ -84,6 +84,7 @@
     --rail-w: 48px;      /* ancho de panel colapsado a rail */
     --panel-left-w: 256px;
     --panel-right-w: 240px;
+    --footer-h: 36px;      /* footer de apoyo Ko-fi / Sponsors (roadmap) */
   }
 
   /* ── TEMA OSCURO ───────────────────────────────────────── */

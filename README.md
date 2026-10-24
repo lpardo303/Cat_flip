@@ -1,5 +1,8 @@
 # 🐈 Cat_flip - Studio ETL
 
+[![Ko-fi](https://img.shields.io/badge/Ko-fi-%23FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/lpardo303)
+[![GitHub Sponsors](https://img.shields.io/badge/GitHub-Sponsors-f0f2f4?logo=githubsponsors&logoColor=black)](https://github.com/sponsors/lpardo303)
+
 > Plataforma local de transformación de datos para Linux y Windows, construida con Python (Flask + pandas) y una interfaz web moderna.
 
 **Cat_flip** es una alternativa ligera, diáfana y rápida a herramientas ETL pesadas (como Power Query), diseñada para ingenieros de datos y analistas que quieren procesar datos sin escribir código. Permite construir pipelines empresariales mediante una interfaz visual intuitiva, generando código Python/Pandas en tiempo real a medida que se aplican las transformaciones.
@@ -112,6 +115,18 @@ npm run test:axe
 
 * **Backend:** `Flask` expone los endpoints REST. `Pandas` funciona como el motor de cálculo en memoria.
 * **Frontend:** Vanilla JS, HTML5 y CSS3. Cero dependencias pesadas en el cliente. Interfaz reactiva comunicada vía `fetch()`.
+
+## ☕ Apoya el proyecto
+
+Cat_flip es y seguirá siendo **gratuito y de código abierto (MIT)**: nada de esto se traslada a funciones de pago ni telemetría. Si el proyecto te ahorra tiempo, puedes invitarme un café por [**Ko-fi**](https://ko-fi.com/lpardo303) o apoyar su desarrollo con [**GitHub Sponsors**](https://github.com/sponsors/lpardo303) — los mismos enlaces viven en el footer de la app. El apoyo es voluntario y solo sostiene el ritmo de desarrollo del core.
+
+## 🤝 Contribuir
+
+Las contribuciones son bienvenidas. Lee [CONTRIBUTING.md](CONTRIBUTING.md) para el flujo completo: puesta en marcha, verificación obligatoria antes del PR (suite con gate de cobertura, `node --check` y gate de axe) y convenciones de código, diseño y accesibilidad.
+
+## 📋 Changelog
+
+Los cambios por versión se documentan en [CHANGELOG.md](CHANGELOG.md) (formato Keep a Changelog, versionado semántico).
 
 ## 📄 Licencia
 
