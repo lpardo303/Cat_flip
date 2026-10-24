@@ -369,6 +369,7 @@ function handleOpResponse(op, params, data, notify = true) {
   updateUndoRedoButtons(true, false);
   loadStats();   // refrescar diagnóstico en segundo plano
   loadCorrelations(); // heatmap de correlaciones al día
+  loadBenchmark(); // barra de benchmark al día
   loadLineage(); // refrescar linaje en segundo plano (F3.3)
   refreshValidation(); // revalidar reglas de esquema contra el nuevo df
   if (notify) toast(op.replace(/_/g, ' ') + ' aplicado');
@@ -404,6 +405,7 @@ async function undo() {
   updateUndoRedoButtons(data.can_undo, data.can_redo);
   loadStats(); // refrescar diagnóstico en segundo plano
   loadCorrelations(); // heatmap de correlaciones al día
+  loadBenchmark(); // barra de benchmark al día
   loadLineage(); // refrescar linaje en segundo plano (F3.3)
   refreshValidation(); // revalidar reglas de esquema contra el nuevo df
   toast('Paso deshecho', 'info');
@@ -420,6 +422,7 @@ async function redo() {
   updateUndoRedoButtons(data.can_undo, data.can_redo);
   loadStats(); // refrescar diagnóstico en segundo plano
   loadCorrelations(); // heatmap de correlaciones al día
+  loadBenchmark(); // barra de benchmark al día
   loadLineage(); // refrescar linaje en segundo plano (F3.3)
   refreshValidation(); // revalidar reglas de esquema contra el nuevo df
   toast('Paso rehecho', 'info');
@@ -834,12 +837,17 @@ function epFail(msg) {
 function applyRecipeResult(data) {
   renderTable(data.data);
   updateCode(data.code);
-  pipelineSteps = data.steps.map(s => ({ op: s.op, params: s.params }));
+  // El servidor hace op_history.extend(applied): la receta AÑADE pasos al
+  // pipeline existente, no lo reemplaza (antes las tarjetas y los índices
+  // del diff se desalineaban del linaje al aplicar una receta con ops
+  // previas — el benchmark lo hizo visible con 5 pasos vs 2 tarjetas).
+  pipelineSteps = pipelineSteps.concat(data.steps.map(s => ({ op: s.op, params: s.params })));
   redoSteps = []; // receta aplicada → avance del pipeline
   updateUndoRedoButtons(true, false);
   renderPipeline();
   loadStats();   // refrescar diagnóstico en segundo plano
   loadCorrelations(); // heatmap de correlaciones al día
+  loadBenchmark(); // barra de benchmark al día
   loadLineage(); // refrescar linaje en segundo plano (F3.3)
   refreshValidation(); // revalidar reglas de esquema contra el nuevo df
   toast(`Receta aplicada: ${data.applied} paso(s)`);

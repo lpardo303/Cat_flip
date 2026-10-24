@@ -92,6 +92,7 @@ async function uploadFile(file, sheet) {
     enableOps();
     loadStats(); // refrescar diagnóstico en segundo plano
     loadCorrelations(); // heatmap de correlaciones al día
+    loadBenchmark(); // barra de benchmark al día
     toast('Archivo cargado: ' + data.data.shape[0] + ' filas × ' + data.data.shape[1] + ' columnas');
     // Codificación no-utf8 detectada (latin-1/cp1252): solo entonces hay campo
     if (data.detected_encoding) {

@@ -31,6 +31,12 @@ redo_history = []
 # entran en la receta ni en el script. Se limpian al cargar un archivo
 # nuevo; las violaciones se recalculan on-demand contra el df vigente.
 schema_rules = []
+# Tiempo por paso (barra de benchmark del roadmap): paralelo a
+# `op_history` — se trunca en cada avance y se rebana con zip al leer, así
+# un undo deja el valor disponible para que /redo lo recupere idéntico y
+# una op nueva descarta la cola de rehacer. Nunca entra en la receta ni
+# en el linaje.
+step_ms = []
 
 # Frame derecho para el cruce Join/Merge (op #19): fuente independiente del
 # pipeline (no participa en undo) más su expresión de carga para el script.
@@ -180,7 +186,7 @@ def read_table(file, sheet=None):
 
 @app.route("/upload", methods=["POST"])
 def upload():
-    global current_df, history, code_log, op_history, redo_history, schema_rules
+    global current_df, history, code_log, op_history, redo_history, schema_rules, step_ms
     file = request.files["file"]
     filename = file.filename.lower()
     
@@ -196,6 +202,7 @@ def upload():
         op_history = []
         redo_history = []  # dataset nuevo → la pila de rehacer no aplica
         schema_rules = []  # las reglas del dataset anterior no aplican
+        step_ms = []  # benchmark vacío con el dataset nuevo
         
         return jsonify({
             "success": True,
@@ -257,7 +264,7 @@ def get_sheets():
 
 @app.route("/operation", methods=["POST"])
 def operation():
-    global current_df, history, code_log, op_history, redo_history
+    global current_df, history, code_log, op_history, redo_history, step_ms
     if current_df is None:
         return jsonify({"error": "No hay datos cargados."}), 400
     
@@ -282,11 +289,15 @@ def operation():
             handler_params = {**(params or {}), "right_df": right_df, "right_code": right_code}
             history_params = {**(params or {}), "right_name": right_name}
 
+        _t0 = time.perf_counter()
         df, code = handler(current_df.copy(), handler_params)
+        ms = round((time.perf_counter() - _t0) * 1000, 1)
 
         # Guardar en historial
         history.append(df.copy())
         op_history.append({"op": op, "params": history_params})
+        del step_ms[len(op_history) - 1:]  # descarta la cola de rehacer
+        step_ms.append(ms)
         current_df = df
         code_log.append(f"# {op}\n{code}")
         # Avance del pipeline → rama de rehacer descartada (semántica estándar)
@@ -426,8 +437,9 @@ def apply_recipe_df(df, steps, right_df=None, right_code=None, on_step=None):
     del ExecutePipelineModal. Dos reglas:
       * `params` es el de la receta (serializable), nunca `handler_params`,
         que en `merge` arrastra el DataFrame derecho;
-      * el tiempo solo se mide si hay callback, así /apply_recipe y el
-        CLI siguen costando exactamente lo que costaban.
+      * el tiempo solo se mide si hay callback: el CLI pasa `None` y sigue
+        costando exactamente lo que costaba; `/apply_recipe` pasa el suyo
+        para alimentar la barra de benchmark.
     """
     df_work = df
     snaps, codes, applied = [], [], []
@@ -683,17 +695,24 @@ def apply_recipe():
     `history` recibe un snapshot por paso: Deshacer revierte paso a paso
     y el linaje muestra cada paso individual, igual que ops manuales.
     """
-    global current_df, history, code_log, op_history, redo_history
+    global current_df, history, code_log, op_history, redo_history, step_ms
     if current_df is None:
         return jsonify({"error": "No hay datos cargados. Carga un archivo antes de aplicar la receta."}), 400
 
     # Validación estructural ANTES de ejecutar nada: un paso malformado
     # ni siquiera llega al motor. Errores → 400 (lo trae la receta del
     # cliente, no el servidor).
+    # on_step alimenta el benchmark; si la receta truena, `mss` se tira a
+    # la basura con todo lo demás (step_ms solo se toca en el commit)
+    mss = []
+
+    def _bench(i, op, params, shape_in, shape_out, ms):
+        mss.append(ms)
+
     try:
         steps = validate_recipe(request.get_json(silent=True))
         df_work, snaps, codes, applied = apply_recipe_df(
-            current_df, steps, right_df, right_code
+            current_df, steps, right_df, right_code, on_step=_bench
         )
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
@@ -702,6 +721,8 @@ def apply_recipe():
     # puede quedar estado parcial por un paso a mitad de camino)
     history.extend(snaps)
     op_history.extend(applied)
+    del step_ms[len(op_history) - len(applied):]  # descarta la cola de rehacer
+    step_ms.extend(mss)
     code_log.extend(codes)
     current_df = df_work
     redo_history = []  # avance del pipeline → rama de rehacer descartada
@@ -1236,6 +1257,27 @@ def correlations():
         for row in corr.to_numpy()
     ]
     return jsonify({"columns": [str(c) for c in numeric], "matrix": matrix})
+
+
+@app.route("/benchmark", methods=["GET"])
+def benchmark():
+    """Tiempo por paso para la barra de benchmark (roadmap). SOLO LEE.
+
+    `step_ms` es paralelo a `op_history` y se rebana con `zip`: un undo
+    (que vacía `op_history` sin tocar `step_ms`) muestra solo los pasos
+    vivos y un `/redo` recupera el MISMO tiempo medido originalmente.
+    """
+    global current_df
+    if current_df is None:
+        return jsonify({"error": "No hay datos."}), 400
+    steps = [
+        {"op": s.get("op", "?"), "ms": m}
+        for s, m in zip(op_history, step_ms)
+    ]
+    return jsonify({
+        "steps": steps,
+        "total_ms": round(sum(st["ms"] for st in steps), 2),
+    })
 
 
 if __name__ == "__main__":

@@ -133,6 +133,12 @@ let currentDtypes = {};
 let currentOp = null;
 let currentSheetFile = null;
 let pipelineSteps = [];
+// Benchmark (GET /benchmark): [{op, ms}] alineado con pipelineSteps, el
+// índice del paso más lento y el total. Lo rellena loadBenchmark() y lo
+// consumen renderPipeline() (chip «N ms») y updateBench() (barra).
+let benchData = [];
+let benchTotal = 0;
+let benchSlow = -1;
 // Pasos rehacibles (popeados por undo, re-aplicados por redo). Se vacía
 // siempre que el pipeline avanza (op nueva, upload, receta) — el backend
 // hace lo mismo con su `redo_history`.
@@ -202,8 +208,68 @@ function renderPipeline() {
     const detail = Object.entries(s.params).map(([k,v]) => `${k}: ${Array.isArray(v)?v.join(','):v}`).join(' · ');
     // El detalle puede traer params de una receta ajena → escapar (F: diff)
     const detailSafe = escapeHtml(detail);
+    const ms = benchData[i] !== undefined ? benchData[i].ms : null;
+    const msChip = (ms !== null)
+      ? `<span class="step-ms${i === benchSlow ? ' step-ms-slow' : ''}" title="Tiempo del paso: ${ms} ms">${ms} ms</span>`
+      : '';
     card.innerHTML = `<div class="step-num">${i+1}</div><div class="step-info"><div class="step-name">${escapeHtml(s.op.replace(/_/g,' '))}</div><div class="step-detail" title="${detailSafe}">${detailSafe}</div></div>`
+      + msChip
       + `<button type="button" class="step-diff-btn" onclick="openStepDiff(${i})" aria-label="Ver qué cambió el paso ${i+1}" title="¿Qué cambió este paso?">${icon('git-compare')}</button>`;
     list.appendChild(card);
   });
+}
+
+// ── BARRA DE BENCHMARK — tiempo por paso (roadmap) ──────────────────────
+// `GET /benchmark` devuelve [{op, ms}] alineado con el pipeline (el
+// backend lo rebana con op_history, así que undo/redo solo cambian la
+// vista y un redo recupera el MISMO ms). Se refresca junto a loadStats.
+async function loadBenchmark() {
+  const clear = () => { benchData = []; benchTotal = 0; benchSlow = -1; updateBench(); };
+  if (!currentColumns.length) { clear(); return; }
+  try {
+    const res = await fetch('/benchmark');
+    const data = await res.json();
+    if (data.error) { clear(); return; }
+    benchData = data.steps || [];
+    benchTotal = data.total_ms || 0;
+    benchSlow = -1;
+    let max = -1;
+    benchData.forEach((s, i) => { if (s.ms > max) { max = s.ms; benchSlow = i; } });
+    updateBench();
+  } catch (e) { /* refresco en segundo plano */ }
+}
+
+function updateBench() {
+  const block = document.getElementById('bench-block');
+  if (!block) return;
+  renderPipeline(); // actualiza los chips «N ms» de las tarjetas
+  if (!benchData.length) { block.hidden = true; return; }
+  block.hidden = false;
+  const share = i => (benchTotal > 0
+    ? benchData[i].ms / benchTotal
+    : 1 / benchData.length);
+  const bar = document.getElementById('bench-bar');
+  bar.innerHTML = benchData.map((s, i) => {
+    const pct = Math.round(share(i) * 100);
+    // Color por tokens (color-mix, sin hex): teal proporcional al peso,
+    // naranja para el paso más lento — el cuello de botella.
+    const bg = i === benchSlow
+      ? 'color-mix(in srgb, var(--orange) 55%, var(--surface))'
+      : 'color-mix(in srgb, var(--teal-400) '
+        + Math.round(35 + Math.min(share(i), 1) * 45) + '%, var(--surface))';
+    return '<span class="bench-seg' + (i === benchSlow ? ' bench-seg-slow' : '') + '"'
+      + ' style="flex:' + Math.max(s.ms, 0.001) + ' 1 0;background:' + bg + '"'
+      + ' title="' + escapeHtml(s.op) + ': ' + s.ms + ' ms (' + pct + '%)"></span>';
+  }).join('');
+  const legend = document.getElementById('bench-legend');
+  if (!legend) return;
+  if (benchSlow >= 0) {
+    const slow = benchData[benchSlow];
+    const pct = Math.round(share(benchSlow) * 100);
+    legend.textContent = 'Benchmark: ' + benchData.length + ' paso(s) · ' + benchTotal
+      + ' ms — más lento: ' + slow.op.replace(/_/g, ' ')
+      + ' (' + slow.ms + ' ms, ' + pct + '%)';
+  } else {
+    legend.textContent = 'Benchmark: ' + benchData.length + ' paso(s) · ' + benchTotal + ' ms';
+  }
 }
