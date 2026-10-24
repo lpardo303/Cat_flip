@@ -1647,3 +1647,127 @@
     .cn-grid { grid-template-columns: 1fr; }
     .cn-field { grid-template-columns: 1fr; gap: 0.2rem; }
   }
+
+  /* ── VALIDACIÓN DE ESQUEMA — marca de celda, badge y modal ─────────── */
+  /* Celda que incumple una regla: tinte rojo + anillo interior. El texto
+     conserva su color normal para que el contraste AA no dependa del rojo. */
+  td.cell-viol {
+    background: var(--red-bg);
+    box-shadow: inset 0 0 0 1px var(--red-bd);
+  }
+
+  /* Badge de la tarjeta del panel derecho (conteo de celdas rojas) */
+  .sv-badge {
+    margin-left: auto;
+    min-width: 20px;
+    padding: 0.05rem 0.45rem;
+    border-radius: 999px;
+    background: var(--red-bg);
+    border: 1px solid var(--red-bd);
+    color: var(--red);
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  /* Lista de reglas activas */
+  .sv-list {
+    list-style: none;
+    margin: 0 0 0.7rem;
+    padding: 0;
+    display: grid;
+    gap: 0.35rem;
+    max-height: 168px;
+    overflow-y: auto;
+  }
+  .sv-empty { font-size: 0.74rem; color: var(--text-muted); }
+  .sv-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.4rem 0.55rem;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius2);
+    font-size: 0.74rem;
+    color: var(--text);
+  }
+  .sv-item-text { overflow-wrap: anywhere; }
+  .sv-item-text strong { font-family: var(--font-mono); }
+  .sv-del {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--text2);
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s, border-color 0.15s;
+  }
+  .sv-del .icon-svg { width: 13px; height: 13px; }
+  .sv-del:hover {
+    color: var(--red);
+    background: var(--red-bg);
+    border-color: var(--red-bd);
+  }
+  .sv-del:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
+
+  /* Formulario de alta de reglas */
+  .sv-form { display: grid; gap: 0.5rem; margin-bottom: 0.6rem; }
+  .sv-form-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; }
+  .sv-form-row label { font-size: 0.72rem; color: var(--text2); }
+  .sv-form-row select {
+    flex: 1 1 40%;
+    min-width: 0;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    padding: 0.35rem 0.5rem;
+    border-radius: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .sv-form-row input {
+    flex: 1 1 30%;
+    min-width: 0;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    padding: 0.35rem 0.5rem;
+    border-radius: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .sv-form-row select:focus,
+  .sv-form-row input:focus {
+    outline: none;
+    border-color: var(--teal);
+  }
+  .sv-add { justify-self: start; }
+
+  /* Resumen de violaciones (aria-live: se actualiza al aplicar) */
+  .sv-results { min-height: 1.1rem; margin-bottom: 0.35rem; font-size: 0.76rem; }
+  .sv-results p { margin: 0 0 0.3rem; }
+  .sv-ok { color: var(--green); }
+  .sv-bad { color: var(--red); font-weight: 600; }
+  .sv-pending { color: var(--orange); }
+  .sv-counts { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.2rem; }
+  .sv-counts li { font-size: 0.75rem; color: var(--text); }
+  .sv-counts strong { font-family: var(--font-mono); }
+  .sv-count {
+    color: var(--red);
+    font-weight: 700;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (max-width: 640px) {
+    .sv-form-row { flex-direction: column; align-items: stretch; gap: 0.2rem; }
+  }

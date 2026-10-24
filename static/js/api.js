@@ -51,6 +51,12 @@ async function uploadFile(file, sheet) {
     hideLoading();
     if (data.error) { toast(data.error, 'error'); return; }
 
+    // Dataset nuevo → las reglas de validación del anterior no aplican
+    // (el backend ya las limpió en /upload).
+    currentViolations = new Map();
+    const svBadge0 = document.getElementById('valid-badge');
+    if (svBadge0) { svBadge0.hidden = true; svBadge0.textContent = ''; }
+
     currentSearchQuery = '';
     const searchInput = document.getElementById('ribbon-search');
     if (searchInput) searchInput.value = '';

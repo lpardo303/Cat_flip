@@ -353,14 +353,20 @@ function renderTable(data) {
     let h = '<tr class="' + (item.i % 2 === 1 ? 'row-alt' : '') + '"><td>' + (item.i + 1) + '</td>';
     visibleIndices.forEach(idx => {
       const cellVal = item.row[idx];
+      // Validación de esquema: ¿incumple alguna regla? (clave = posición
+      // de fila + nombre de columna; las etiquetas del índice no pintan)
+      const violRule = currentViolations.get(item.i + '\u0000' + currentColumns[idx]);
+      const violTitle = violRule ? ' — incumple: ' + SV_RULE_LABELS[violRule] : '';
       // Bug 4: el backend envía JSON null para nulos reales de pandas (NaN)
       if (cellVal === null || cellVal === undefined) {
-        h += '<td class="cell-null-td"><span class="cell-null" title="Nulo real de pandas (NaN)">null</span></td>';
+        const nullCls = violRule ? 'cell-null-td cell-viol' : 'cell-null-td';
+        h += '<td class="' + nullCls + '"><span class="cell-null" title="Nulo real de pandas (NaN)' + violTitle + '">null</span></td>';
         return;
       }
       const escaped = escapeHtml(String(cellVal));
       const highlighted = query ? highlightEscaped(escaped, query) : escaped;
-      h += '<td title="' + escaped + '">' + highlighted + '</td>';
+      const violCls = violRule ? ' class="cell-viol"' : '';
+      h += '<td' + violCls + ' title="' + escaped + violTitle + '">' + highlighted + '</td>';
     });
     return h + '</tr>';
   };

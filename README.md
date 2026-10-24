@@ -17,6 +17,7 @@
 * 📅 **Auto-Mapeo de Tipos:** Al cargar un archivo, un motor heurístico analiza cada columna de texto del esquema completo y una barra te ofrece convertirlas con un clic a `datetime`, `int` o `float` cuando ≥90% de los valores lo permiten — cada conversión queda como paso deshacible en la receta.
 * 📤 **Exportación en 5 formatos:** CSV, Excel XLSX, **Parquet** (columnar, preserva tipos), **JSON Records** (array de objetos con nulos `null` y fechas ISO, round-trip con `pd.read_json(orient='records')`) y **SQL** (script DDL + INSERT portable a PostgreSQL/SQLite con tipos derivados del dtype real, lotes de 100 filas y escapado de comillas — se ejecuta tal cual).
 * 🧪 **Destinos (demo):** Simulador visual de conectores **BigQuery**, **Snowflake** y **Webhook REST**: configura proyecto/tabla o URL, valida el formulario y verás en consola el paquete que se enviaría — sin que nada salga de tu equipo (cero peticiones de red, badge DEMO permanente).
+* 🛡️ **Validación de esquema:** Define reglas por columna — **no-nulo**, **único**, **regex** y **rango** (mín/máx inclusivo) — y Cat_flip pinta de rojo las celdas que las incumplen con el motivo en el tooltip, con badge de conteo y resumen por columna. Solo marcan: nunca tocan los datos ni entran en la receta, se revalidan solas tras cada operación/deshacer y se limpian al cargar otro archivo.
 * 📊 **Perfilado de Datos:** Diagnóstico estadístico instantáneo de tus columnas (nulos, valores únicos, mínimos, máximos).
 * 💻 **100% Local y Privado:** Sin bases de datos ni envíos a la nube; todo el procesamiento ocurre de forma segura en la memoria RAM de tu equipo.
 
@@ -99,7 +100,7 @@ pytest tests/ --cov=app --cov=operations --cov=cli --cov-report=term-missing --c
 
 Los tests originales siguen siendo unittest y también corren con `python -m unittest discover -s tests`.
 
-El workflow de CI (`.github/workflows/ci.yml`) ejecuta la suite con el gate de cobertura y añade `node --check` sobre los 5 módulos de `static/js/` en cada push/PR a `main`. Un segundo job (**axe**) levanta la app, la abre con Playwright y ejecuta [axe-core](https://github.com/dequelabs/axe-core) (WCAG 2.0 A/AA) sobre la página base y el modal *Receta desde CSV* en tema claro y oscuro; si hay violaciones el job falla y sube `violations.json` como artefacto. Para correrlo localmente (con la app en `127.0.0.1:5050`):
+El workflow de CI (`.github/workflows/ci.yml`) ejecuta la suite con el gate de cobertura y añade `node --check` sobre los 5 módulos de `static/js/` en cada push/PR a `main`. Un segundo job (**axe**) levanta la app, la abre con Playwright y ejecuta [axe-core](https://github.com/dequelabs/axe-core) (WCAG 2.0 A/AA) sobre 4 superficies — página base y los modales *Receta desde CSV*, conectores demo y *Validación de esquema* — en tema claro y oscuro; si hay violaciones el job falla y sube `violations.json` como artefacto. Para correrlo localmente (con la app en `127.0.0.1:5050`):
 
 ```bash
 npm ci && npx playwright install chromium
