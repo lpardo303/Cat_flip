@@ -18,6 +18,7 @@
 * 💻 **Modo CLI:** La misma receta corre en terminal, sin navegador: `python cli.py run receta.catflip.json --input datos.csv --output limpio.csv` — autodetección de separador/encoding, salidas `.csv`/`.tsv`/`.xlsx`/`.parquet` con escritura atómica y exit codes para CI.
 * ⏱️ **Benchmark por paso:** barra proporcional sobre el pipeline con el tiempo de cada operación, chip «N ms» en cada tarjeta y leyenda con el paso más lento y su porcentaje — medido en el servidor, alineado con deshacer/rehacer y con la receta aplicada.
 * 🌗 **Kinetic Query Minimal:** Interfaz fluida y minimalista (Glassmorphism) con soporte persistente para modo claro y oscuro, más un modo **Automático** por defecto que sigue `prefers-color-scheme` del sistema y reacciona en vivo sin recargar.
+* 🎨 **Temas premium Aurora y Solar (Open Core):** Con licencia premium, el botón de tema amplía su ciclo a **Claro → Oscuro → Automático → Aurora → Solar** — dos paletas fijas (violeta y ámbar) independientes del sistema. Sin licencia la app es idéntica: el CSS premium ni siquiera se sirve.
 * 📅 **Auto-Mapeo de Tipos:** Al cargar un archivo, un motor heurístico analiza cada columna de texto del esquema completo y una barra te ofrece convertirlas con un clic a `datetime`, `int` o `float` cuando ≥90% de los valores lo permiten — cada conversión queda como paso deshacible en la receta.
 * 📤 **Exportación en 5 formatos:** CSV, Excel XLSX, **Parquet** (columnar, preserva tipos), **JSON Records** (array de objetos con nulos `null` y fechas ISO, round-trip con `pd.read_json(orient='records')`) y **SQL** (script DDL + INSERT portable a PostgreSQL/SQLite con tipos derivados del dtype real, lotes de 100 filas y escapado de comillas — se ejecuta tal cual).
 * 🧪 **Destinos (demo):** Simulador visual de conectores **BigQuery**, **Snowflake** y **Webhook REST**: configura proyecto/tabla o URL, valida el formulario y verás en consola el paquete que se enviaría — sin que nada salga de tu equipo (cero peticiones de red, badge DEMO permanente).
@@ -104,7 +105,7 @@ pytest tests/ --cov=app --cov=operations --cov=cli --cov-report=term-missing --c
 
 Los tests originales siguen siendo unittest y también corren con `python -m unittest discover -s tests`.
 
-El workflow de CI (`.github/workflows/ci.yml`) ejecuta la suite con el gate de cobertura y añade `node --check` sobre los 5 módulos de `static/js/` en cada push/PR a `main`. Un segundo job (**axe**) levanta la app, la abre con Playwright y ejecuta [axe-core](https://github.com/dequelabs/axe-core) (WCAG 2.0 A/AA) en 11 corridas: la página base en modo Automático con el sistema en oscuro (`prefers-color-scheme`, perfil sin localStorage) y tema claro/oscuro explícitos sobre 5 superficies — página base, los modales *Receta desde CSV*, conectores demo y *Validación de esquema*, y la pestaña Diagnóstico con el heatmap —; además verifica que el cambio en vivo del sistema re-aplica el tema. Si hay violaciones o fallos el job falla y sube `violations.json` como artefacto. Para correrlo localmente (con la app en `127.0.0.1:5050`):
+El workflow de CI (`.github/workflows/ci.yml`) ejecuta la suite con el gate de cobertura y añade `node --check` sobre los 5 módulos de `static/js/` en cada push/PR a `main`. Un segundo job (**axe**) levanta la app (con `CATFLIP_PREMIUM_KEY` para cubrir también las paletas premium), la abre con Playwright y ejecuta [axe-core](https://github.com/dequelabs/axe-core) (WCAG 2.0 A/AA) en 13 corridas: la página base en modo Automático con el sistema en oscuro (`prefers-color-scheme`, perfil sin localStorage); tema claro/oscuro explícitos sobre 5 superficies — página base, los modales *Receta desde CSV*, conectores demo y *Validación de esquema*, y la pestaña Diagnóstico con el heatmap —; y las 2 paletas premium **Aurora** y **Solar**; además verifica que el cambio en vivo del sistema re-aplica el tema. Si hay violaciones o fallos el job falla y sube `violations.json` como artefacto. Para correrlo localmente (con la app en `127.0.0.1:5050`; para las 13 corridas, levántala con `CATFLIP_PREMIUM_KEY=local python app.py`):
 
 ```bash
 npm ci && npx playwright install chromium
@@ -128,6 +129,14 @@ Las contribuciones son bienvenidas. Lee [CONTRIBUTING.md](CONTRIBUTING.md) para 
 
 Los cambios por versión se documentan en [CHANGELOG.md](CHANGELOG.md) (formato Keep a Changelog, versionado semántico).
 
+## 💼 Licencia dual (Open Core)
+
+El core es **MIT** y nunca se degrada: sin licencia la app funciona igual, sin telemetría ni funciones de pago. Para uso empresarial embebido (incrustar Cat_flip en un producto propietario, distribuir binarios sin publicar la fuente o servirlo como SaaS) existe una **licencia comercial** — ver [LICENSE-PREMIUM.txt](LICENSE-PREMIUM.txt) (borrador) y contacta por [Ko-fi](https://ko-fi.com/lpardo303) o [GitHub Sponsors](https://github.com/sponsors/lpardo303).
+
+## ⭐ Premium (Open Core)
+
+Junto al core vive el paquete [`premium/`](premium/), con gating **server-side**: la licencia se activa con la env var `CATFLIP_PREMIUM_KEY` o el fichero `premium.key` (ignorado por git), y sin ella `/premium/status` devuelve la lista vacía y `/premium/themes/<id>.css` responde 404. Hoy contiene los **temas Aurora y Solar**; en el roadmap, packaging firmado (Flatpak/AppImage/.exe), auto-update y conectores reales (Postgres/S3/BigQuery). Detalles y guía para ampliarlo en [premium/README.md](premium/README.md).
+
 ## 📄 Licencia
 
-Este proyecto se distribuye bajo la licencia [MIT](LICENSE). Eres libre de utilizarlo, modificarlo y distribuirlo.
+Este proyecto se distribuye bajo la licencia [MIT](LICENSE). Eres libre de utilizarlo, modificarlo y distribuirlo. El paquete `premium/` y [LICENSE-PREMIUM.txt](LICENSE-PREMIUM.txt) se rigen por la licencia comercial.

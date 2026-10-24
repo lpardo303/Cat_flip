@@ -23,7 +23,8 @@ pip install -r requirements.txt -r requirements-dev.txt
 # Solo si vas a correr el gate de axe:
 npm ci && npx playwright install chromium
 
-python app.py                      # http://127.0.0.1:5050
+CATFLIP_PREMIUM_KEY=local python app.py   # http://127.0.0.1:5050
+# (la key solo la necesita el gate de axe, para cubrir las paletas premium)
 ```
 
 ## 🔄 Flujo de trabajo
@@ -48,7 +49,9 @@ python app.py                      # http://127.0.0.1:5050
    node --check static/js/modals.js
 
    # 3) Gate de accesibilidad (con la app corriendo en 127.0.0.1:5050)
-   npm run test:axe                 # 11 corridas: 0 violaciones y 0 fallos
+   npm run test:axe                 # 13 corridas: 0 violaciones y 0 fallos
+   # (el servidor debe correr con CATFLIP_PREMIUM_KEY; sin ella el gate
+   #  falla: no se omiten las superficies premium en silencio)
    ```
 
 4. Abre un PR contra `main`. Los jobs de CI (`test` y `axe`) deben estar
@@ -65,11 +68,14 @@ python app.py                      # http://127.0.0.1:5050
 - **Diseño**: solo design tokens de `static/css/tokens.css` — **sin colores
   hex sueltos** en componentes; las variantes de color se construyen con
   `color-mix()` sobre tokens. Contraste AA verificado en los dos temas.
-- **Accesibilidad**: axe debe terminar en 0 sobre las 11 corridas
+- **Accesibilidad**: axe debe terminar en 0 sobre las 13 corridas
   (5 superficies × claro/oscuro + la página en modo Automático con el
-  sistema en oscuro). Teclado completo, `aria` coherente y foco visible.
+  sistema en oscuro + las 2 paletas premium Aurora/Solar). Teclado
+  completo, `aria` coherente y foco visible.
 - **Tests**: toda feature nueva lleva sus tests; nunca bajes el gate de
   cobertura (93%). Los fixtures de `tests/conftest.py` resetean el estado.
+  Las features de `premium/` se prueban en ambos estados (licenciado y
+  no) con `monkeypatch` de `CATFLIP_PREMIUM_KEY`.
 - **Commits**: mensaje en español que explique el *porqué*, no solo el qué.
 
 ## 📄 Licencia
