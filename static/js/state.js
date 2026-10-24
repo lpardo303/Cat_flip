@@ -137,6 +137,12 @@ let pipelineSteps = [];
 // siempre que el pipeline avanza (op nueva, upload, receta) — el backend
 // hace lo mismo con su `redo_history`.
 let redoSteps = [];
+// Validación de esquema: celdas que incumplen una regla — clave
+// `posición\u0000columna` → tipo de regla. La rellena refreshValidation()
+// (modals.js) y la consume buildRowHtml (grid.js) para pintar .cell-viol.
+let currentViolations = new Map();
+// Mismos `rule` que SCHEMA_RULE_KINDS del backend, en etiqueta española
+const SV_RULE_LABELS = { not_null: 'no-nulo', unique: 'único', regex: 'regex', range: 'rango' };
 
 // Sincroniza los botones Deshacer/Rehacer con los flags del backend
 // (can_undo/can_redo). Sin flags conocidos, deja el estado actual.

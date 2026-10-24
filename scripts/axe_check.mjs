@@ -1,8 +1,8 @@
 // Gate de accesibilidad (F3.4): abre Cat_flip con Playwright, ejecuta axe
-// (WCAG 2.0 A/AA) en tema claro y oscuro sobre 6 superficies — página
-// base, modal «Receta desde CSV» y modal de conectores demo — y escribe
-// violations.json. Sale con código 1 si hay violaciones, así la CI
-// falla sin parsear la consola.
+// (WCAG 2.0 A/AA) en tema claro y oscuro sobre 4 superficies — página
+// base, modal «Receta desde CSV», modal de conectores demo y modal de
+// validación de esquema — y escribe violations.json. Sale con código 1 si
+// hay violaciones, así la CI falla sin parsear la consola.
 //
 // Uso: con el servidor corriendo (python app.py), `npm run test:axe`.
 // Variables: AXE_BASE_URL (default http://127.0.0.1:5050), AXE_OUT.
@@ -89,6 +89,21 @@ try {
     await page.waitForSelector('#connector-overlay.open');
     await runAxe(page, `modal conector-webhook (${theme})`);
     await page.evaluate(() => closeConnector());
+
+    // Modal de validación de esquema (reglas no-nulo/único/regex/rango):
+    // se añade y aplica una regla real para que el resumen tenga contenido.
+    // En la 2ª pasada (tema oscuro) la regla ya existe → addSchemaRule la
+    // descarta como duplicada y apply reenvía la misma lista: superficie idéntica.
+    await page.evaluate(async () => {
+      await openSchemaRules();
+      document.getElementById('sv-col').value = 'Ciudad';
+      document.getElementById('sv-rule').value = 'not_null';
+      addSchemaRule();
+      await applySchemaRules();
+    });
+    await page.waitForSelector('#schemaval-overlay.open');
+    await runAxe(page, `modal validación-esquema (${theme})`);
+    await page.evaluate(() => closeSchemaRules());
   }
 } catch (err) {
   console.error('Error inesperado del gate de axe:', err);

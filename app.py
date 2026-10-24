@@ -8,7 +8,13 @@ import json
 import base64
 import time
 
-from operations import OPS, detect_pii_columns, detect_type_suggestions
+from operations import (
+    OPS,
+    detect_pii_columns,
+    detect_type_suggestions,
+    validate_rules,
+    validate_schema,
+)
 
 app = Flask(__name__)
 
@@ -21,6 +27,10 @@ op_history = []  # Pasos estructurados {op, params} para el linaje (F3.3)
 # por /undo. Se vacía en cualquier avance del pipeline (op nueva, upload,
 # receta) — semántica estándar de redo: solo se rehace lo último deshecho.
 redo_history = []
+# Reglas de validación de esquema — SOLO anotan: no transforman el df y no
+# entran en la receta ni en el script. Se limpian al cargar un archivo
+# nuevo; las violaciones se recalculan on-demand contra el df vigente.
+schema_rules = []
 
 # Frame derecho para el cruce Join/Merge (op #19): fuente independiente del
 # pipeline (no participa en undo) más su expresión de carga para el script.
@@ -170,7 +180,7 @@ def read_table(file, sheet=None):
 
 @app.route("/upload", methods=["POST"])
 def upload():
-    global current_df, history, code_log, op_history, redo_history
+    global current_df, history, code_log, op_history, redo_history, schema_rules
     file = request.files["file"]
     filename = file.filename.lower()
     
@@ -185,6 +195,7 @@ def upload():
         code_log = [f"import pandas as pd\n\n# Cargar archivo\n{code}"]
         op_history = []
         redo_history = []  # dataset nuevo → la pila de rehacer no aplica
+        schema_rules = []  # las reglas del dataset anterior no aplican
         
         return jsonify({
             "success": True,
@@ -1149,6 +1160,49 @@ def step_diff():
         "params": step.get("params", {}) or {},
     })
     return jsonify(result)
+
+
+@app.route("/schema_rules", methods=["POST"])
+def schema_rules_post():
+    """Guarda la lista completa de reglas de validación de esquema.
+
+    Valida TODA la lista antes de tocar `schema_rules` (fail-fast, sin
+    estado parcial — patrón /apply_recipe): una regla mala → 400 citando
+    «regla N» y la lista vigente queda intacta. Lista vacía = limpiar.
+    Devuelve las reglas normalizadas y las violaciones ya calculadas.
+    """
+    global schema_rules, current_df
+    if current_df is None:
+        return jsonify({"error": "No hay datos cargados."}), 400
+
+    data = request.get_json(silent=True)
+    if data is None or not isinstance(data.get("rules"), list):
+        return jsonify({
+            "error": "Se requiere JSON válido con la clave 'rules' (lista de reglas)."
+        }), 400
+
+    try:
+        clean = validate_rules(current_df, data["rules"])
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    schema_rules = clean
+    result = validate_schema(current_df, schema_rules)
+    return jsonify({"success": True, "rules": schema_rules, **result})
+
+
+@app.route("/schema_validate", methods=["GET"])
+def schema_validate():
+    """Violaciones actuales, recalculadas contra el df vigente.
+
+    SOLO LEE — consultar la validación jamás altera el pipeline. Las
+    reglas sobreviven a operaciones/undo/recarga; solo un upload nuevo las
+    limpia (se recalculan contra el estado actual del dataset).
+    """
+    if current_df is None:
+        return jsonify({"error": "No hay datos."}), 400
+    result = validate_schema(current_df, schema_rules)
+    return jsonify({"rules": schema_rules, **result})
 
 
 if __name__ == "__main__":

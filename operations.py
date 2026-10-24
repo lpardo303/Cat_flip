@@ -901,6 +901,160 @@ def detect_pii_columns(df, max_sample=200, min_pct=0.9, max_cols=10):
     return findings
 
 
+# ── Validación de esquema (reglas del usuario) ──────────────────────────
+# Reglas que SOLO anotan: no transforman el df y no entran en la receta
+# ni en el script. `validate_rules` valida la lista completa ANTES de
+# aplicarla (fail-fast, sin estado parcial — patrón /apply_recipe) y la
+# normaliza; `validate_schema` es pura y devuelve las celdas que incumplen
+# cada regla por POSICIÓN de fila (la numeración con la que el grid pinta
+# las filas), sin tocar el DataFrame.
+
+SCHEMA_RULE_KINDS = ("not_null", "unique", "regex", "range")
+_SCHEMA_MAX_VIOLATIONS = 2000
+_REGEX_MAX_LEN = 500  # mismo límite que regex_mask
+
+
+def validate_rules(df, rules):
+    """Valida y normaliza la lista de reglas de esquema.
+
+    Lanza ``ValueError`` citando la posición de la regla mala («regla N»),
+    igual que ``/apply_recipe`` cita el paso fallido. Devuelve la lista
+    normalizada: solo las claves propias de cada tipo de regla.
+    """
+    if not isinstance(rules, list):
+        raise ValueError("Las reglas deben ser una lista.")
+    columns = {str(c) for c in df.columns}
+    clean = []
+    for i, rule in enumerate(rules, 1):
+        if not isinstance(rule, dict):
+            raise ValueError(f"La regla {i} no es un objeto.")
+        column = rule.get("column")
+        kind = rule.get("rule")
+        if not isinstance(column, str) or column not in columns:
+            raise ValueError(f"La regla {i} referencia una columna inexistente: {column!r}.")
+        if kind not in SCHEMA_RULE_KINDS:
+            raise ValueError(f"La regla {i} tiene un tipo desconocido: {kind!r}.")
+        entry = {"column": column, "rule": kind}
+        if kind == "regex":
+            pattern = rule.get("pattern")
+            if not isinstance(pattern, str) or not pattern:
+                raise ValueError(f"La regla {i} (regex) necesita un patrón.")
+            if len(pattern) > _REGEX_MAX_LEN:
+                raise ValueError(
+                    f"La regla {i}: el patrón no puede superar {_REGEX_MAX_LEN} caracteres."
+                )
+            try:
+                compiled = re.compile(pattern)
+            except re.error as e:
+                raise ValueError(f"La regla {i} tiene una regex inválida: {e}.") from e
+            if compiled.search(""):
+                # Mismo criterio que regex_mask: un patrón que casa vacío
+                # marcaría (o enmascararía) todo sin distinguir nada.
+                raise ValueError(f"La regla {i}: el patrón no puede casar una cadena vacía.")
+            entry["pattern"] = pattern
+        elif kind == "range":
+            lo = rule.get("min")
+            hi = rule.get("max")
+            if lo is None and hi is None:
+                raise ValueError(f"La regla {i} (rango) necesita mínimo y/o máximo.")
+            for label, val in (("mínimo", lo), ("máximo", hi)):
+                if val is None:
+                    continue
+                if (isinstance(val, bool) or not isinstance(val, (int, float))
+                        or val != val):
+                    raise ValueError(f"La regla {i}: el {label} debe ser numérico, got {val!r}.")
+            if lo is not None and hi is not None and float(lo) > float(hi):
+                raise ValueError(
+                    f"La regla {i}: el mínimo no puede ser mayor que el máximo."
+                )
+            series = df[column]
+            if (not pd.api.types.is_numeric_dtype(series.dtype)
+                    or pd.api.types.is_bool_dtype(series.dtype)):
+                raise ValueError(f"La regla {i}: la columna {column!r} no es numérica.")
+            if lo is not None:
+                entry["min"] = float(lo)
+            if hi is not None:
+                entry["max"] = float(hi)
+        clean.append(entry)
+    return clean
+
+
+def validate_schema(df, rules, max_violations=_SCHEMA_MAX_VIOLATIONS):
+    """Celdas que incumplen `rules` sobre `df`. No muta el DataFrame.
+
+    Devuelve ``{violations, total, counts}``:
+
+    * ``violations`` — recortado a ``max_violations`` entradas
+      ``{row, column, rule}`` con ``row`` = posición base 0 de la fila (la
+      numeración del grid; no el índice del DataFrame, que drop_rows puede
+      haber desalineado).
+    * ``total`` — número real de celdas incumplidas sin recortar.
+    * ``counts`` — resumen sin recorte ``[{column, rule, count}]`` para que
+      el modal pinte cifras exactas aunque la lista venga recortada.
+
+    Las reglas se aplican en el orden recibido y una celda puede acumular
+    varias violaciones (una entrada por regla). Los nulos solo los marca
+    ``not_null``: ``unique``, ``regex`` y ``range`` ignoran las celdas
+    nulas. Espera reglas ya pasadas por ``validate_rules``.
+    """
+    violations = []
+    counts = {}
+    total = 0
+
+    def add(row, column, kind):
+        nonlocal total
+        total += 1
+        key = (column, kind)
+        counts[key] = counts.get(key, 0) + 1
+        if len(violations) < max_violations:
+            violations.append({"row": int(row), "column": column, "rule": kind})
+
+    for rule in rules:
+        column = rule["column"]
+        kind = rule["rule"]
+        series = df[column]
+        if kind == "not_null":
+            for pos in series.isna().to_numpy().nonzero()[0]:
+                add(pos, column, kind)
+        elif kind == "unique":
+            # duplicated(keep=False) marca TODAS las ocurrencias; los
+            # nulos quedan fuera (los cubre not_null).
+            mask = (series.duplicated(keep=False) & series.notna()).to_numpy(
+                dtype=bool, na_value=False
+            )
+            for pos in mask.nonzero()[0]:
+                add(pos, column, kind)
+        elif kind == "regex":
+            compiled = re.compile(rule["pattern"])
+            for pos, value in enumerate(series.tolist()):
+                if pd.isna(value):
+                    continue
+                if compiled.fullmatch(str(value)) is None:
+                    add(pos, column, kind)
+        elif kind == "range":
+            lo = rule.get("min")
+            hi = rule.get("max")
+            # coerrsión por seguridad: una operación posterior pudo volver
+            # la columna a texto — lo no convertible se salta (no es un
+            # valor fuera de rango, es un valor sin rango).
+            for pos, value in enumerate(pd.to_numeric(series, errors="coerce").tolist()):
+                if pd.isna(value):
+                    continue
+                if (lo is not None and value < lo) or (hi is not None and value > hi):
+                    add(pos, column, kind)
+        else:
+            raise ValueError(f"Tipo de regla desconocido: {kind!r}.")
+
+    return {
+        "violations": violations,
+        "total": total,
+        "counts": [
+            {"column": c, "rule": k, "count": n}
+            for (c, k), n in counts.items()
+        ],
+    }
+
+
 # ── Registro (consumido por app.operation()) ────────────────────────────
 
 OPS = {

@@ -33,6 +33,8 @@
     --color-mutation:#a5500a;
     --green:         #21754f;  /* F0.6: ≥4.6:1 también sobre toast */
     --red:           #af4040;  /* F0.6: ≥4.6:1 sobre toast */
+    --red-bg:        rgba(175,64,64,0.10);  /* celda que incumple regla */
+    --red-bd:        rgba(175,64,64,0.35);
     --yellow:        #8c6513;  /* F0.6: 4.6:1 sobre tintes */
 
     /* Logo */
@@ -113,6 +115,8 @@
     --color-mutation:#f08030;
     --green:         #22c55e;
     --red:           #ff4d4d;  /* F0.6: ≥4.6:1 sobre toast y superficies */
+    --red-bg:        rgba(255,77,77,0.14);
+    --red-bd:        rgba(255,77,77,0.40);
     --yellow:        #f59e0b;
 
     --logo-disc: var(--teal);

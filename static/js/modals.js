@@ -369,6 +369,7 @@ function handleOpResponse(op, params, data, notify = true) {
   updateUndoRedoButtons(true, false);
   loadStats();   // refrescar diagnóstico en segundo plano
   loadLineage(); // refrescar linaje en segundo plano (F3.3)
+  refreshValidation(); // revalidar reglas de esquema contra el nuevo df
   if (notify) toast(op.replace(/_/g, ' ') + ' aplicado');
 }
 
@@ -402,6 +403,7 @@ async function undo() {
   updateUndoRedoButtons(data.can_undo, data.can_redo);
   loadStats(); // refrescar diagnóstico en segundo plano
   loadLineage(); // refrescar linaje en segundo plano (F3.3)
+  refreshValidation(); // revalidar reglas de esquema contra el nuevo df
   toast('Paso deshecho', 'info');
 }
 
@@ -416,6 +418,7 @@ async function redo() {
   updateUndoRedoButtons(data.can_undo, data.can_redo);
   loadStats(); // refrescar diagnóstico en segundo plano
   loadLineage(); // refrescar linaje en segundo plano (F3.3)
+  refreshValidation(); // revalidar reglas de esquema contra el nuevo df
   toast('Paso rehecho', 'info');
 }
 
@@ -834,6 +837,7 @@ function applyRecipeResult(data) {
   renderPipeline();
   loadStats();   // refrescar diagnóstico en segundo plano
   loadLineage(); // refrescar linaje en segundo plano (F3.3)
+  refreshValidation(); // revalidar reglas de esquema contra el nuevo df
   toast(`Receta aplicada: ${data.applied} paso(s)`);
 }
 
@@ -1230,4 +1234,219 @@ function sendConnector() {
     }
   };
   cnTimer = setTimeout(step, 120);
+}
+
+// ── VALIDACIÓN DE ESQUEMA — reglas no-nulo / único / regex / rango ──────
+// Reglas que viven en el servidor (se limpian al subir otro archivo) y
+// SOLO anotan: no entran en la receta ni en el script. `svDraft` es el
+// estado del modal; «Aplicar reglas» envía la lista COMPLETA al backend
+// (POST /schema_rules) y el backend responde con las violaciones ya
+// calculadas. Las celdas se pintan en el grid vía `currentViolations`.
+let svDraft = [];
+
+async function openSchemaRules() {
+  if (!currentColumns.length) {
+    toast('Carga un archivo para gestionar reglas de validación', 'info');
+    return;
+  }
+  document.getElementById('sv-col').innerHTML = colOptions();
+  const ruleSel = document.getElementById('sv-rule');
+  ruleSel.value = 'not_null';
+  if (!ruleSel.dataset.bound) {
+    ruleSel.addEventListener('change', svRuleChanged);
+    ruleSel.dataset.bound = '1';
+  }
+  svRuleChanged();
+  try {
+    const res = await fetch('/schema_validate');
+    const data = await res.json();
+    if (data.error) { toast(data.error, 'error'); return; }
+    svDraft = (data.rules || []).slice();
+    applyValidationResult(data);
+  } catch (e) {
+    toast('Error al leer las reglas de validación', 'error');
+    return;
+  }
+  renderSchemaRules();
+  document.getElementById('schemaval-overlay').classList.add('open');
+}
+
+function closeSchemaRules() {
+  const overlay = document.getElementById('schemaval-overlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+// Campos condicionales: patrón solo para regex, mínimo/máximo solo para rango
+function svRuleChanged() {
+  const kind = document.getElementById('sv-rule').value;
+  document.getElementById('sv-regex-wrap').style.display = kind === 'regex' ? 'flex' : 'none';
+  document.getElementById('sv-range-wrap').style.display = kind === 'range' ? 'flex' : 'none';
+}
+
+function renderSchemaRules() {
+  const list = document.getElementById('sv-list');
+  if (!list) return;
+  if (!svDraft.length) {
+    list.innerHTML = '<li class="sv-empty">Sin reglas activas. Añade una abajo y pulsa «Aplicar reglas».</li>';
+    return;
+  }
+  list.innerHTML = svDraft.map((r, i) => {
+    let detail = '';
+    if (r.rule === 'regex') detail = ' — ' + escapeHtml(String(r.pattern));
+    else if (r.rule === 'range') {
+      const lo = (r.min !== undefined && r.min !== null) ? r.min : '−∞';
+      const hi = (r.max !== undefined && r.max !== null) ? r.max : '∞';
+      detail = ' — [' + lo + ', ' + hi + ']';
+    }
+    return '<li class="sv-item">' +
+      '<span class="sv-item-text"><strong>' + escapeHtml(r.column) + '</strong> · ' +
+      SV_RULE_LABELS[r.rule] + detail + '</span>' +
+      '<button type="button" class="sv-del" data-i="' + i + '"' +
+      ' aria-label="Eliminar la regla ' + (i + 1) + '" title="Eliminar regla">' +
+      icon('x') + '</button>' +
+      '</li>';
+  }).join('');
+  list.querySelectorAll('.sv-del').forEach(btn => {
+    btn.addEventListener('click', () => {
+      svDraft.splice(parseInt(btn.dataset.i, 10), 1);
+      renderSchemaRules();
+      markSchemaPending();
+    });
+  });
+}
+
+// Añade la regla del formulario al borrador (la escribe el servidor al
+// pulsar «Aplicar reglas»). Los duplicados exactos se descartan aquí.
+function addSchemaRule() {
+  const column = document.getElementById('sv-col').value;
+  const kind = document.getElementById('sv-rule').value;
+  const rule = { column: column, rule: kind };
+  if (kind === 'regex') {
+    rule.pattern = document.getElementById('sv-pattern').value;
+    if (!rule.pattern) { toast('Escribe un patrón para la regla regex', 'error'); return; }
+  } else if (kind === 'range') {
+    const lo = document.getElementById('sv-min').value;
+    const hi = document.getElementById('sv-max').value;
+    if (lo === '' && hi === '') {
+      toast('Indica el mínimo y/o el máximo del rango', 'error');
+      return;
+    }
+    if (lo !== '') {
+      rule.min = parseFloat(lo);
+      if (isNaN(rule.min)) { toast('El mínimo debe ser numérico', 'error'); return; }
+    }
+    if (hi !== '') {
+      rule.max = parseFloat(hi);
+      if (isNaN(rule.max)) { toast('El máximo debe ser numérico', 'error'); return; }
+    }
+  }
+  if (svDraft.some(r => JSON.stringify(r) === JSON.stringify(rule))) {
+    toast('Esa regla ya está añadida', 'info');
+    return;
+  }
+  svDraft.push(rule);
+  renderSchemaRules();
+  markSchemaPending();
+}
+
+function markSchemaPending() {
+  const box = document.getElementById('sv-results');
+  if (box) box.innerHTML = '<p class="sv-pending">Cambios sin aplicar — pulsa «Aplicar reglas».</p>';
+}
+
+async function applySchemaRules() {
+  try {
+    const res = await fetch('/schema_rules', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rules: svDraft })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) { toast(data.error || 'Error al aplicar las reglas', 'error'); return; }
+    svDraft = (data.rules || []).slice();
+    renderSchemaRules();
+    applyValidationResult(data);
+    toast(data.total === 0 ? 'Reglas aplicadas — sin violaciones'
+      : data.total === 1 ? '1 celda incumple las reglas'
+      : data.total + ' celdas incumen las reglas');
+  } catch (e) {
+    toast('Error al aplicar las reglas', 'error');
+  }
+}
+
+async function clearSchemaRules() {
+  svDraft = [];
+  renderSchemaRules();
+  try {
+    const res = await fetch('/schema_rules', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rules: [] })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) { toast(data.error || 'Error al limpiar las reglas', 'error'); return; }
+    applyValidationResult(data);
+    toast('Reglas de validación eliminadas', 'info');
+  } catch (e) {
+    toast('Error al limpiar las reglas', 'error');
+  }
+}
+
+// Refresco en segundo plano tras cada op/undo/redo/receta (el backend
+// recalcula contra el df vigente). Silenciosa: sin datos no hay nada que
+// revalidar.
+async function refreshValidation() {
+  if (!currentColumns.length) return;
+  try {
+    const res = await fetch('/schema_validate');
+    const data = await res.json();
+    if (data.error) return;
+    applyValidationResult(data);
+  } catch (e) { /* refresco en segundo plano */ }
+}
+
+// Pinta el resultado: mapa de celdas, badge del panel, resumen del modal
+// y repinto del grid. Se usa desde el open/apply y desde el refresco.
+function applyValidationResult(data) {
+  currentViolations = new Map();
+  (data.violations || []).forEach(v => {
+    currentViolations.set(v.row + '\u0000' + v.column, v.rule);
+  });
+  const badge = document.getElementById('valid-badge');
+  if (badge) {
+    const total = data.total || 0;
+    if (total > 0) {
+      badge.hidden = false;
+      badge.textContent = total > 999 ? '999+' : String(total);
+      badge.title = total + ' celda(s) incumplen las reglas de validación';
+    } else {
+      badge.hidden = true;
+      badge.textContent = '';
+    }
+  }
+  renderSchemaResults(data);
+  if (currentRawData) renderTable(currentRawData);
+}
+
+function renderSchemaResults(data) {
+  const box = document.getElementById('sv-results');
+  if (!box) return;
+  const rules = data.rules || [];
+  if (!rules.length) {
+    box.innerHTML = '<p class="sv-ok">Sin reglas activas.</p>';
+    return;
+  }
+  if (!data.total) {
+    box.innerHTML = '<p class="sv-ok">✓ ' + rules.length +
+      (rules.length === 1 ? ' regla activa — sin violaciones.' : ' reglas activas — sin violaciones.') +
+      '</p>';
+    return;
+  }
+  const rows = (data.counts || []).map(c =>
+    '<li><strong>' + escapeHtml(c.column) + '</strong> · ' + SV_RULE_LABELS[c.rule] +
+    ': <span class="sv-count">' + c.count + '</span></li>'
+  ).join('');
+  box.innerHTML = '<p class="sv-bad">' + data.total +
+    (data.total === 1 ? ' celda incumple' : ' celdas incumen') +
+    ' las reglas:</p><ul class="sv-counts">' + rows + '</ul>';
 }
