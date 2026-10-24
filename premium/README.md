@@ -25,13 +25,15 @@ recibe CSS premium que no deba ver.
 
 | Feature | Estado |
 | --- | --- |
-| Temas visuales **Aurora** (violeta) y **Solar** (ámbar) | ✅ |
+| Temas visuales **Aurora** (violeta) y **Solar** (ámbar) con vista previa en el selector | ✅ |
 | Packaging firmado (Flatpak + AppImage + `.exe`) | ⏳ roadmap |
 | Auto-update integrado | ⏳ roadmap |
 | Conectores reales (Postgres / S3 / BigQuery) | ⏳ roadmap |
 
-Con licencia, el botón de tema del encabezado amplía su ciclo:
-**Claro → Oscuro → Automático → Aurora → Solar → Claro**.
+Con licencia, el panel de tema del encabezado añade **Aurora** y **Solar**
+al grupo *Claro* (cada opción con su vista previa), agrupado en
+**Claro / Oscuro / Sistema**. El grupo lo decide el campo `mode` del
+manifiesto: lo manda el servidor, el front no lo adivina.
 
 ## Cómo añadir un feature premium nuevo
 

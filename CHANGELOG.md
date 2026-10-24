@@ -21,8 +21,18 @@ siguiente corte.
 - **Licencia dual**: `LICENSE-PREMIUM.txt` (borrador de licencia
   comercial para uso empresarial embebido) y nota al pie de `LICENSE`;
   el texto MIT queda intacto.
-- Gate de axe ampliado a **13 corridas** (paletas Aurora y Solar con el
-  servidor licenciado — la CI levanta con `CATFLIP_PREMIUM_KEY`).
+- Gate de axe ampliado a **15 corridas** (paletas Aurora y Solar con el
+  servidor licenciado — la CI levanta con `CATFLIP_PREMIUM_KEY` — y el
+  panel del selector de tema abierto en claro y oscuro; antes 13).
+- **Selector de tema con vista previa**: el botón de tema deja de ciclar y
+  abre un panel con una opción por tema — cada una con una mini-vista
+  previa real de su paleta (fondo, superficie, texto y acento) — agrupado
+  en **Claro / Oscuro / Sistema**. El grupo de cada tema premium lo decide
+  el servidor con el nuevo campo `mode` de `/premium/status`. Accesibilidad:
+  `aria-haspopup`/`aria-expanded` en el botón, `menuitemradio` con
+  `aria-checked` en el activo, flechas/Home/End para recorrer, Escape para
+  cerrar y devolver el foco, clic-fuera para descartar. La etiqueta del
+  botón pasa a mostrar el tema vigente en lugar del siguiente.
 
 ## [1.0.0] - 2026-10-23
 

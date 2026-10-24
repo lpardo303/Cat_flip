@@ -1,6 +1,9 @@
 /* Cat_flip Studio ETL — design tokens — tema claro/oscuro (extraído de templates/index.html, P0 modularización) */
 /* ── TOKENS ────────────────────────────────────────────── */
-  :root {
+/* `:root` = tema claro. `[data-theme="light"]` es el MISMO bloque para que
+   un swatch aislado pueda declararse claro de forma explícita aunque la
+   página esté en otro tema (selector de tema con vista previa). */
+  :root, [data-theme="light"] {
     color-scheme: light; /* widgets nativos (scroll, formularios) → tema claro */
     /* Escala cromática teal (spec Cat_flip Studio) */
     --teal-50:  #f2faf9;

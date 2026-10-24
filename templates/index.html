@@ -78,8 +78,10 @@
       <div class="metric-quality" id="metric-quality" title="% Calidad global del dataset"></div>
     </div>
 
-    <!-- Toggle tema: ciclo Claro → Oscuro → Automático (auto = prefers-color-scheme) -->
-    <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Cambiar tema (actual: Automático)" aria-label="Cambiar tema — actual: Automático">
+    <!-- Selector de tema: botón que abre el panel con una opción por tema
+         (vista previa real + grupos Claro/Oscuro/Sistema). El panel vive en
+         el final del body y se posiciona junto al botón. -->
+    <button class="theme-toggle" id="theme-toggle" type="button" onclick="toggleThemeMenu()" aria-haspopup="menu" aria-expanded="false" aria-controls="theme-menu" title="Elegir tema (actual: Automático)" aria-label="Elegir tema — actual: Automático">
       <span id="theme-icon">
         <svg class="icon-svg icon-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
         <svg class="icon-svg icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
@@ -670,6 +672,7 @@
 
 <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
 <div id="col-menu-dropdown" class="col-dropdown-menu" role="dialog" aria-label="Transformaciones de columna" style="display:none"></div>
+<div id="theme-menu" class="theme-menu" role="menu" aria-label="Selector de tema" hidden></div>
 <div id="toast-container" role="region" aria-label="Notificaciones"></div>
 
 <!-- ══ SCRIPT ══════════════════════════════════════════════════════════════ -->

@@ -42,7 +42,29 @@ def test_status_con_licencia_expone_manifiesto(client, monkeypatch):
     assert ids == ["aurora", "solar"]
     # El manifiesto público NUNCA filtra la ruta interna del fichero
     for t in data["themes"]:
-        assert set(t) == {"id", "name"}
+        assert set(t) == {"id", "name", "mode"}
+
+
+def test_status_licencia_expone_mode_para_agrupar(client, monkeypatch):
+    """`mode` es lo que agrupa el selector de tema en el front.
+
+    Tiene que venir SIEMPRE del servidor (no de una suposición del cliente)
+    y ser un valor que el front sepa agrupar: light o dark.
+    """
+    monkeypatch.setenv("CATFLIP_PREMIUM_KEY", "demo")
+    data = status(client).get_json()
+    assert [(t["id"], t["mode"]) for t in data["themes"]] == [
+        ("aurora", "light"),
+        ("solar", "light"),
+    ]
+    for t in data["themes"]:
+        assert t["mode"] in {"light", "dark"}
+
+
+def test_manifest_sin_licencia_sigue_vacio(client, monkeypatch):
+    """`mode` no filtra la existencia de la lista: sigue gated."""
+    monkeypatch.delenv("CATFLIP_PREMIUM_KEY", raising=False)
+    assert status(client).get_json() == {"licensed": False, "themes": []}
 
 
 # ── /premium/themes/<id>.css ───────────────────────────────────────────
@@ -103,3 +125,8 @@ def test_theme_css_devuelve_none_sin_licencia(monkeypatch):
 def test_theme_manifest_no_expone_rutas():
     for entry in premium.theme_manifest():
         assert "file" not in entry
+
+
+def test_theme_manifest_mode_valido():
+    for entry in premium.theme_manifest():
+        assert entry["mode"] in {"light", "dark"}

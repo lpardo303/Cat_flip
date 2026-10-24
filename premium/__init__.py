@@ -20,9 +20,11 @@ _KEY_FILE = _DIR / "premium.key"
 
 # Manifiesto de features premium. `id` es el valor de `data-theme` que el
 # front aplica al elegir el tema; `file` es relativo a este paquete.
+# `mode` declara la familia del tema (light/dark) para que el selector de
+# tema agrupe en el servidor y el front no tenga que adivinarlo.
 THEMES = [
-    {"id": "aurora", "name": "Aurora", "file": "themes/aurora.css"},
-    {"id": "solar", "name": "Solar", "file": "themes/solar.css"},
+    {"id": "aurora", "name": "Aurora", "mode": "light", "file": "themes/aurora.css"},
+    {"id": "solar", "name": "Solar", "mode": "light", "file": "themes/solar.css"},
 ]
 
 
@@ -37,8 +39,8 @@ def is_licensed() -> bool:
 
 
 def theme_manifest():
-    """Lista pública de temas: SOLO id y nombre (nunca la ruta interna)."""
-    return [{"id": t["id"], "name": t["name"]} for t in THEMES]
+    """Lista pública de temas: SOLO id, nombre y mode (nunca la ruta interna)."""
+    return [{"id": t["id"], "name": t["name"], "mode": t["mode"]} for t in THEMES]
 
 
 def theme_css(theme_id):
