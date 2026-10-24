@@ -1,11 +1,12 @@
-// Gate de accesibilidad (F3.4 + dark mode automático + Open Core): abre
-// Cat_flip con Playwright y ejecuta axe (WCAG 2.0 A/AA) en 15 corridas —
-// la página base en modo Automático con el sistema en oscuro
-// (prefers-color-scheme, perfil sin localStorage); tema claro y oscuro
-// explícitos sobre 6 superficies (página base, modal «Receta desde CSV»,
-// modal de conectores demo, modal de validación de esquema, la pestaña
-// Diagnóstico con el heatmap y el panel de selector de tema abierto); y
-// las 2 paletas premium (Aurora, Solar) con el servidor licenciado.
+// Gate de accesibilidad (F3.4 + dark mode automático + Open Core + nuevo
+// front Tech Labs): abre Cat_flip con Playwright y ejecuta axe (WCAG 2.0
+// A/AA) en 15 corridas — la página base en modo Automático con el sistema
+// en oscuro (prefers-color-scheme, perfil sin localStorage); tema claro y
+// oscuro explícitos sobre 6 superficies (página base, modal «Receta desde
+// CSV», modal de conectores demo, modal de validación de esquema, la
+// pestaña Diagnóstico con el heatmap y el panel de selector de tema
+// abierto — con el catálogo de énfasis incluido); y las 2 paletas premium
+// (Aurora, Solar) con el servidor licenciado.
 // Además verifica que el cambio en vivo del sistema re-aplica el tema
 // (listener del matchMedia en modo 'auto') y escribe violations.json.
 // Sale con código 1 si hay fallos o violaciones, así la CI falla sin
@@ -32,7 +33,32 @@ const CSV = 'Nombre,Edad,Ciudad\n Ana ,30,Madrid\nLuis,25,\nAna ,30,Madrid\nCarl
 const results = [];
 let failures = 0;
 
+// axe debe medir el estado en REPOSO, no a mitad de vuelo: el cambio de
+// tema (transition de color/fondo), el enable de los botones al cargar el
+// CSV y el fade-in de los toasts duran 150–220 ms, y muestreados en medio
+// dan colores interpolados que no existen en la UI real (falsos positivos
+// de contraste). Espera a que termine toda animación/transición FINITA
+// (las infinitas, como el punto pulsante del badge, se ignoran) con tope
+// de 2 s, y así la verificación sigue siendo sobre los valores calculados
+// finales de cada superficie.
+async function settleAnimations(page) {
+  await page.evaluate(async () => {
+    const anims = (typeof document.getAnimations === 'function' ? document.getAnimations() : [])
+      .filter(a => {
+        const t = a.effect && a.effect.getComputedTiming();
+        return t && t.iterations !== Infinity;
+      })
+      .slice(0, 60);
+    await Promise.race([
+      Promise.all(anims.map(a => a.finished.catch(() => {}))),
+      new Promise(resolve => setTimeout(resolve, 2000)),
+    ]);
+  }).catch(() => {});
+  await page.waitForTimeout(120);
+}
+
 async function runAxe(page, label) {
+  await settleAnimations(page);
   await page.addScriptTag({ path: AXE_PATH });
   const violations = await page.evaluate(async () => {
     const r = await window.axe.run(document, {
@@ -162,19 +188,23 @@ try {
     await runAxe(page, `diagnóstico-correlaciones (${theme})`);
     await page.evaluate(() => switchTab('data'));
 
-    // Selector de tema abierto (6ª superficie): el panel con vista previa
-    // y grupos Claro/Oscuro/Sistema, abierto por el mismo mecanismo que el
-    // usuario (aria-expanded, foco roving y swatches en su estado real).
+    // Selector de tema abierto (6ª superficie): el panel con vista previa,
+    // los grupos Claro/Oscuro/Sistema Y el catálogo de énfasis (6 presets +
+    // personalizado), abierto por el mismo mecanismo que el usuario
+    // (aria-expanded, foco roving y swatches en su estado real).
     await page.evaluate(() => openThemeMenu());
     await page.waitForSelector('#theme-menu:not([hidden])');
     const menuItems = await page.evaluate(() => ({
-      items: document.querySelectorAll('#theme-menu .theme-menu-item').length,
+      themes: document.querySelectorAll('#theme-menu [data-theme-id]').length,
       groups: document.querySelectorAll('#theme-menu [role="group"]').length,
-      checked: document.querySelectorAll('#theme-menu [aria-checked="true"]').length,
+      checked: document.querySelectorAll('#theme-menu [data-theme-id][aria-checked="true"]').length,
+      accents: document.querySelectorAll('#theme-menu .accent-swatch').length,
+      accentChecked: document.querySelectorAll('#theme-menu .accent-swatch[aria-checked="true"]').length,
     }));
-    if (menuItems.items < 3 || menuItems.groups !== 3 || menuItems.checked !== 1) {
+    if (menuItems.themes < 3 || menuItems.groups !== 4 || menuItems.checked !== 1 ||
+        menuItems.accents < 6 || menuItems.accentChecked !== 1) {
       console.log(`selector de tema: FALLO — panel mal construido (${JSON.stringify(menuItems)})`);
-      results.push({ label: `selector-tema-abierto-${theme}`, violations: [], error: 'panel de tema vacío o inválido' });
+      results.push({ label: `selector-tema-abierto-${theme}`, violations: [], error: 'panel de tema o catálogo de énfasis inválido' });
       failures += 1;
     } else {
       await runAxe(page, `selector-tema-abierto (${theme})`);

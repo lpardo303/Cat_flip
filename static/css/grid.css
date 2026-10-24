@@ -141,8 +141,8 @@
     opacity: 1;
   }
   .th-menu-btn:hover {
-    background: var(--teal-bg);
-    color: var(--teal);
+    background: var(--accent-subtle);
+    color: var(--accent-text);
     opacity: 1;
   }
   .th-menu-btn svg {
@@ -155,12 +155,12 @@
   .col-dropdown-menu {
     position: fixed;
     z-index: 999;
-    background: var(--surface);
-    backdrop-filter: blur(20px) saturate(1.6);
-    -webkit-backdrop-filter: blur(20px) saturate(1.6);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-glass-active);
+    background: var(--bg-input);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 2px solid var(--border-strong);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
     padding: 0.4rem 0;
     width: 220px;
     max-height: 80vh;
@@ -179,13 +179,16 @@
 
   .col-menu-header {
     padding: 0.4rem 0.8rem 0.35rem;
-    border-bottom: 1px solid var(--border2);
+    border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-size: 0.72rem;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
     font-weight: 700;
-    color: var(--teal);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text);
   }
   .col-menu-header span {
     overflow: hidden;
@@ -213,8 +216,8 @@
     user-select: none;
   }
   .col-menu-item:hover {
-    background: var(--teal-bg);
-    color: var(--teal);
+    background: var(--accent-subtle);
+    color: var(--accent-text);
   }
   .col-menu-item svg {
     width: 14px; height: 14px;
