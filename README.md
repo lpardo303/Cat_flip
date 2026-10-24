@@ -18,7 +18,7 @@
 * 📤 **Exportación en 5 formatos:** CSV, Excel XLSX, **Parquet** (columnar, preserva tipos), **JSON Records** (array de objetos con nulos `null` y fechas ISO, round-trip con `pd.read_json(orient='records')`) y **SQL** (script DDL + INSERT portable a PostgreSQL/SQLite con tipos derivados del dtype real, lotes de 100 filas y escapado de comillas — se ejecuta tal cual).
 * 🧪 **Destinos (demo):** Simulador visual de conectores **BigQuery**, **Snowflake** y **Webhook REST**: configura proyecto/tabla o URL, valida el formulario y verás en consola el paquete que se enviaría — sin que nada salga de tu equipo (cero peticiones de red, badge DEMO permanente).
 * 🛡️ **Validación de esquema:** Define reglas por columna — **no-nulo**, **único**, **regex** y **rango** (mín/máx inclusivo) — y Cat_flip pinta de rojo las celdas que las incumplen con el motivo en el tooltip, con badge de conteo y resumen por columna. Solo marcan: nunca tocan los datos ni entran en la receta, se revalidan solas tras cada operación/deshacer y se limpian al cargar otro archivo.
-* 📊 **Perfilado de Datos:** Diagnóstico estadístico instantáneo de tus columnas (nulos, valores únicos, mínimos, máximos).
+* 📊 **Perfilado de Datos:** Diagnóstico estadístico instantáneo de tus columnas (nulos, valores únicos, mínimos, máximos) y **heatmap de correlaciones de Pearson** entre columnas numéricas — teal para positivas, rojo para negativas, celdas sin variación como «—» — con refresco automático tras cada operación.
 * 💻 **100% Local y Privado:** Sin bases de datos ni envíos a la nube; todo el procesamiento ocurre de forma segura en la memoria RAM de tu equipo.
 
 ## 🚀 Instalación y Uso

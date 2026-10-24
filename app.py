@@ -1205,5 +1205,38 @@ def schema_validate():
     return jsonify({"rules": schema_rules, **result})
 
 
+@app.route("/correlations", methods=["GET"])
+def correlations():
+    """Matriz de correlación de Pearson de las columnas numéricas (roadmap).
+
+    Alimenta el heatmap del tab Diagnóstico. SOLO LEE, como /stats.
+    Excluye booleanos (pandas los trata como numéricos en `.corr()`),
+    redondea a 4 decimales y convierte los NaN (columna constante o par sin
+    variación) en `null` — nunca un NaN suelto, que rompería el
+    `response.json()` del navegador. Con menos de 2 columnas numéricas
+    devuelve `matrix` vacía y el front muestra su aviso.
+    """
+    global current_df
+    if current_df is None:
+        return jsonify({"error": "No hay datos."}), 400
+
+    numeric = [
+        c for c in current_df.columns
+        if pd.api.types.is_numeric_dtype(current_df[c])
+        and not pd.api.types.is_bool_dtype(current_df[c])
+    ]
+    if len(numeric) < 2:
+        return jsonify({"columns": [str(c) for c in numeric], "matrix": []})
+
+    # `.corr()` usa borrado por pares: cada par se calcula sobre las filas
+    # donde ambos valores no son nulos (misma semántica que pandas).
+    corr = current_df[numeric].corr()
+    matrix = [
+        [None if pd.isna(v) else round(float(v), 4) for v in row]
+        for row in corr.to_numpy()
+    ]
+    return jsonify({"columns": [str(c) for c in numeric], "matrix": matrix})
+
+
 if __name__ == "__main__":
     app.run(debug=False, port=5050, host="127.0.0.1")

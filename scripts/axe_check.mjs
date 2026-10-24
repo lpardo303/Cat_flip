@@ -1,8 +1,9 @@
 // Gate de accesibilidad (F3.4): abre Cat_flip con Playwright, ejecuta axe
-// (WCAG 2.0 A/AA) en tema claro y oscuro sobre 4 superficies — página
-// base, modal «Receta desde CSV», modal de conectores demo y modal de
-// validación de esquema — y escribe violations.json. Sale con código 1 si
-// hay violaciones, así la CI falla sin parsear la consola.
+// (WCAG 2.0 A/AA) en tema claro y oscuro sobre 5 superficies — página
+// base, modal «Receta desde CSV», modal de conectores demo, modal de
+// validación de esquema y la pestaña Diagnóstico con el heatmap de
+// correlaciones — y escribe violations.json. Sale con código 1 si hay
+// violaciones, así la CI falla sin parsear la consola.
 //
 // Uso: con el servidor corriendo (python app.py), `npm run test:axe`.
 // Variables: AXE_BASE_URL (default http://127.0.0.1:5050), AXE_OUT.
@@ -104,6 +105,25 @@ try {
     await page.waitForSelector('#schemaval-overlay.open');
     await runAxe(page, `modal validación-esquema (${theme})`);
     await page.evaluate(() => closeSchemaRules());
+
+    // Pestaña Diagnóstico con el heatmap de correlaciones (5ª superficie):
+    // calculated_column crea la 2ª numérica (sobrescribe → idempotente en
+    // la 2ª pasada) y switchTab + loadCorrelations pinta la matriz.
+    await page.evaluate(async () => {
+      const params = { name: 'Edad_x2', expression: 'Edad * 2' };
+      const res = await fetch('/operation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operation: 'calculated_column', params }),
+      });
+      const data = await res.json();
+      if (!data.error) handleOpResponse('calculated_column', params, data, false);
+      switchTab('stats');
+      await loadCorrelations();
+    });
+    await page.waitForSelector('#corr-grid table');
+    await runAxe(page, `diagnóstico-correlaciones (${theme})`);
+    await page.evaluate(() => switchTab('data'));
   }
 } catch (err) {
   console.error('Error inesperado del gate de axe:', err);

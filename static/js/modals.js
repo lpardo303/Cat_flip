@@ -368,6 +368,7 @@ function handleOpResponse(op, params, data, notify = true) {
   redoSteps = [];
   updateUndoRedoButtons(true, false);
   loadStats();   // refrescar diagnóstico en segundo plano
+  loadCorrelations(); // heatmap de correlaciones al día
   loadLineage(); // refrescar linaje en segundo plano (F3.3)
   refreshValidation(); // revalidar reglas de esquema contra el nuevo df
   if (notify) toast(op.replace(/_/g, ' ') + ' aplicado');
@@ -402,6 +403,7 @@ async function undo() {
   if (pipelineSteps.length > 0) { redoSteps.push(pipelineSteps.pop()); renderPipeline(); }
   updateUndoRedoButtons(data.can_undo, data.can_redo);
   loadStats(); // refrescar diagnóstico en segundo plano
+  loadCorrelations(); // heatmap de correlaciones al día
   loadLineage(); // refrescar linaje en segundo plano (F3.3)
   refreshValidation(); // revalidar reglas de esquema contra el nuevo df
   toast('Paso deshecho', 'info');
@@ -417,6 +419,7 @@ async function redo() {
   if (redoSteps.length > 0) { pipelineSteps.push(redoSteps.pop()); renderPipeline(); }
   updateUndoRedoButtons(data.can_undo, data.can_redo);
   loadStats(); // refrescar diagnóstico en segundo plano
+  loadCorrelations(); // heatmap de correlaciones al día
   loadLineage(); // refrescar linaje en segundo plano (F3.3)
   refreshValidation(); // revalidar reglas de esquema contra el nuevo df
   toast('Paso rehecho', 'info');
@@ -836,6 +839,7 @@ function applyRecipeResult(data) {
   updateUndoRedoButtons(true, false);
   renderPipeline();
   loadStats();   // refrescar diagnóstico en segundo plano
+  loadCorrelations(); // heatmap de correlaciones al día
   loadLineage(); // refrescar linaje en segundo plano (F3.3)
   refreshValidation(); // revalidar reglas de esquema contra el nuevo df
   toast(`Receta aplicada: ${data.applied} paso(s)`);
