@@ -469,6 +469,69 @@ async function loadStats() {
   if (schemaTab && schemaTab.classList.contains('active')) loadSchema();
 }
 
+// ── Perfilado de correlaciones — heatmap (roadmap) ─────────────────────
+// GET /correlations: matriz de Pearson de las columnas numéricas, solo
+// lectura como /stats. El color de cada celda interpola tokens con
+// `color-mix()` (sin hex sueltos) con intensidad tope del 50% para que el
+// texto conserve el contraste AA en ambos temas. Se refresca junto a
+// loadStats (ops, undo/redo, receta, upload y pestaña Diagnóstico).
+async function loadCorrelations() {
+  const box = document.getElementById('corr-grid');
+  if (!box) return;
+  try {
+    const res = await fetch('/correlations');
+    const data = await res.json();
+    if (data.error) {
+      box.innerHTML = '<p class="corr-hint">' + escapeHtml(data.error) + '</p>';
+      return;
+    }
+    renderCorrelations(data);
+  } catch (e) {
+    box.innerHTML = '<p class="corr-hint">Error al calcular las correlaciones.</p>';
+  }
+}
+
+// Color divergente: teal para r > 0, rojo para r < 0; la intensidad es
+// |r| limitada al 50% de mezcla para que el texto siga pasando AA.
+function heatColor(r) {
+  const pct = Math.round(Math.min(Math.abs(r), 1) * 50);
+  const token = r >= 0 ? 'var(--teal-500)' : 'var(--red)';
+  return 'color-mix(in srgb, ' + token + ' ' + pct + '%, var(--surface))';
+}
+
+function renderCorrelations(data) {
+  const box = document.getElementById('corr-grid');
+  const cols = data.columns || [];
+  const matrix = data.matrix || [];
+  if (cols.length < 2) {
+    box.innerHTML = '<p class="corr-hint">Se necesitan al menos 2 columnas numéricas para calcular correlaciones ('
+      + cols.length + ' detectada' + (cols.length === 1 ? '' : 's') + ').</p>';
+    return;
+  }
+  let html = '<table class="corr-heat" aria-label="Matriz de correlación de Pearson entre columnas numéricas">';
+  html += '<thead><tr><th scope="col" class="corr-corner" title="Correlación de Pearson (−1 a 1)">r</th>';
+  cols.forEach(c => {
+    html += '<th scope="col" title="' + escapeHtml(c) + '">' + escapeHtml(c) + '</th>';
+  });
+  html += '</tr></thead><tbody>';
+  matrix.forEach((row, i) => {
+    html += '<tr><th scope="row" title="' + escapeHtml(cols[i]) + '">' + escapeHtml(cols[i]) + '</th>';
+    row.forEach((v, j) => {
+      const has = v !== null && v !== undefined;
+      const style = has ? ' style="background:' + heatColor(v) + '"' : '';
+      const txt = has ? Number(v).toFixed(2) : '—';
+      const title = has
+        ? cols[i] + ' — ' + cols[j] + ': r = ' + v
+        : cols[i] + ' — ' + cols[j] + ': sin variación suficiente (columna constante)';
+      html += '<td' + style + ' title="' + escapeHtml(title) + '">' + txt + '</td>';
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>' +
+    '<p class="corr-hint">Pearson sobre filas con valores en ambos pares · 1 = correlación perfecta · 0 = ninguna · −1 = inversa · «—» = sin variación suficiente.</p>';
+  box.innerHTML = html;
+}
+
 // Última respuesta de /stats (para redibujar la distribución sin re-fetch)
 let lastStatsData = null;
 

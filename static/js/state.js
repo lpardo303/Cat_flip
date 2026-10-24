@@ -175,7 +175,7 @@ function switchTab(name) {
   document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', names[i]===name));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
-  if (name === 'stats') loadStats();
+  if (name === 'stats') { loadStats(); loadCorrelations(); }
   if (name === 'schema') loadSchema();
   if (name === 'lineage') loadLineage();
 }
