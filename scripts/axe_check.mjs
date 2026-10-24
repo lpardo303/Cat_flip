@@ -1,18 +1,18 @@
 // Gate de accesibilidad (F3.4 + dark mode automático + Open Core): abre
-// Cat_flip con Playwright y ejecuta axe (WCAG 2.0 A/AA) en 13 corridas —
+// Cat_flip con Playwright y ejecuta axe (WCAG 2.0 A/AA) en 15 corridas —
 // la página base en modo Automático con el sistema en oscuro
 // (prefers-color-scheme, perfil sin localStorage); tema claro y oscuro
-// explícitos sobre 5 superficies (página base, modal «Receta desde CSV»,
-// modal de conectores demo, modal de validación de esquema y la pestaña
-// Diagnóstico con el heatmap); y las 2 paletas premium (Aurora, Solar)
-// con el servidor licenciado. Además verifica que el cambio en vivo del
-// sistema re-aplica el tema (listener del matchMedia en modo 'auto') y
-// escribe violations.json. Sale con código 1 si hay fallos o
-// violaciones, así la CI falla sin parsear la consola.
+// explícitos sobre 6 superficies (página base, modal «Receta desde CSV»,
+// modal de conectores demo, modal de validación de esquema, la pestaña
+// Diagnóstico con el heatmap y el panel de selector de tema abierto); y
+// las 2 paletas premium (Aurora, Solar) con el servidor licenciado.
+// Además verifica que el cambio en vivo del sistema re-aplica el tema
+// (listener del matchMedia en modo 'auto') y escribe violations.json.
+// Sale con código 1 si hay fallos o violaciones, así la CI falla sin
+// parsear la consola.
 //
 // Uso: con el servidor corriendo (python app.py), `npm run test:axe`.
-// El servidor debe levantar CON licencia premium (CATFLIP_PREMIUM_KEY)
-// si no, las corridas premium fallan — la CI lo hace así.
+// El servidor debe levantar CON licencia premium (CATFLIP_PREMIUM_KEY)  // si no, las corridas premium fallan — la CI lo hace así.
 // Variables: AXE_BASE_URL (default http://127.0.0.1:5050), AXE_OUT.
 import { chromium } from 'playwright';
 import { createRequire } from 'node:module';
@@ -161,12 +161,31 @@ try {
     await page.waitForSelector('#corr-grid table');
     await runAxe(page, `diagnóstico-correlaciones (${theme})`);
     await page.evaluate(() => switchTab('data'));
+
+    // Selector de tema abierto (6ª superficie): el panel con vista previa
+    // y grupos Claro/Oscuro/Sistema, abierto por el mismo mecanismo que el
+    // usuario (aria-expanded, foco roving y swatches en su estado real).
+    await page.evaluate(() => openThemeMenu());
+    await page.waitForSelector('#theme-menu:not([hidden])');
+    const menuItems = await page.evaluate(() => ({
+      items: document.querySelectorAll('#theme-menu .theme-menu-item').length,
+      groups: document.querySelectorAll('#theme-menu [role="group"]').length,
+      checked: document.querySelectorAll('#theme-menu [aria-checked="true"]').length,
+    }));
+    if (menuItems.items < 3 || menuItems.groups !== 3 || menuItems.checked !== 1) {
+      console.log(`selector de tema: FALLO — panel mal construido (${JSON.stringify(menuItems)})`);
+      results.push({ label: `selector-tema-abierto-${theme}`, violations: [], error: 'panel de tema vacío o inválido' });
+      failures += 1;
+    } else {
+      await runAxe(page, `selector-tema-abierto (${theme})`);
+    }
+    await page.evaluate(() => closeThemeMenu(false));
   }
 
   // ── Superficies premium (Open Core): Aurora y Solar ─────────────────
   // Usa el mismo mecanismo que el usuario (themeMode + applyTheme + link
   // /premium/themes/<id>.css). Sin licencia en el servidor, FALLO: el
-  // gate de CI siempre levanta con CATFLIP_PREMIUM_KEY, así las 13
+  // gate de CI siempre levanta con CATFLIP_PREMIUM_KEY, así las 15
   // corridas son reales y nunca se omiten en silencio.
   const premium = await page.evaluate(() =>
     fetch('/premium/status').then(r => r.json()).catch(() => null));

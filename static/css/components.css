@@ -27,7 +27,114 @@
   [data-theme="dark"] .theme-toggle .icon-moon { display: none; }
   [data-theme="dark"] .theme-toggle .icon-sun { display: inline-block; }
 
-  /* ── TOP RIBBON (Fase 2 — 2 filas) ────────────────────── */
+  /* ── PANEL DE TEMA (lista con vista previa, Claro/Oscuro/Sistema) ──── */
+  .theme-menu {
+    position: fixed;
+    z-index: 420;
+    min-width: 212px;
+    max-width: 260px;
+    padding: 0.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    background: var(--surface-elevated);
+    backdrop-filter: blur(16px) saturate(1.6);
+    -webkit-backdrop-filter: blur(16px) saturate(1.6);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-glass);
+  }
+  .theme-menu[hidden] { display: none; }
+  .theme-menu-group { display: flex; flex-direction: column; gap: 0.15rem; }
+  .theme-menu-group + .theme-menu-group {
+    border-top: 1px solid var(--border-subtle);
+    padding-top: 0.3rem;
+  }
+  .theme-menu-title {
+    font-size: 0.62rem;
+    font-weight: 700;
+    font-family: var(--font-ui);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 0.1rem 0.45rem 0.15rem;
+  }
+  .theme-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    width: 100%;
+    padding: 0.3rem 0.45rem;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius2);
+    color: var(--text);
+    font-size: 0.78rem;
+    font-family: var(--font-ui);
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .theme-menu-item:hover { background: var(--teal-bg); border-color: var(--teal-bd); }
+  .theme-menu-item:focus-visible {
+    outline: 2px solid var(--teal);
+    outline-offset: 1px;
+    background: var(--teal-bg);
+    border-color: var(--teal-bd);
+  }
+  .theme-menu-item[aria-checked="true"] {
+    background: var(--teal-bg);
+    border-color: var(--teal);
+    font-weight: 600;
+  }
+  .theme-menu-name { flex: 1; }
+  .theme-menu-check {
+    width: 14px;
+    height: 14px;
+    color: var(--teal);
+    visibility: hidden;
+    flex-shrink: 0;
+  }
+  .theme-menu-item[aria-checked="true"] .theme-menu-check { visibility: visible; }
+
+  /* Vista previa del tema: mini-lienzo con los TOKENS de esa paleta.
+     Decorativo (aria-hidden), por eso las barras son fondos y no texto:
+     el gate de axe no exige contraste sobre elementos sin nodo de texto. */
+  .theme-swatch {
+    width: 46px;
+    height: 32px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 4px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-main);
+  }
+  .theme-swatch .sw-head {
+    height: 9px;
+    border-radius: 3px;
+    background: var(--surface-elevated);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .theme-swatch .sw-line {
+    height: 3px;
+    width: 78%;
+    border-radius: 2px;
+    background: var(--text-muted);
+    opacity: 0.55;
+  }
+  .theme-swatch .sw-line-short { width: 48%; }
+  .theme-swatch .sw-pill {
+    height: 3px;
+    width: 16px;
+    margin-top: auto;
+    border-radius: 2px;
+    background: var(--teal);
+  }
+
   header {
     position: sticky; top: 0; z-index: 200;
     background: var(--surface);

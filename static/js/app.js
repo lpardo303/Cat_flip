@@ -4,13 +4,22 @@
 // resultado de no tener clave guardada) sigue `prefers-color-scheme` con
 // re-aplicación en vivo. Los ids premium ('aurora', 'solar', …) llegan de
 // /premium/status — solo existen con licencia y el CSS se inyecta desde
-// /premium/themes/<id>.css. Ciclo del botón sin licencia:
-// Claro → Oscuro → Automático; con licencia se amplía tras Automático con
-// cada tema del manifiesto y vuelta a Claro.
+// /premium/themes/<id>.css.
+// El botón NO cicla: abre el panel #theme-menu, donde cada opción lleva una
+// vista previa real del tema (swatch con los tokens de esa paleta) y se
+// agrupa en Claro / Oscuro / Sistema. La familia de cada tema premium
+// (campo `mode`) la manda el servidor en /premium/status, nunca la adivina
+// el front; sin licencia solo existen Claro, Oscuro y Sistema.
 const THEME_SHORT = { light: 'Claro', dark: 'Oscuro', auto: 'Auto' };
 const THEME_NAME  = { light: 'Claro', dark: 'Oscuro', auto: 'Automático' };
+const THEME_GROUPS = [
+  { key: 'light', title: 'Claro' },
+  { key: 'dark',  title: 'Oscuro' },
+  { key: 'auto',  title: 'Sistema' },
+];
 let themeMode = 'auto';
-let premiumThemes = [];   // [{id, name}] del servidor — vacío sin licencia
+let themeMenuOpen = false;
+let premiumThemes = [];   // [{id, name, mode}] del servidor — vacío sin licencia
 const schemeMQ = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
 
 function premiumThemeById(id) {
@@ -21,10 +30,32 @@ function themeOrder() {
   return ['light', 'dark', 'auto'].concat(premiumThemes.map(t => t.id));
 }
 
-function themeNext(mode) {
-  const order = themeOrder();
-  const i = order.indexOf(mode);
-  return order[(i + 1) % order.length]; // id desconocido (−1) → 'light'
+// Grupos del panel: el core siempre, los premium según `mode` del servidor.
+function themeGroups() {
+  const groups = THEME_GROUPS.map(g => ({ key: g.key, title: g.title, items: [] }));
+  groups[0].items.push({ id: 'light', name: THEME_NAME.light });
+  groups[1].items.push({ id: 'dark',  name: THEME_NAME.dark });
+  groups[2].items.push({ id: 'auto',  name: THEME_NAME.auto });
+  premiumThemes.forEach(t => {
+    const g = groups.find(x => x.key === (t.mode === 'dark' ? 'dark' : 'light'));
+    if (g) g.items.push({ id: t.id, name: t.name });
+  });
+  return groups;
+}
+
+// Qué resuelve 'auto' AHORA: la preferencia del sistema. Siempre un id con
+// alcance propio ('light' incluido) para que un swatch nunca herede la
+// paleta de la página, aunque esté en otro tema.
+function systemThemeId() {
+  return (schemeMQ && schemeMQ.matches) ? 'dark' : 'light';
+}
+
+// data-theme del swatch: 'auto' muestra lo que daría el sistema; el resto,
+// su propio id.
+function swatchThemeAttr(id) {
+  if (id === 'auto') return systemThemeId();
+  if (id === 'light') return 'light';
+  return id;
 }
 
 function themeDisplayName(mode) {
@@ -57,16 +88,15 @@ function applyTheme() {
   } else {
     html.removeAttribute('data-theme');
   }
-  const next = themeNext(themeMode);
-  const nextPremium = premiumThemeById(next);
+  const name = themeDisplayName(themeMode);
   const label = document.getElementById('theme-label');
-  if (label) label.textContent = nextPremium ? nextPremium.name : THEME_SHORT[next];
+  if (label) label.textContent = THEME_SHORT[themeMode] || name;
   const btn = document.getElementById('theme-toggle');
   if (btn) {
-    const name = themeDisplayName(themeMode);
-    btn.title = 'Cambiar tema (actual: ' + name + ')';
-    btn.setAttribute('aria-label', 'Cambiar tema — actual: ' + name);
+    btn.title = 'Elegir tema (actual: ' + name + ')';
+    btn.setAttribute('aria-label', 'Elegir tema — actual: ' + name);
   }
+  syncThemeMenu();
 }
 
 (function initTheme() {
@@ -79,7 +109,7 @@ function applyTheme() {
 })();
 
 // Licencia premium (Open Core): confirma/corrige el modo guardado y
-// amplía el ciclo del botón con los temas del manifiesto del servidor.
+// amplía el panel con los temas del manifiesto del servidor.
 // Un id premium guardado sin licencia degrada a 'auto' aquí mismo.
 async function initPremiumThemes() {
   try {
@@ -88,6 +118,8 @@ async function initPremiumThemes() {
     premiumThemes = (data.licensed && Array.isArray(data.themes)) ? data.themes : [];
   } catch (e) { premiumThemes = []; }
   if (themeOrder().indexOf(themeMode) === -1) themeMode = 'auto';
+  preloadPremiumCss();   // solo con licencia: la lista viene vacía sin ella
+  buildThemeMenu();
   applyTheme();
 }
 initPremiumThemes();
@@ -99,11 +131,187 @@ if (schemeMQ) {
   else if (schemeMQ.addListener) schemeMQ.addListener(onSchemeChange); // Safari <14
 }
 
-function toggleTheme() {
-  themeMode = themeNext(themeMode);
+function setThemeMode(id) {
+  if (themeOrder().indexOf(id) === -1) return;
+  themeMode = id;
   try { localStorage.setItem('catflip-theme', themeMode); } catch (e) {}
   applyTheme();
+  closeThemeMenu(true);
 }
+
+// ── PANEL DE TEMA (lista con vista previa, agrupada Claro/Oscuro/Sistema) ─
+// El panel es estático en el HTML (#theme-menu); aquí se construye su
+// contenido y se gestiona apertura, teclado y foco.
+function preloadPremiumCss() {
+  premiumThemes.forEach(t => {
+    const id = 'premium-preview-css-' + t.id;
+    if (document.getElementById(id)) return;
+    const link = document.createElement('link');
+    link.id = id;
+    link.rel = 'stylesheet';
+    link.href = '/premium/themes/' + encodeURIComponent(t.id) + '.css';
+    document.head.appendChild(link);
+  });
+}
+
+function buildThemeMenu() {
+  const menu = document.getElementById('theme-menu');
+  if (!menu) return;
+  menu.textContent = '';
+  themeGroups().forEach(group => {
+    const wrap = document.createElement('div');
+    wrap.className = 'theme-menu-group';
+    wrap.setAttribute('role', 'group');
+    const title = document.createElement('span');
+    title.className = 'theme-menu-title';
+    title.id = 'theme-group-' + group.key;
+    title.textContent = group.title;
+    wrap.setAttribute('aria-labelledby', title.id);
+    wrap.appendChild(title);
+
+    group.items.forEach(item => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'theme-menu-item';
+      btn.setAttribute('role', 'menuitemradio');
+      btn.setAttribute('aria-checked', 'false');
+      btn.tabIndex = -1;
+      btn.dataset.themeId = item.id;
+
+      const sw = document.createElement('span');
+      sw.className = 'theme-swatch';
+      sw.setAttribute('aria-hidden', 'true');
+      ['sw-head', 'sw-line', 'sw-line sw-line-short', 'sw-pill'].forEach(cls => {
+        const part = document.createElement('span');
+        part.className = cls;
+        sw.appendChild(part);
+      });
+
+      const name = document.createElement('span');
+      name.className = 'theme-menu-name';
+      name.textContent = item.name;
+
+      // icon() devuelve cadena HTML → se materializa en un nodo suelto
+      const holder = document.createElement('span');
+      holder.innerHTML = icon('check');
+      const check = holder.firstElementChild;
+      check.setAttribute('class', 'icon-svg theme-menu-check');
+
+      btn.appendChild(sw);
+      btn.appendChild(name);
+      btn.appendChild(check);
+      btn.addEventListener('click', () => setThemeMode(item.id));
+      wrap.appendChild(btn);
+    });
+    menu.appendChild(wrap);
+  });
+  syncThemeMenu();
+}
+
+// aria-checked + tabindex móvil (roving) + data-theme de cada swatch.
+function syncThemeMenu() {
+  const menu = document.getElementById('theme-menu');
+  if (!menu) return;
+  let active = null;
+  const items = menu.querySelectorAll('.theme-menu-item');
+  items.forEach(btn => {
+    const on = btn.dataset.themeId === themeMode;
+    btn.setAttribute('aria-checked', on ? 'true' : 'false');
+    btn.tabIndex = on ? 0 : -1;
+    if (on) active = btn;
+    const sw = btn.querySelector('.theme-swatch');
+    const attr = swatchThemeAttr(btn.dataset.themeId);
+    if (sw) {
+      if (attr) sw.setAttribute('data-theme', attr);
+      else sw.removeAttribute('data-theme');
+    }
+  });
+  if (!active && items.length) items[0].tabIndex = 0;
+}
+
+function positionThemeMenu() {
+  const menu = document.getElementById('theme-menu');
+  const btn = document.getElementById('theme-toggle');
+  if (!menu || !btn) return;
+  const r = btn.getBoundingClientRect();
+  const width = menu.offsetWidth || 208;
+  menu.style.top = (r.bottom + 6) + 'px';
+  let left = r.right - width;
+  const maxLeft = Math.max(8, window.innerWidth - width - 8);
+  if (left > maxLeft) left = maxLeft;
+  if (left < 8) left = 8;
+  menu.style.left = left + 'px';
+}
+
+function openThemeMenu() {
+  const menu = document.getElementById('theme-menu');
+  const btn = document.getElementById('theme-toggle');
+  if (!menu || !btn) return;
+  themeMenuOpen = true;
+  menu.hidden = false;
+  btn.setAttribute('aria-expanded', 'true');
+  syncThemeMenu();
+  positionThemeMenu();
+  const active = menu.querySelector('.theme-menu-item[aria-checked="true"]') ||
+                 menu.querySelector('.theme-menu-item');
+  if (active) active.focus();
+}
+
+function closeThemeMenu(refocus) {
+  const menu = document.getElementById('theme-menu');
+  const btn = document.getElementById('theme-toggle');
+  if (!menu || !btn || !themeMenuOpen) return;
+  themeMenuOpen = false;
+  menu.hidden = true;
+  btn.setAttribute('aria-expanded', 'false');
+  if (refocus) btn.focus();
+}
+
+function toggleThemeMenu() {
+  if (themeMenuOpen) closeThemeMenu(false);
+  else openThemeMenu();
+}
+
+// Teclado del panel: flechas recorren las opciones de TODOS los grupos,
+// Home/End saltan a los extremos, Escape cierra y devuelve el foco al
+// botón, Tab cierra (el foco sigue su curso natural).
+document.addEventListener('keydown', e => {
+  if (!themeMenuOpen) return;
+  const menu = document.getElementById('theme-menu');
+  if (!menu) return;
+  const items = Array.prototype.slice.call(menu.querySelectorAll('.theme-menu-item'));
+  if (!items.length) return;
+  const i = items.indexOf(document.activeElement);
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    closeThemeMenu(true);
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    items[(i + 1) % items.length].focus();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    items[(i - 1 + items.length) % items.length].focus();
+  } else if (e.key === 'Home') {
+    e.preventDefault();
+    items[0].focus();
+  } else if (e.key === 'End') {
+    e.preventDefault();
+    items[items.length - 1].focus();
+  } else if (e.key === 'Tab') {
+    closeThemeMenu(false);
+  }
+});
+
+// Clic fuera del panel o del botón → cierra (el propio clic del botón ya
+// alternó antes de burbujear hasta aquí).
+document.addEventListener('click', e => {
+  if (!themeMenuOpen) return;
+  const t = e.target;
+  if (t && typeof t.closest === 'function' && t.closest('#theme-menu, #theme-toggle')) return;
+  closeThemeMenu(false);
+});
+
+window.addEventListener('resize', () => { if (themeMenuOpen) positionThemeMenu(); });
 
 function icon(name) {
   const paths = {
@@ -148,6 +356,7 @@ function icon(name) {
 document.addEventListener('DOMContentLoaded', () => {
   applyPanelClasses();
   updateColVisBadge();
+  buildThemeMenu();   // núcleo (Claro/Oscuro/Sistema) antes de /premium/status
 });
 
 // ── PANELES COLAPSABLES (F2.3) ──────────────────────────────────────────

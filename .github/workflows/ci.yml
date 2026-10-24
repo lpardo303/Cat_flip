@@ -45,7 +45,7 @@ jobs:
   axe:
     runs-on: ubuntu-latest
     # Licencia premium para que el gate cubra también las 2 paletas
-    # premium (Aurora y Solar) → 13 corridas en total
+    # premium (Aurora y Solar) → 15 corridas en total
     env:
       CATFLIP_PREMIUM_KEY: ci
     steps:
