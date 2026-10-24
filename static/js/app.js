@@ -1,22 +1,49 @@
 // Cat_flip — tema, paneles colapsables, init, listeners globales
-// ── TEMA ────────────────────────────────────────────────────────────────
-(function() {
-  const saved = localStorage.getItem('catflip-theme') || 'light';
-  if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+// ── TEMA (light | dark | auto — prefers-color-scheme) ────────────────────────────────────────────────────────────────
+// Tres estados: 'light' y 'dark' son elección manual persistida; 'auto'
+// (valor por defecto y resultado de no tener clave guardada) sigue la
+// preferencia del sistema `prefers-color-scheme` y se re-aplica en vivo
+// cuando el SO cambia. El ciclo del botón es Claro → Oscuro → Automático.
+const THEME_NEXT  = { light: 'dark', dark: 'auto', auto: 'light' };
+const THEME_LABEL = { light: 'Oscuro', dark: 'Auto', auto: 'Claro' };       // texto del botón = siguiente estado
+const THEME_NAME  = { light: 'Claro', dark: 'Oscuro', auto: 'Automático' }; // nombre del estado actual (aria/title)
+let themeMode = 'auto';
+const schemeMQ = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+
+function applyTheme() {
+  const html = document.documentElement;
+  const dark = themeMode === 'dark' || (themeMode === 'auto' && !!(schemeMQ && schemeMQ.matches));
+  html.setAttribute('data-theme-mode', themeMode);
+  if (dark) html.setAttribute('data-theme', 'dark');
+  else html.removeAttribute('data-theme');
+  const label = document.getElementById('theme-label');
+  if (label) label.textContent = THEME_LABEL[themeMode];
+  const btn = document.getElementById('theme-toggle');
+  if (btn) {
+    btn.title = 'Cambiar tema (actual: ' + THEME_NAME[themeMode] + ')';
+    btn.setAttribute('aria-label', 'Cambiar tema — actual: ' + THEME_NAME[themeMode]);
+  }
+}
+
+(function initTheme() {
+  let saved = null;
+  try { saved = localStorage.getItem('catflip-theme'); } catch (e) {}
+  // Clave ausente o legada → 'auto': nuevas visitas siguen el sistema
+  themeMode = (saved === 'light' || saved === 'dark') ? saved : 'auto';
+  applyTheme();
 })();
 
+// Cambios del sistema: solo re-aplican si el usuario no forzó claro/oscuro
+if (schemeMQ) {
+  const onSchemeChange = () => { if (themeMode === 'auto') applyTheme(); };
+  if (schemeMQ.addEventListener) schemeMQ.addEventListener('change', onSchemeChange);
+  else if (schemeMQ.addListener) schemeMQ.addListener(onSchemeChange); // Safari <14
+}
+
 function toggleTheme() {
-  const html = document.documentElement;
-  const isDark = html.getAttribute('data-theme') === 'dark';
-  if (isDark) {
-    html.removeAttribute('data-theme');
-    localStorage.setItem('catflip-theme', 'light');
-    document.getElementById('theme-label').textContent = 'Oscuro';
-  } else {
-    html.setAttribute('data-theme', 'dark');
-    localStorage.setItem('catflip-theme', 'dark');
-    document.getElementById('theme-label').textContent = 'Claro';
-  }
+  themeMode = THEME_NEXT[themeMode];
+  try { localStorage.setItem('catflip-theme', themeMode); } catch (e) {}
+  applyTheme();
 }
 
 function icon(name) {
@@ -57,11 +84,9 @@ function icon(name) {
   return '<svg class="icon-svg" viewBox="0 0 24 24">' + (paths[name] || '') + '</svg>';
 }
 
-// Sincronizar tema y layout al cargar (desde localStorage)
+// Sincronizar layout al cargar (el tema ya se aplicó en initTheme al
+// cargar este script — mismo punto que antes, sin flash adicional)
 document.addEventListener('DOMContentLoaded', () => {
-  if (document.documentElement.getAttribute('data-theme') === 'dark') {
-    document.getElementById('theme-label').textContent = 'Claro';
-  }
   applyPanelClasses();
   updateColVisBadge();
 });

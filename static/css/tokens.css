@@ -1,6 +1,7 @@
 /* Cat_flip Studio ETL — design tokens — tema claro/oscuro (extraído de templates/index.html, P0 modularización) */
 /* ── TOKENS ────────────────────────────────────────────── */
   :root {
+    color-scheme: light; /* widgets nativos (scroll, formularios) → tema claro */
     /* Escala cromática teal (spec Cat_flip Studio) */
     --teal-50:  #f2faf9;
     --teal-100: #cfefef;
@@ -87,6 +88,7 @@
 
   /* ── TEMA OSCURO ───────────────────────────────────────── */
   [data-theme="dark"] {
+    color-scheme: dark; /* widgets nativos → tema oscuro (idem en modo auto cuando el SO oscurece) */
     /* Escala teal más luminosa para oscuro */
     --teal-200: #b8e8e8;
     --teal-300: #85cccc;
