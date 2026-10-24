@@ -1,8 +1,12 @@
-// Gate de accesibilidad (F3.4): abre Cat_flip con Playwright, ejecuta axe
-// (WCAG 2.0 A/AA) en tema claro y oscuro sobre 5 superficies — página
-// base, modal «Receta desde CSV», modal de conectores demo, modal de
-// validación de esquema y la pestaña Diagnóstico con el heatmap de
-// correlaciones — y escribe violations.json. Sale con código 1 si hay
+// Gate de accesibilidad (F3.4 + dark mode automático): abre Cat_flip con
+// Playwright y ejecuta axe (WCAG 2.0 A/AA) en 11 corridas — la página base
+// en modo Automático con el sistema en oscuro (prefers-color-scheme, perfil
+// sin localStorage) y después tema claro y oscuro explícitos sobre 5
+// superficies: página base, modal «Receta desde CSV», modal de conectores
+// demo, modal de validación de esquema y la pestaña Diagnóstico con el
+// heatmap de correlaciones. Además verifica que el cambio en vivo del
+// sistema re-aplica el tema (listener del matchMedia en modo 'auto') y
+// escribe violations.json. Sale con código 1 si hay fallos o
 // violaciones, así la CI falla sin parsear la consola.
 //
 // Uso: con el servidor corriendo (python app.py), `npm run test:axe`.
@@ -49,11 +53,24 @@ const browser = await chromium.launch();
 try {
   const page = await browser.newPage();
 
-  // Sube el CSV por el input real del app (mismo camino que un usuario)
   const dir = mkdtempSync(join(tmpdir(), 'catflip-axe-'));
   const csvPath = join(dir, 'demo.csv');
   writeFileSync(csvPath, CSV);
+
+  // Modo Automático con el SO en oscuro: contexto Playwright fresco (sin
+  // localStorage) → themeMode='auto' debe resolver data-theme=dark al cargar
+  await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto(BASE_URL);
+  const autoDark = await page.evaluate(() =>
+    document.documentElement.getAttribute('data-theme-mode') === 'auto' &&
+    document.documentElement.getAttribute('data-theme') === 'dark');
+  if (!autoDark) {
+    console.log('auto-oscuro: FALLO — prefers-color-scheme oscuro no aplicó data-theme=dark');
+    results.push({ label: 'página (automático · sistema oscuro)', violations: [], error: 'auto-dark no aplicado' });
+    failures += 1;
+  }
+
+  // Sube el CSV por el input real del app (mismo camino que un usuario)
   await page.setInputFiles('#file-input', csvPath);
   await page.waitForFunction(
     () => document.getElementById('header-metrics').style.display === 'flex',
@@ -71,6 +88,23 @@ try {
     const data = await res.json();
     if (!data.error) handleOpResponse('change_case', { column: 'Nombre', case: 'upper' }, data, false);
   });
+
+  // Superficie extra: la página ya con datos en Automático + sistema oscuro
+  if (autoDark) await runAxe(page, 'página (automático · sistema oscuro)');
+
+  // El cambio del sistema en vivo debe re-aplicar el tema (modo 'auto'):
+  // al emular claro, el listener del matchMedia quita data-theme=dark.
+  await page.emulateMedia({ colorScheme: 'light' });
+  const liveFlip = await page.waitForFunction(
+    () => document.documentElement.getAttribute('data-theme-mode') === 'auto' &&
+          !document.documentElement.hasAttribute('data-theme'),
+    null, { timeout: 3000 },
+  ).then(() => true).catch(() => false);
+  if (!liveFlip) {
+    console.log('cambio en vivo: FALLO — prefers-color-scheme claro no re-aplicó el tema');
+    results.push({ label: 'cambio-en-vivo-scheme', violations: [], error: 'listener no re-aplicó' });
+    failures += 1;
+  }
 
   for (const theme of ['light', 'dark']) {
     await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme);
