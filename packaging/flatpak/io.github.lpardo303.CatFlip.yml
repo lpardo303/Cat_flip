@@ -1,0 +1,44 @@
+# Manifesto de Flatpak de Cat_flip (build local firmado).
+#
+# Envuelve el mismo binario onedir de PyInstaller que usa el AppImage
+# (packaging/appimage/catflip.spec → dist/CatFlip), de modo que ambos
+# formatos compilan exactamente el mismo código. El módulo `catflip`
+# espera que dist/CatFlip exista: build.sh lo construye antes.
+#
+# Runtime FDO 26.08 (glibc 2.44, el mismo que enlaza el binario construido
+# en este host; con 25.08/glibc 2.42 el binario no arranca). Sin Python del
+# runtime: la app trae su intérprete congelado. --share=network porque el
+# servidor enlaza 127.0.0.1:5050.
+id: io.github.lpardo303.CatFlip
+runtime: org.freedesktop.Platform
+runtime-version: '26.08'
+sdk: org.freedesktop.Sdk
+command: catflip
+finish-args:
+  - --share=network
+
+modules:
+  - name: catflip
+    buildsystem: simple
+    build-commands:
+      - mkdir -p /app/lib/catflip
+      - cp -a CatFlip/. /app/lib/catflip/
+      - install -Dm755 catflip.sh /app/bin/catflip
+      - install -Dm644 io.github.lpardo303.CatFlip.desktop /app/share/applications/io.github.lpardo303.CatFlip.desktop
+      - install -Dm644 io.github.lpardo303.CatFlip.metainfo.xml /app/share/metainfo/io.github.lpardo303.CatFlip.metainfo.xml
+      - install -Dm644 catflip-icon-512.png /app/share/icons/hicolor/512x512/apps/io.github.lpardo303.CatFlip.png
+      - install -Dm644 catflip-icon-256.png /app/share/icons/hicolor/256x256/apps/io.github.lpardo303.CatFlip.png
+    sources:
+      - type: dir
+        path: ../../dist/CatFlip
+        dest: CatFlip
+      - type: file
+        path: catflip.sh
+      - type: file
+        path: io.github.lpardo303.CatFlip.desktop
+      - type: file
+        path: io.github.lpardo303.CatFlip.metainfo.xml
+      - type: file
+        path: ../appimage/catflip-icon-512.png
+      - type: file
+        path: ../appimage/catflip-icon-256.png

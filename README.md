@@ -93,6 +93,17 @@ Asegúrate de tener **Python 3.10+** instalado en tu sistema.
 > Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 > ```
 
+## 📦 Paquetes (AppImage y Flatpak)
+
+El core MIT se empaqueta en dos formatos **firmados con GPG** desde [`packaging/`](packaging/):
+
+```bash
+packaging/appimage/build.sh   # dist/appimage/CatFlip-<ver>-x86_64.AppImage (+ .asc y SHA256SUMS firmados)
+packaging/flatpak/build.sh    # dist/flatpak/repo (ostree firmado) + CatFlip-<ver>.flatpak (+ .asc)
+```
+
+Ambos formatos envuelven el mismo binario congelado de PyInstaller. Requisitos, verificación de firmas, instalación y las decisiones técnicas (runtime 26.08, SDK a nivel de sistema) están en **[packaging/README.md](packaging/README.md)**.
+
 ## 🧪 Tests
 
 El proyecto usa `pytest` con cobertura. Los fixtures de `tests/conftest.py` resetean el estado global de `app` en cada test, así que los tests son independientes entre sí.
@@ -136,7 +147,7 @@ El core es **MIT** y nunca se degrada: sin licencia la app funciona igual, sin t
 
 ## ⭐ Premium (Open Core)
 
-Junto al core vive el paquete [`premium/`](premium/), con gating **server-side**: la licencia se activa con la env var `CATFLIP_PREMIUM_KEY` o el fichero `premium.key` (ignorado por git), y sin ella `/premium/status` devuelve la lista vacía y `/premium/themes/<id>.css` responde 404. Hoy contiene los **temas Aurora y Solar**; en el roadmap, packaging firmado (Flatpak/AppImage/.exe), auto-update y conectores reales (Postgres/S3/BigQuery). Detalles y guía para ampliarlo en [premium/README.md](premium/README.md).
+Junto al core vive el paquete [`premium/`](premium/), con gating **server-side**: la licencia se activa con la env var `CATFLIP_PREMIUM_KEY` o el fichero `premium.key` (ignorado por git), y sin ella `/premium/status` devuelve la lista vacía y `/premium/themes/<id>.css` responde 404. Hoy contiene los **temas Aurora y Solar**; en el roadmap, auto-update, `.exe` firmado y conectores reales (Postgres/S3/BigQuery). El packaging firmado de Linux (Flatpak/AppImage) ya vive en [`packaging/`](packaging/README.md). Detalles y guía para ampliarlo en [premium/README.md](premium/README.md).
 
 ## 📄 Licencia
 

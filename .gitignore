@@ -70,3 +70,6 @@ violations.json
 
 # Licencia premium local (Open Core) — nunca subir
 premium.key
+
+# Herramientas de packaging (descargadas y verificadas por hash pina)
+packaging/appimage/tools/

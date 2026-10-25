@@ -11,6 +11,19 @@ siguiente corte.
 
 ### Añadido
 
+- **Packaging firmado (AppImage + Flatpak)**: carpeta `packaging/` con builds
+  locales reproducibles del core MIT. `packaging/appimage/build.sh` produce
+  `dist/appimage/CatFlip-<ver>-x86_64.AppImage` y
+  `packaging/flatpak/build.sh` un repo ostree + bundle
+  `dist/flatpak/CatFlip-<ver>.flatpak`, ambos con firma GPG detached y
+  `SHA256SUMS` firmados. Comparten el mismo binario onedir de PyInstaller
+  (`packaging/appimage/catflip.spec` + `entry.py`), el Flatpak usa el app id
+  `io.github.lpardo303.CatFlip` sobre FDO 26.08 y una clave de firma dedicada
+  (pública versionada en `packaging/gpg/`, privada solo en `~/.gnupg`).
+  Verificado: AppImage y flatpak arrancan y sirven `/` 200, la instalación
+  desde un remote con `gpg-verify=1` funciona y un `summary.idx` alterado se
+  rechaza con `BAD signature`. Guía completa en `packaging/README.md`.
+
 - **Nuevo front «Tech Labs»**: rediseño completo de la interfaz (tokens,
   componentes, grid y cabecera) con la triada **Plus Jakarta Sans /
   Space Mono**, grid técnico de fondo con cruces de registro, logo de
