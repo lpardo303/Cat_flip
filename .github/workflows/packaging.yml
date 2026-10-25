@@ -140,6 +140,9 @@ jobs:
       - name: Crea la release (si no existe) y sube los artefactos
         env:
           GH_TOKEN: ${{ github.token }}
+          # Sin checkout en este job: GH_REPO evita que gh resuelva el repo
+          # con git (fallaría con «not a git repository»).
+          GH_REPO: ${{ github.repository }}
         run: |
           gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1 ||
             gh release create "$GITHUB_REF_NAME" --generate-notes
