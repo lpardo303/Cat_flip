@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Cat_flip Studio ETL
+GenericName=Data testing workbench
+Comment=Banco de pruebas de datos, accesibilidad y pipelines ETL
+Exec=catflip
+Icon=io.github.lpardo303.CatFlip
+Terminal=false
+Categories=Development;Utility;
+Keywords=etl;csv;data;calidad;accessibility;axe;
+StartupNotify=true

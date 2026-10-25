@@ -26,7 +26,8 @@ recibe CSS premium que no deba ver.
 | Feature | Estado |
 | --- | --- |
 | Temas visuales **Aurora** (violeta) y **Solar** (ámbar) con vista previa en el selector | ✅ |
-| Packaging firmado (Flatpak + AppImage + `.exe`) | ⏳ roadmap |
+| Packaging firmado (Flatpak + AppImage, Linux) | ✅ 2026-10-25 — `packaging/`, firmado GPG (ver `packaging/README.md`) |
+| Packaging firmado (`.exe` Windows) | ⏳ roadmap |
 | Auto-update integrado | ⏳ roadmap |
 | Conectores reales (Postgres / S3 / BigQuery) | ⏳ roadmap |
 

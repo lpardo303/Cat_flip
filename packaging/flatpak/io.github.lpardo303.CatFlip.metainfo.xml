@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.lpardo303.CatFlip</id>
+  <name>Cat_flip Studio ETL</name>
+  <summary>Banco de pruebas de datos y pipelines ETL</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>
+      Cat_flip Studio ETL carga CSV/Excel y audita calidad, esquema, linaje y
+      distribuciones, ejecuta comprobaciones de accesibilidad (axe) y construye
+      pipelines ETL reproducibles con recetas exportables.
+    </p>
+    <p>
+      El núcleo es libre (MIT); los temas premium viven aparte tras gating
+      server-side.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.lpardo303.CatFlip.desktop</launchable>
+  <url type="homepage">https://github.com/lpardo303/Cat_flip</url>
+  <url type="bugtracker">https://github.com/lpardo303/Cat_flip/issues</url>
+  <developer id="io.github.lpardo303">
+    <name>lpardo303</name>
+  </developer>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="1.0.0" date="2026-10-25"/>
+  </releases>
+</component>
