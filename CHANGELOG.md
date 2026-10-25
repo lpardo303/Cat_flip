@@ -23,6 +23,13 @@ siguiente corte.
   Verificado: AppImage y flatpak arrancan y sirven `/` 200, la instalación
   desde un remote con `gpg-verify=1` funciona y un `summary.idx` alterado se
   rechaza con `BAD signature`. Guía completa en `packaging/README.md`.
+- **CI de packaging**: `.github/workflows/packaging.yml` construye y firma el
+  AppImage y el Flatpak en tags `v*` (y `workflow_dispatch`), verifica las
+  firmas con `gpg --verify` + `sha256sum -c`, sube artifacts y adjunta los
+  artefactos a la release con `gh`. Requiere el secreto `GPG_SIGNING_KEY`
+  (clave privada armored; sin él los jobs fallan de forma explícita). Los
+  scripts ganan `FLATPAK_BUILDER_CMD` (flatpak-builder del host en CI) y
+  detección de Python cuando no hay `.venv`.
 
 - **Nuevo front «Tech Labs»**: rediseño completo de la interfaz (tokens,
   componentes, grid y cabecera) con la triada **Plus Jakarta Sans /

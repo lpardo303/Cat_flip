@@ -14,6 +14,9 @@ cd "$ROOT"
 source "$ROOT/packaging/appimage/pins.env"
 FPR="$(tr -d '[:space:]' < "$ROOT/packaging/gpg/FINGERPRINT")"
 VERSION="$(python3 -c "import json; print(json.load(open('package.json'))['version'])")"
+# Python del proyecto: .venv si existe (local); si no, el del entorno (CI).
+PYBIN=".venv/bin/python"
+[ -x "$PYBIN" ] || PYBIN="python3"
 OUT="$ROOT/dist/appimage"
 TOOLS="$ROOT/packaging/appimage/tools"
 WORK="$ROOT/build/appimage"
@@ -30,8 +33,8 @@ echo "$APPIMAGETOOL_SHA256  $TOOLS/appimagetool.AppImage" | sha256sum -c -
 
 # 2) Binario onedir con PyInstaller (el mismo que usa el Flatpak).
 if [ "${SKIP_FROZEN:-0}" != "1" ]; then
-  echo "→ PyInstaller onedir"
-  .venv/bin/pyinstaller --noconfirm --clean \
+  echo "→ PyInstaller onedir ($PYBIN)"
+  "$PYBIN" -m PyInstaller --noconfirm --clean \
     --distpath dist --workpath build/pyinstaller \
     packaging/appimage/catflip.spec
 fi

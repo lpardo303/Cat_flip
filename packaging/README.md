@@ -102,9 +102,43 @@ los valida.
 - **App id `io.github.lpardo303.CatFlip`**: ya cumple la convención de
   Flathub por si se publica allí (metainfo y desktop incluidos).
 
+## CI (GitHub Actions)
+
+`.github/workflows/packaging.yml` construye y firma ambos paquetes en cada tag
+`v*` y bajo demanda con `workflow_dispatch`:
+
+- **appimage** / **flatpak**: pip + `packaging/*/build.sh` + verificación
+  (`gpg --verify` + `sha256sum -c`) y subida de artifacts. El job de flatpak
+  instala `flatpak-builder` con apt y el runtime 26.08 en `--user`, y usa
+  `FLATPAK_BUILDER_CMD=flatpak-builder` (sin el sandbox de
+  `org.flatpak.Builder` no existe el problema de la instalación de sistema).
+- **release** (solo en tag): crea la release si no existe y adjunta los
+  artefactos con `gh release upload`.
+
+### Secreto obligatorio
+
+La clave privada vive **solo** como secreto del repo **`GPG_SIGNING_KEY`**
+nunca en el código ni en el chat. Exportarla en local y añadirla en
+Settings → Secrets and variables → Actions:
+
+```bash
+gpg --armor --export-secret-keys "$(tr -d '[:space:]' < packaging/gpg/FINGERPRINT)" > /tmp/catflip-signing.key
+```
+
+Sin el secreto, los jobs fallan al inicio con
+`::error::Falta el secreto GPG_SIGNING_KEY` — a propósito: no se publica nada
+sin firmar. Si la huella del secreto no coincide con `packaging/gpg/FINGERPRINT`,
+falla el paso de firma (`gpg --local-user`).
+
+### Compatibilidad
+
+El binario se enlaza contra el glibc del runner (`ubuntu-latest`), igual que en
+local contra el del host (2.44). Bajar el suelo de compatibilidad (p. ej.
+Ubuntu 22.04) exigiría construir en un contenedor antiguo.
+
 ## Límites de esta iteración
 
-- Build local a mano; **no hay workflow de CI** que construya en tags.
-- **No publicado**: ni Flathub ni AppImageHub ni releases de GitHub.
+- **No publicado**: ni Flathub ni AppImageHub (la release de GitHub en tags
+  sí se publica sola).
 - Solo Linux: el `.exe` firmado de Windows y el auto-update siguen en el
   roadmap Open Core (`premium/README.md`).
