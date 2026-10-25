@@ -29,6 +29,8 @@ if [ ! -f "$TOOLS/appimagetool.AppImage" ]; then
   echo "→ descargando appimagetool"
   curl -fsSL -o "$TOOLS/appimagetool.AppImage" "$APPIMAGETOOL_URL"
 fi
+# El run del repo no conserva el bit de ejecución: asegurarlo siempre.
+chmod +x "$TOOLS/appimagetool.AppImage"
 echo "$APPIMAGETOOL_SHA256  $TOOLS/appimagetool.AppImage" | sha256sum -c -
 
 # 2) Binario onedir con PyInstaller (el mismo que usa el Flatpak).
