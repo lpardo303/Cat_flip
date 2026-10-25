@@ -13,6 +13,9 @@ cd "$ROOT"
 
 FPR="$(tr -d '[:space:]' < "$ROOT/packaging/gpg/FINGERPRINT")"
 VERSION="$(python3 -c "import json; print(json.load(open('package.json'))['version'])")"
+# Python del proyecto: .venv si existe (local); si no, el del entorno (CI).
+PYBIN=".venv/bin/python"
+[ -x "$PYBIN" ] || PYBIN="python3"
 MANIFEST="$ROOT/packaging/flatpak/io.github.lpardo303.CatFlip.yml"
 OUT="$ROOT/dist/flatpak"
 BUILD="$ROOT/build/flatpak"
@@ -20,17 +23,26 @@ APP_ID="io.github.lpardo303.CatFlip"
 
 # 1) Binario onedir con PyInstaller (el mismo que usa el AppImage).
 if [ "${SKIP_FROZEN:-0}" != "1" ]; then
-  echo "→ PyInstaller onedir"
-  .venv/bin/pyinstaller --noconfirm --clean \
+  echo "→ PyInstaller onedir ($PYBIN)"
+  "$PYBIN" -m PyInstaller --noconfirm --clean \
     --distpath dist --workpath build/pyinstaller \
     packaging/appimage/catflip.spec
 fi
 
 # 2) flatpak-builder dentro de su app aislada (misma keyring de usuario).
+# Builder: por defecto la app aislada org.flatpak.Builder (necesita el SDK a
+# nivel de sistema); en CI se puede usar un flatpak-builder del host con
+# FLATPAK_BUILDER_CMD="flatpak-builder".
+if [ -n "${FLATPAK_BUILDER_CMD:-}" ]; then
+  read -r -a FB <<< "$FLATPAK_BUILDER_CMD"
+else
+  FB=(flatpak run --filesystem="$ROOT" --command=flatpak-builder org.flatpak.Builder)
+fi
+
 echo "→ flatpak-builder (repo firmado con $FPR)"
 mkdir -p "$OUT" "$BUILD"
 rm -rf "$OUT/repo"
-flatpak run --filesystem="$ROOT" --command=flatpak-builder org.flatpak.Builder \
+"${FB[@]}" \
   --force-clean \
   --repo="$OUT/repo" \
   --gpg-sign="$FPR" \

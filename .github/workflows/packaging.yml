@@ -1,0 +1,147 @@
+name: packaging
+
+# Construye y firma los paquetes del core MIT en cada tag v* (y bajo demanda
+# con workflow_dispatch). Los artefactos firmados suben como artifacts; en un
+# tag además se adjuntan a la release. La clave privada vive SOLO como secreto
+# del repo (GPG_SIGNING_KEY, armored) y su huella está versionada en
+# packaging/gpg/FINGERPRINT: si no coinciden, el paso de firma falla.
+#
+# Nota de compatibilidad: el binario se enlaza contra el glibc del runner
+# (ubuntu-latest). Bajar el suelo de glibc (p. ej. Ubuntu 22.04) exigiría
+# construir en un contenedor antiguo; ver packaging/README.md.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  appimage:
+    name: AppImage firmado
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Herramientas del build
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y desktop-file-utils
+
+      - name: Importa la clave de firma
+        env:
+          GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
+        run: |
+          if [ -z "$GPG_SIGNING_KEY" ]; then
+            echo "::error::Falta el secreto GPG_SIGNING_KEY (clave privada armored de packaging/gpg/FINGERPRINT)"
+            exit 1
+          fi
+          echo "$GPG_SIGNING_KEY" | gpg --batch --import
+
+      - name: Construye y firma el AppImage
+        run: packaging/appimage/build.sh
+
+      - name: Verifica firmas y checksums
+        run: |
+          cd dist/appimage
+          gpg --verify ./*.AppImage.asc ./*.AppImage
+          gpg --verify SHA256SUMS.asc SHA256SUMS
+          sha256sum -c SHA256SUMS
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: appimage
+          path: dist/appimage/
+          if-no-files-found: error
+
+  flatpak:
+    name: Flatpak firmado
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Importa la clave de firma
+        env:
+          GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
+        run: |
+          if [ -z "$GPG_SIGNING_KEY" ]; then
+            echo "::error::Falta el secreto GPG_SIGNING_KEY (clave privada armored de packaging/gpg/FINGERPRINT)"
+            exit 1
+          fi
+          echo "$GPG_SIGNING_KEY" | gpg --batch --import
+
+      - name: flatpak-builder + runtime 26.08
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub \
+            https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub \
+            org.freedesktop.Platform//26.08 org.freedesktop.Sdk//26.08
+
+      - name: Construye y firma el Flatpak
+        env:
+          # flatpak-builder del host: sin sandbox de org.flatpak.Builder no
+          # existe el problema de resolver el SDK en la instalación de sistema.
+          FLATPAK_BUILDER_CMD: flatpak-builder
+        run: packaging/flatpak/build.sh
+
+      - name: Verifica firmas y checksums
+        run: |
+          cd dist/flatpak
+          gpg --verify ./*.flatpak.asc ./*.flatpak
+          gpg --verify SHA256SUMS.asc SHA256SUMS
+          sha256sum -c SHA256SUMS
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flatpak
+          path: dist/flatpak/
+          if-no-files-found: error
+
+  release:
+    name: Adjunta los paquetes a la release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [appimage, flatpak]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Crea la release (si no existe) y sube los artefactos
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1 ||
+            gh release create "$GITHUB_REF_NAME" --generate-notes
+          gh release upload "$GITHUB_REF_NAME" \
+            artifacts/appimage/* artifacts/flatpak/* --clobber
