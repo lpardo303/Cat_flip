@@ -11,6 +11,56 @@ siguiente corte.
 
 ### Añadido
 
+- **Nuevo front «Tech Labs»**: rediseño completo de la interfaz (tokens,
+  componentes, grid y cabecera) con la triada **Plus Jakarta Sans /
+  Space Mono**, grid técnico de fondo con cruces de registro, logo de
+  Cat_flip en caja de acento, botones y badges con sombra sólida y un
+  **canvas isométrico animado** teñido con el acento vigente (se dibuja
+  estático bajo `prefers-reduced-motion`). La lógica ETL, los modales y
+  el comportamiento de los temas no cambian.
+- **Catálogo de color de énfasis**: 6 presets + color personalizado
+  dentro del panel de tema, como **capa ortogonal** a Claro/Oscuro/
+  Sistema y a los premium (Aurora/Solar). `setAccent()` recalcula
+  `--accent`, `--accent-hover`, `--accent-contrast`, `--accent-text`
+  (derivado con ≥5.2:1 sobre las superficies del tema), `--accent-subtle`
+  y `--accent-glow`, y repinta el canvas; persiste entre sesiones
+  (`catflip-accent`). El gate de axe verifica el panel con los 6
+  swatches y el marcado.
+
+### Cambiado
+
+- **Teal estructural retirado**: cabeceras del data grid, títulos del
+  diagnóstico, schema, linaje, badges del ribbon, chips de tipo y toasts
+  `info` pasan a los neutros del prototipo (con `--border-strong` donde
+  hacía falta jerarquía) y a tokens de acento en los puntos de énfasis.
+  El teal queda **solo como color de datos**: heatmap de correlaciones
+  positivas, barras de distribución y peso del benchmark. Los badges
+  `INT`/`FLOAT` ahora son neutros con borde fuerte (riesgo de colisión
+  con `DATE` si se pintaran con el acento naranja).
+- **Vistas limpias al iniciar**: `loadStats`, `loadCorrelations`,
+  `loadSchema` y `loadLineage` no consultan al servidor cuando la sesión
+  del cliente no tiene dataset, así una carga fresca no pinta datos de
+  sesiones anteriores (antes la pestaña Datos estaba vacía pero
+  Diagnóstico/Schema/Linaje mostraban el último dataset del backend).
+- **Footer en inglés**: «Invítame un café» → «Buy me a coffee».
+- **El gate de axe cambia de tema como el usuario**: en vez de un
+  `setAttribute('data-theme')` directo (que pintaba el CSS nuevo pero
+  dejaba `--accent-text`, un token derivado por JS, calculado contra la
+  superficie del tema anterior) ahora hace `themeMode + applyTheme()`,
+  igual que `setThemeMode()`. Así se mide el estado real de la app y no
+  uno que solo existe en el test.
+- **Toasts con fondo opaco** (`--bg-input` + borde de color): antes su
+  fondo translúcido se mezclaba con el scrim del modal y hundía el
+  contraste del texto por debajo de AA.
+- **El gate de axe mide en reposo**: espera a que terminen las
+  transiciones/animaciones finitas de cada superficie antes de evaluar,
+  así el contraste se comprueba sobre los colores finales y no sobre
+  fotogramas interpolados del cambio de tema.
+- **`<input type="color">` fuera del `role="menu"`**: el selector
+  personalizado vive en `<body>` y lo abre desde el panel un
+  `menuitemradio` (un `menu` solo admite `menuitem*`), lo que deja
+  `aria-required-children` limpio en axe.
+
 - **Open Core — paquete `premium/`** con gating server-side (env var
   `CATFLIP_PREMIUM_KEY` o fichero `premium.key`): endpoints
   `/premium/status` y `/premium/themes/<id>.css` (lista vacía y 404 sin

@@ -1,4 +1,160 @@
 // Cat_flip — tema, paneles colapsables, init, listeners globales
+// ── CATÁLOGO DE ÉNFASIS (ortogonal al tema) ──────────────────────────────────
+// Un solo catálogo para claro, oscuro, Sistema y los temas premium: el
+// usuario elige un color de énfasis y de él se derivan variables por
+// CONTRASTE WCAG real (no el umbral de luminancia percibida del prototipo,
+// que ponía texto blanco sobre naranja = 3.2:1 y suspendería axe):
+//   · --accent / --accent-hover / --accent-subtle / --accent-glow
+//   · --accent-contrast  → texto SOBRE el relleno (blanco vs #0c0d10, el
+//     de mayor contraste; sobre naranja sale texto oscuro = 6.0:1)
+//   · --accent-text       → texto acento SOBRE superficie (se oscurece o
+//     mezcla con blanco hasta ≥4.6:1 contra la superficie del tema vigente)
+// applyTheme() llama a applyAccent() → los derivados se recalculan al
+// cambiar de paleta (la ortogonalidad con Aurora/Solar es este cálculo).
+// Persistencia: localStorage['catflip-accent'].
+const ACCENTS = [
+  { hex: '#FF5414', name: 'Naranja Eléctrico' },
+  { hex: '#00F0FF', name: 'Cyan Quantum' },
+  { hex: '#10B981', name: 'Lima Cyber' },
+  { hex: '#8B5CF6', name: 'Violeta Tensor' },
+  { hex: '#F59E0B', name: 'Ámbar Neón' },
+  { hex: '#237373', name: 'Teal Cat_flip' },
+];
+let activeAccent = '#FF5414';
+
+function normalizeHex(v) {
+  if (typeof v !== 'string') return null;
+  let h = v.trim().replace(/^#/, '');
+  if (/^[0-9a-f]{3}$/i.test(h)) h = h.split('').map(c => c + c).join('');
+  return /^[0-9a-f]{6}$/i.test(h) ? '#' + h.toUpperCase() : null;
+}
+
+function hexToRgb(hex) {
+  const h = normalizeHex(hex) || '#FF5414';
+  const n = parseInt(h.slice(1), 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+function rgbToHex(rgb) {
+  const c = v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
+  return ('#' + c(rgb.r) + c(rgb.g) + c(rgb.b)).toUpperCase();
+}
+
+// Luminancia relativa WCAG 2.1
+function relLum(rgb) {
+  const f = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  return 0.2126 * f(rgb.r) + 0.7152 * f(rgb.g) + 0.0722 * f(rgb.b);
+}
+
+function contrastRatio(l1, l2) {
+  const hi = Math.max(l1, l2), lo = Math.min(l1, l2);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+// Parsea el valor calculado de un token (#hex o rgb()/rgba()) → {r,g,b}
+function parseCssRgb(str) {
+  if (!str) return null;
+  str = String(str).trim().toLowerCase();
+  const hex = normalizeHex(str);
+  if (hex) return hexToRgb(hex);
+  const m = str.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/);
+  return m ? { r: +m[1], g: +m[2], b: +m[3] } : null;
+}
+
+// Superficie de referencia del tema vigente para --accent-text.
+// Se usa --base2 (hex) porque todas las paletas la definen y parsea;
+// --bg-panel puede ser color-mix() sin resolver y no se puede leer como
+// color. El objetivo 5.2 (no 4.6) deja margen sobre los tintes de acento
+// (badge, chips) donde el fondo efectivo es más oscuro que la superficie.
+function themeAccentRef() {
+  const cs = getComputedStyle(document.documentElement);
+  return parseCssRgb(cs.getPropertyValue('--base2')) ||
+         parseCssRgb(cs.getPropertyValue('--bg-main')) ||
+         { r: 224, g: 224, b: 224 };
+}
+
+function adjustBrightness(hex, percent) {
+  const rgb = hexToRgb(hex);
+  const factor = 1 + percent / 100;
+  return rgbToHex({ r: rgb.r * factor, g: rgb.g * factor, b: rgb.b * factor });
+}
+
+function applyAccent() {
+  const hex = normalizeHex(activeAccent);
+  if (!hex) return;
+  activeAccent = hex;
+  const rgb = hexToRgb(hex);
+  const root = document.documentElement;
+
+  // Texto sobre el relleno: el de mayor contraste (blanco vs casi-negro)
+  const lumFill = relLum(rgb);
+  const whiteC = (1.0 + 0.05) / (lumFill + 0.05);
+  const darkC = (lumFill + 0.05) / (relLum({ r: 12, g: 13, b: 16 }) + 0.05);
+  const contrastText = whiteC >= darkC ? '#ffffff' : '#0c0d10';
+
+  // Texto acento sobre superficie: iterar hasta ≥5.2:1 vs el tema vigente
+  // (margen sobre 4.6 para los usos sobre tinte de acento, más oscuros)
+  const ref = themeAccentRef();
+  const refLum = relLum(ref);
+  const lighten = refLum <= 0.4;   // superficie oscura → mezclar con blanco
+  let textRgb = { r: rgb.r, g: rgb.g, b: rgb.b };
+  for (let i = 0; i < 40 && contrastRatio(relLum(textRgb), refLum) < 5.2; i++) {
+    textRgb = lighten
+      ? { r: textRgb.r + (255 - textRgb.r) * 0.12,
+          g: textRgb.g + (255 - textRgb.g) * 0.12,
+          b: textRgb.b + (255 - textRgb.b) * 0.12 }
+      : { r: textRgb.r * 0.94, g: textRgb.g * 0.94, b: textRgb.b * 0.94 };
+  }
+
+  root.style.setProperty('--accent', hex);
+  root.style.setProperty('--accent-hover', adjustBrightness(hex, -14));
+  root.style.setProperty('--accent-contrast', contrastText);
+  root.style.setProperty('--accent-text', rgbToHex(textRgb));
+  root.style.setProperty('--accent-subtle', 'rgba(' + rgb.r + ', ' + rgb.g + ', ' + rgb.b + ', 0.12)');
+  root.style.setProperty('--accent-glow', 'rgba(' + rgb.r + ', ' + rgb.g + ', ' + rgb.b + ', 0.35)');
+
+  const dot = document.getElementById('accent-dot');
+  if (dot) dot.style.background = hex;
+  syncAccentMenu();
+  // El fondo estático (reduced-motion) se repinta con el nuevo acento; se
+  // difiere a rAF para que corra tras ejecutar todo el script (evita TDZ
+  // en la primera llamada, producida antes de declarar el canvas).
+  requestAnimationFrame(() => {
+    try { if (mathCtx && mathReduced()) drawStaticMathGrid(); } catch (e) {}
+  });
+}
+
+function setAccent(hex) {
+  const norm = normalizeHex(hex);
+  if (!norm) return;
+  activeAccent = norm;
+  try { localStorage.setItem('catflip-accent', activeAccent); } catch (e) {}
+  applyAccent();
+}
+
+// aria-checked + hex + picker del catálogo dentro del panel de tema
+function syncAccentMenu() {
+  const menu = document.getElementById('theme-menu');
+  if (!menu) return;
+  menu.querySelectorAll('.accent-swatch').forEach(btn => {
+    btn.setAttribute('aria-checked', normalizeHex(btn.dataset.accent) === activeAccent ? 'true' : 'false');
+    btn.tabIndex = -1;
+  });
+  const label = document.getElementById('accent-hex-label');
+  if (label) label.textContent = activeAccent;
+  // El botón «Personalizado» queda marcado solo si el acento activo no es
+  // ninguno de los presets del catálogo (mutuamente excluyente con ellos).
+  const customBtn = menu.querySelector('.accent-custom');
+  if (customBtn) {
+    const isPreset = ACCENTS.some(a => normalizeHex(a.hex) === activeAccent);
+    customBtn.setAttribute('aria-checked', isPreset ? 'false' : 'true');
+    const dot = customBtn.querySelector('.accent-custom-dot');
+    if (dot) dot.style.background = activeAccent;
+  }
+  const custom = document.getElementById('accent-custom');
+  if (custom && normalizeHex(custom.value) !== activeAccent) custom.value = activeAccent;
+}
+
 // ── TEMA (light | dark | auto | temas premium Open Core) ─────────────────────────────────────────────────────────
 // 'light' y 'dark' son elección manual persistida; 'auto' (por defecto y
 // resultado de no tener clave guardada) sigue `prefers-color-scheme` con
@@ -97,6 +253,7 @@ function applyTheme() {
     btn.setAttribute('aria-label', 'Elegir tema — actual: ' + name);
   }
   syncThemeMenu();
+  applyAccent();   // los derivados del acento se recalculan contra la nueva paleta
 }
 
 (function initTheme() {
@@ -106,6 +263,15 @@ function applyTheme() {
   // contra /premium/status justo después); sin clave → 'auto'.
   themeMode = saved || 'auto';
   applyTheme();
+})();
+
+// Acento guardado (o Naranja Eléctrico por defecto). Va después de
+// initTheme para derivar contra la paleta ya aplicada.
+(function initAccent() {
+  let saved = null;
+  try { saved = localStorage.getItem('catflip-accent'); } catch (e) {}
+  activeAccent = normalizeHex(saved) || '#FF5414';
+  applyAccent();
 })();
 
 // Licencia premium (Open Core): confirma/corrige el modo guardado y
@@ -205,7 +371,99 @@ function buildThemeMenu() {
     });
     menu.appendChild(wrap);
   });
+
+  // Sección «Color de énfasis» — catálogo orthogonal al tema (mismo menú,
+  // mismas reglas de teclado: flechas/Home/End recorren también aquí).
+  const accWrap = document.createElement('div');
+  accWrap.className = 'theme-menu-group';
+  accWrap.setAttribute('role', 'group');
+  const accTitle = document.createElement('span');
+  accTitle.className = 'theme-menu-title';
+  accTitle.id = 'accent-group-title';
+  accTitle.textContent = 'Color de énfasis';
+  accWrap.setAttribute('aria-labelledby', accTitle.id);
+  accWrap.appendChild(accTitle);
+
+  const accRow = document.createElement('div');
+  accRow.className = 'accent-row';
+  ACCENTS.forEach(a => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'accent-swatch';
+    btn.setAttribute('role', 'menuitemradio');
+    btn.setAttribute('aria-checked', 'false');
+    btn.setAttribute('aria-label', a.name);
+    btn.title = a.name + ' — ' + a.hex;
+    btn.dataset.accent = a.hex;
+    btn.tabIndex = -1;
+    const dotEl = document.createElement('span');
+    dotEl.className = 'accent-swatch-dot';
+    dotEl.setAttribute('aria-hidden', 'true');
+    dotEl.style.background = a.hex;
+    btn.appendChild(dotEl);
+    btn.addEventListener('click', () => setAccent(a.hex));
+    accRow.appendChild(btn);
+  });
+  accWrap.appendChild(accRow);
+
+  const customWrap = document.createElement('div');
+  customWrap.className = 'accent-custom-wrap';
+  const customLabel = document.createElement('label');
+  customLabel.className = 'accent-custom-label';
+  customLabel.htmlFor = 'accent-custom';
+  customLabel.textContent = 'Personalizado';
+
+  // El <input type="color"> nativo no puede vivir dentro de role="menu"
+  // (solo admite menuitem*): vive FUERA del panel — en <body>, invisible
+  // pero renderizado — y el botón del menú lo abre con showPicker() (o
+  // click() como respaldo). Misma UX, ARIA válido (axe wcag2a/aa).
+  let custom = document.getElementById('accent-custom');
+  if (!custom) {
+    custom = document.createElement('input');
+    custom.type = 'color';
+    custom.id = 'accent-custom';
+    custom.className = 'accent-native-picker';
+    custom.title = 'Elegir un color de énfasis personalizado';
+    custom.setAttribute('aria-hidden', 'true');
+    custom.tabIndex = -1;
+    custom.addEventListener('input', () => setAccent(custom.value));
+    document.body.appendChild(custom);
+  }
+  custom.value = activeAccent;
+
+  const customBtn = document.createElement('button');
+  customBtn.type = 'button';
+  customBtn.className = 'accent-custom';
+  customBtn.setAttribute('role', 'menuitemradio');
+  customBtn.setAttribute('aria-checked', 'false');
+  customBtn.setAttribute('aria-label', 'Color de énfasis personalizado');
+  customBtn.title = 'Elegir un color de énfasis personalizado';
+  customBtn.tabIndex = -1;
+  const customDot = document.createElement('span');
+  customDot.className = 'accent-swatch-dot accent-custom-dot';
+  customDot.setAttribute('aria-hidden', 'true');
+  customDot.style.background = activeAccent;
+  customBtn.appendChild(customDot);
+  customBtn.addEventListener('click', () => {
+    // showPicker() exige gesto del usuario → va dentro de este click.
+    if (typeof custom.showPicker === 'function') {
+      try { custom.showPicker(); return; } catch (e) { /* sin soporte → click */ }
+    }
+    custom.click();
+  });
+
+  const hexLabel = document.createElement('span');
+  hexLabel.className = 'accent-hex';
+  hexLabel.id = 'accent-hex-label';
+  hexLabel.textContent = activeAccent;
+  customWrap.appendChild(customLabel);
+  customWrap.appendChild(customBtn);
+  customWrap.appendChild(hexLabel);
+  accWrap.appendChild(customWrap);
+  menu.appendChild(accWrap);
+
   syncThemeMenu();
+  syncAccentMenu();
 }
 
 // aria-checked + tabindex móvil (roving) + data-theme de cada swatch.
@@ -279,7 +537,7 @@ document.addEventListener('keydown', e => {
   if (!themeMenuOpen) return;
   const menu = document.getElementById('theme-menu');
   if (!menu) return;
-  const items = Array.prototype.slice.call(menu.querySelectorAll('.theme-menu-item'));
+  const items = Array.prototype.slice.call(menu.querySelectorAll('.theme-menu-item, .accent-swatch, .accent-custom'));
   if (!items.length) return;
   const i = items.indexOf(document.activeElement);
   if (e.key === 'Escape') {
@@ -312,6 +570,174 @@ document.addEventListener('click', e => {
 });
 
 window.addEventListener('resize', () => { if (themeMenuOpen) positionThemeMenu(); });
+
+// ── CANVAS MATEMÁTICO DE FONDO (grid isométrico ondulante, Tech Labs) ───
+// Firma visual del prototipo: malla 28×20 en proyección isométrica con onda
+// armónica, repulsión al ratón y tinte del color de énfasis activo. Con
+// prefers-reduced-motion se pinta UNA vez estático (sin rAF, sin ratón).
+const mathCanvas = document.getElementById('math-grid-bg');
+const mathCtx = mathCanvas ? mathCanvas.getContext('2d') : null;
+const MCOLS = 28;
+const MROWS = 20;
+const motionMQ = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+let mathMouse = { x: -9999, y: -9999, tx: -9999, ty: -9999 };
+let mathW = 0;
+let mathH = 0;
+let mathPhase = 0;
+let mathRaf = null;
+
+function mathReduced() { return !!(motionMQ && motionMQ.matches); }
+
+function resizeMathGrid() {
+  if (!mathCtx) return;
+  mathW = window.innerWidth;
+  mathH = window.innerHeight;
+  // setTransform (no scale) — reiniciar el bitmap ya limpia la transformación
+  mathCanvas.width = mathW * window.devicePixelRatio;
+  mathCanvas.height = mathH * window.devicePixelRatio;
+  mathCtx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+}
+
+function drawMathGrid() {
+  if (!mathCtx) return;
+  if (mathReduced()) { drawStaticMathGrid(); return; }
+
+  mathMouse.x += (mathMouse.tx - mathMouse.x) * 0.08;
+  mathMouse.y += (mathMouse.ty - mathMouse.y) * 0.08;
+  mathCtx.clearRect(0, 0, mathW, mathH);
+
+  const rgb = hexToRgb(activeAccent);
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  mathPhase += 0.022;
+
+  const originX = mathW * 0.5;
+  const originY = mathH * 0.48;
+  const cellW = Math.max(34, mathW / (MCOLS * 0.9));
+  const cellH = cellW * 0.52;
+
+  const points = [];
+  for (let r = 0; r < MROWS; r++) {
+    points[r] = [];
+    for (let c = 0; c < MCOLS; c++) {
+      const u = c - MCOLS / 2;
+      const v = r - MROWS / 2;
+      const screenX = originX + (u - v) * cellW * 0.5;
+      const screenY = originY + (u + v) * cellH * 0.5;
+      const dist = Math.sqrt(u * u + v * v);
+      const wave = Math.sin(dist * 0.45 - mathPhase) * 16 +
+                   Math.cos(u * 0.35 + mathPhase * 0.7) * 8;
+      const dx = screenX - mathMouse.x;
+      const dy = (screenY + wave) - mathMouse.y;
+      const distMouse = Math.sqrt(dx * dx + dy * dy);
+      let push = 0;
+      if (distMouse < 260) push = Math.sin((1 - distMouse / 260) * Math.PI) * -22;
+      points[r][c] = {
+        x: screenX,
+        y: screenY + wave + push,
+        intensity: Math.max(0, 1 - dist / (MCOLS * 0.65)),
+      };
+    }
+  }
+
+  const baseAlpha = isDark ? 0.22 : 0.16;
+  mathCtx.lineWidth = 1;
+  for (let r = 0; r < MROWS; r++) {
+    for (let c = 0; c < MCOLS; c++) {
+      const p = points[r][c];
+      if (c < MCOLS - 1) {
+        const pr = points[r][c + 1];
+        const a = (((p.intensity + pr.intensity) * 0.5) * baseAlpha).toFixed(3);
+        mathCtx.strokeStyle = 'rgba(' + rgb.r + ', ' + rgb.g + ', ' + rgb.b + ', ' + a + ')';
+        mathCtx.beginPath();
+        mathCtx.moveTo(p.x, p.y);
+        mathCtx.lineTo(pr.x, pr.y);
+        mathCtx.stroke();
+      }
+      if (r < MROWS - 1) {
+        const pd = points[r + 1][c];
+        const a = (((p.intensity + pd.intensity) * 0.5) * baseAlpha).toFixed(3);
+        mathCtx.strokeStyle = 'rgba(' + rgb.r + ', ' + rgb.g + ', ' + rgb.b + ', ' + a + ')';
+        mathCtx.beginPath();
+        mathCtx.moveTo(p.x, p.y);
+        mathCtx.lineTo(pd.x, pd.y);
+        mathCtx.stroke();
+      }
+      if (r % 2 === 0 && c % 2 === 0 && p.intensity > 0.1) {
+        const a = (p.intensity * (isDark ? 0.6 : 0.4)).toFixed(3);
+        mathCtx.fillStyle = 'rgba(' + rgb.r + ', ' + rgb.g + ', ' + rgb.b + ', ' + a + ')';
+        mathCtx.beginPath();
+        mathCtx.arc(p.x, p.y, 1.6, 0, Math.PI * 2);
+        mathCtx.fill();
+      }
+    }
+  }
+  mathRaf = requestAnimationFrame(drawMathGrid);
+}
+
+function drawStaticMathGrid() {
+  if (!mathCtx) return;
+  mathCtx.clearRect(0, 0, mathW, mathH);
+  const rgb = hexToRgb(activeAccent);
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const alpha = isDark ? 0.15 : 0.12;
+  const originX = mathW * 0.5;
+  const originY = mathH * 0.5;
+  const cellW = Math.max(34, mathW / (MCOLS * 0.9));
+  const cellH = cellW * 0.52;
+  mathCtx.lineWidth = 1;
+  mathCtx.strokeStyle = 'rgba(' + rgb.r + ', ' + rgb.g + ', ' + rgb.b + ', ' + alpha + ')';
+  for (let r = 0; r < MROWS; r++) {
+    for (let c = 0; c < MCOLS; c++) {
+      const u = c - MCOLS / 2;
+      const v = r - MROWS / 2;
+      const x = originX + (u - v) * cellW * 0.5;
+      const y = originY + (u + v) * cellH * 0.5;
+      if (c < MCOLS - 1) {
+        mathCtx.beginPath();
+        mathCtx.moveTo(x, y);
+        mathCtx.lineTo(originX + (u + 1 - v) * cellW * 0.5, originY + (u + 1 + v) * cellH * 0.5);
+        mathCtx.stroke();
+      }
+      if (r < MROWS - 1) {
+        const vNext = (r + 1) - MROWS / 2;
+        mathCtx.beginPath();
+        mathCtx.moveTo(x, y);
+        mathCtx.lineTo(originX + (u - vNext) * cellW * 0.5, originY + (u + vNext) * cellH * 0.5);
+        mathCtx.stroke();
+      }
+    }
+  }
+}
+
+function initMathGrid() {
+  if (!mathCtx) return;
+  resizeMathGrid();
+  if (mathReduced()) { drawStaticMathGrid(); return; }
+  mathRaf = requestAnimationFrame(drawMathGrid);
+}
+
+window.addEventListener('resize', () => {
+  resizeMathGrid();
+  if (mathReduced()) drawStaticMathGrid();
+});
+window.addEventListener('mousemove', e => {
+  mathMouse.tx = e.clientX;
+  mathMouse.ty = e.clientY;
+});
+if (motionMQ) {
+  const onMotionChange = () => {
+    if (mathReduced()) {
+      if (mathRaf) cancelAnimationFrame(mathRaf);
+      mathRaf = null;
+      drawStaticMathGrid();
+    } else if (!mathRaf && mathCtx) {
+      mathRaf = requestAnimationFrame(drawMathGrid);
+    }
+  };
+  if (motionMQ.addEventListener) motionMQ.addEventListener('change', onMotionChange);
+  else if (motionMQ.addListener) motionMQ.addListener(onMotionChange);
+}
+initMathGrid();
 
 function icon(name) {
   const paths = {

@@ -6,7 +6,7 @@
 <title>Cat_flip — Studio ETL</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700;800&family=Geist:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Space+Mono:wght@400;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!-- CSS modular (P0: extraído del bloque de estilos inline) -->
 <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
@@ -14,16 +14,16 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/grid.css') }}">
 </head>
 <body>
-<!-- ── ORBES DE FONDO ──────────────────────────────────────────────────── -->
-<div class="orb orb-1" aria-hidden="true"></div>
-<div class="orb orb-2" aria-hidden="true"></div>
+<!-- ── CANVAS MATEMÁTICO DE FONDO (Tech Labs) ─────────────────────────── -->
+<canvas id="math-grid-bg" aria-hidden="true"></canvas>
 
 <!-- ══ TOP RIBBON ══════════════════════════════════════════════════════════ -->
 <header>
   <!-- ── Fila 1: Identidad + controles + métricas ──────────── -->
   <div class="ribbon-row1">
-    <!-- Logo -->
+    <!-- Logo — caja de acento con el gato (spec Tech Labs) -->
     <div class="logo">
+      <span class="logo-icon-box" aria-hidden="true">
       <svg class="logo-svg" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
         <g transform="matrix(1,0,0,1,-2001.834001,-2225.317355)">
           <g>
@@ -36,6 +36,7 @@
           </g>
         </g>
       </svg>
+      </span>
       <h1 class="logo-title">Cat_flip</h1>
       <span class="logo-sub">Studio ETL</span>
     </div>
@@ -82,6 +83,7 @@
          (vista previa real + grupos Claro/Oscuro/Sistema). El panel vive en
          el final del body y se posiciona junto al botón. -->
     <button class="theme-toggle" id="theme-toggle" type="button" onclick="toggleThemeMenu()" aria-haspopup="menu" aria-expanded="false" aria-controls="theme-menu" title="Elegir tema (actual: Automático)" aria-label="Elegir tema — actual: Automático">
+      <span class="accent-dot" id="accent-dot" aria-hidden="true"></span>
       <span id="theme-icon">
         <svg class="icon-svg icon-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
         <svg class="icon-svg icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
@@ -207,6 +209,7 @@
     <div class="content-area">
       <!-- Empty state -->
       <div class="empty-state" id="empty-state">
+        <div class="empty-badge-hero" id="empty-badge-hero"><span aria-hidden="true">●</span> PIPELINE ENGINE ACTIVE</div>
         <div class="empty-icon">
           <svg class="logo-svg empty-logo" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
             <g transform="matrix(1,0,0,1,-2001.834001,-2225.317355)">
@@ -223,6 +226,15 @@
         </div>
         <h2>Cat_flip Studio ETL</h2>
         <p>Carga un archivo <strong>CSV</strong>, <strong>XLSX</strong> o <strong>XLS</strong> desde el panel izquierdo para empezar tu pipeline.</p>
+        <div class="empty-state-cta">
+          <button class="btn btn-primary" onclick="openDatasetPicker()">
+            <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+            <span>Cargar archivo</span>
+          </button>
+          <button class="btn btn-secondary" onclick="openDatasetPicker()">
+            <span>Ver datasets demo</span>
+          </button>
+        </div>
       </div>
       <!-- Data Grid -->
       <div class="tab-content active" id="tab-data">
@@ -422,7 +434,7 @@
 <footer class="app-footer" id="app-footer">
   <span class="footer-brand">🐈 Cat_flip Studio ETL · <a class="footer-link" href="https://github.com/lpardo303/Cat_flip/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT</a></span>
   <span class="footer-support">
-    <a class="footer-btn" href="https://ko-fi.com/lpardo303" target="_blank" rel="noopener noreferrer" title="Invítame un café en Ko-fi">☕ Invítame un café</a>
+    <a class="footer-btn" href="https://ko-fi.com/lpardo303" target="_blank" rel="noopener noreferrer" title="Buy me a coffee on Ko-fi">☕ Buy me a coffee</a>
     <a class="footer-btn" href="https://github.com/sponsors/lpardo303" target="_blank" rel="noopener noreferrer" title="Apoya el proyecto con GitHub Sponsors">♥ Sponsors</a>
   </span>
 </footer>

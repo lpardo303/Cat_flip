@@ -4,13 +4,13 @@
   table { border-collapse: collapse; width: 100%; font-family: var(--font-mono); font-size: 0.75rem; }
   thead th {
     background: var(--base2);
-    color: var(--teal);
+    color: var(--text);
     font-family: var(--font-head);
     font-weight: 600;
     font-size: 0.72rem;
     padding: 0.55rem 0.85rem 0.7rem; /* padding-bottom extra para la barra */
     text-align: left;
-    border-bottom: 2px solid var(--teal-bd);
+    border-bottom: 2px solid var(--border-strong);
     position: sticky; top: 0;
     white-space: nowrap;
     backdrop-filter: blur(8px);
@@ -84,8 +84,10 @@
     line-height: 1.5;
   }
   .type-badge:hover { opacity: 0.75; transform: translateY(-1px); }
-  .type-badge.INT  { background: var(--teal-bg);    border-color: var(--teal-bd);    color: var(--teal); }
-  .type-badge.FLOAT{ background: var(--teal-bg);    border-color: var(--teal-bd);    color: var(--teal); }
+  /* Tipos numéricos: neutro con borde fuerte (neobrutalismo) — sin teal
+     estructural; distingue INT/FLOAT de STR (borde suave) sin añadir color */
+  .type-badge.INT  { background: var(--surface2);   border-color: var(--border-strong); color: var(--text); }
+  .type-badge.FLOAT{ background: var(--surface2);   border-color: var(--border-strong); color: var(--text); }
   .type-badge.STR  { background: var(--surface2);   border-color: var(--border);     color: var(--text2); }
   .type-badge.DATE { background: var(--orange-bg);  border-color: var(--orange-bd);  color: var(--orange); }
   .type-badge.BOOL { background: rgba(45,158,107,0.10); border-color: rgba(45,158,107,0.28); color: var(--green); }
@@ -141,8 +143,8 @@
     opacity: 1;
   }
   .th-menu-btn:hover {
-    background: var(--teal-bg);
-    color: var(--teal);
+    background: var(--accent-subtle);
+    color: var(--accent-text);
     opacity: 1;
   }
   .th-menu-btn svg {
@@ -155,12 +157,12 @@
   .col-dropdown-menu {
     position: fixed;
     z-index: 999;
-    background: var(--surface);
-    backdrop-filter: blur(20px) saturate(1.6);
-    -webkit-backdrop-filter: blur(20px) saturate(1.6);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-glass-active);
+    background: var(--bg-input);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 2px solid var(--border-strong);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
     padding: 0.4rem 0;
     width: 220px;
     max-height: 80vh;
@@ -179,13 +181,16 @@
 
   .col-menu-header {
     padding: 0.4rem 0.8rem 0.35rem;
-    border-bottom: 1px solid var(--border2);
+    border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-size: 0.72rem;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
     font-weight: 700;
-    color: var(--teal);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text);
   }
   .col-menu-header span {
     overflow: hidden;
@@ -213,8 +218,8 @@
     user-select: none;
   }
   .col-menu-item:hover {
-    background: var(--teal-bg);
-    color: var(--teal);
+    background: var(--accent-subtle);
+    color: var(--accent-text);
   }
   .col-menu-item svg {
     width: 14px; height: 14px;

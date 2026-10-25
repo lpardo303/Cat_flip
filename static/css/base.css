@@ -1,59 +1,51 @@
-/* Cat_flip Studio ETL — reset, base, orbes, reduced-motion (extraído de templates/index.html, P0 modularización) */
+/* Cat_flip Studio ETL — reset, base, fondo grid Tech Labs, reduced-motion (nuevo front) */
   /* ── RESET & BASE ──────────────────────────────────────── */
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html { height: 100%; }
   body {
     font-family: var(--font-ui);
     background: var(--base);
+    /* Grid técnico 80×80 del prototipo (los orbes se sustituyen por esto;
+       Aurora/Solar siguen pintando sus orbes con `[data-theme] body`) */
     background-image:
-      radial-gradient(ellipse 80% 50% at 20% 0%, rgba(38,124,124,0.07) 0%, transparent 60%),
-      radial-gradient(ellipse 60% 40% at 80% 100%, rgba(238,247,247,0.9) 0%, transparent 60%);
+      linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+    background-size: 80px 80px;
     color: var(--text);
     min-height: 100vh;
     font-size: 14px;
-    transition: background 0.3s ease, color 0.3s ease;
-  }
-  [data-theme="dark"] body {
-    background-image:
-      radial-gradient(ellipse 80% 50% at 20% 0%, rgba(61,184,184,0.06) 0%, transparent 60%),
-      radial-gradient(ellipse 60% 40% at 80% 100%, rgba(15,17,23,0.9) 0%, transparent 60%);
+    overflow-x: hidden;
+    transition: background-color 0.25s ease, color 0.25s ease;
+    position: relative;
   }
 
-/* ── ORBES DE FONDO (F0.5) ─────────────────────────────── */
-  .orb {
+  /* ── CRUCES DE REGISTRO (esquinas, estilo Tech Labs) ───── */
+  body::before, body::after {
+    content: "＋";
     position: fixed;
-    border-radius: 50%;
+    font-family: var(--font-mono);
+    color: var(--text-muted);  /* ≥4.6:1 — axe revisa también el texto generado */
+    font-size: 15px;
+    line-height: 1;
+    pointer-events: none;
+    z-index: 99;
+  }
+  body::before { top: 10px; left: 14px; }
+  body::after { bottom: 10px; right: 14px; }
+
+  /* ── CANVAS MATEMÁTICO DE FONDO (grid isométrico ondulante) ── */
+  #math-grid-bg {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
     pointer-events: none;
     z-index: 0;
-    will-change: transform;
+    opacity: 0.85;
   }
-  .orb-1 {
-    width: 520px; height: 520px;
-    top: -160px; left: -120px;
-    background: radial-gradient(circle, rgba(38,124,124,0.13) 0%, transparent 70%);
-    filter: blur(100px);
-    animation: orb-drift-1 18s ease-in-out infinite alternate;
-  }
-  .orb-2 {
-    width: 420px; height: 420px;
-    bottom: -100px; right: -80px;
-    background: radial-gradient(circle, rgba(102,178,178,0.10) 0%, transparent 70%);
-    filter: blur(130px);
-    animation: orb-drift-2 22s ease-in-out infinite alternate;
-  }
-  @keyframes orb-drift-1 {
-    from { transform: translate(0, 0) scale(1); }
-    to   { transform: translate(40px, 30px) scale(1.08); }
-  }
-  @keyframes orb-drift-2 {
-    from { transform: translate(0, 0) scale(1); }
-    to   { transform: translate(-30px, -20px) scale(1.06); }
-  }
-  /* Respetar preferencia de movimiento reducido */
-  @media (prefers-reduced-motion: reduce) {
-    /* Orbes — sin animación de deriva */
-    .orb { animation: none !important; filter: blur(120px); }
 
+  /* ── REDUCED MOTION ────────────────────────────────────── */
+  @media (prefers-reduced-motion: reduce) {
     /* Botones, tarjetas ETL, pasos de receta — sin escala ni traslación */
     .op-btn, .btn, .pipeline-step, .stat-card, .glass-button, .logo-svg {
       transition: none !important;
@@ -78,17 +70,10 @@
     /* Spinner — detiene la rotación continua */
     .spinner {
       animation: none !important;
-      border-top-color: var(--teal);
+      border-top-color: var(--accent);
       opacity: 0.75;
     }
 
     /* Quality-bar — sin transición de ancho al renderizar */
     .quality-bar-fill { transition: none !important; }
-  }
-  /* En oscuro los orbes son más tenues */
-  [data-theme="dark"] .orb-1 {
-    background: radial-gradient(circle, rgba(61,184,184,0.07) 0%, transparent 70%);
-  }
-  [data-theme="dark"] .orb-2 {
-    background: radial-gradient(circle, rgba(61,184,184,0.05) 0%, transparent 70%);
   }
