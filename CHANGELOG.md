@@ -29,6 +29,26 @@ siguiente corte.
 
 ### Cambiado
 
+- **Teal estructural retirado**: cabeceras del data grid, títulos del
+  diagnóstico, schema, linaje, badges del ribbon, chips de tipo y toasts
+  `info` pasan a los neutros del prototipo (con `--border-strong` donde
+  hacía falta jerarquía) y a tokens de acento en los puntos de énfasis.
+  El teal queda **solo como color de datos**: heatmap de correlaciones
+  positivas, barras de distribución y peso del benchmark. Los badges
+  `INT`/`FLOAT` ahora son neutros con borde fuerte (riesgo de colisión
+  con `DATE` si se pintaran con el acento naranja).
+- **Vistas limpias al iniciar**: `loadStats`, `loadCorrelations`,
+  `loadSchema` y `loadLineage` no consultan al servidor cuando la sesión
+  del cliente no tiene dataset, así una carga fresca no pinta datos de
+  sesiones anteriores (antes la pestaña Datos estaba vacía pero
+  Diagnóstico/Schema/Linaje mostraban el último dataset del backend).
+- **Footer en inglés**: «Invítame un café» → «Buy me a coffee».
+- **El gate de axe cambia de tema como el usuario**: en vez de un
+  `setAttribute('data-theme')` directo (que pintaba el CSS nuevo pero
+  dejaba `--accent-text`, un token derivado por JS, calculado contra la
+  superficie del tema anterior) ahora hace `themeMode + applyTheme()`,
+  igual que `setThemeMode()`. Así se mide el estado real de la app y no
+  uno que solo existe en el test.
 - **Toasts con fondo opaco** (`--bg-input` + borde de color): antes su
   fondo translúcido se mezclaba con el scrim del modal y hundía el
   contraste del texto por debajo de AA.

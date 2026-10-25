@@ -136,7 +136,12 @@ try {
   }
 
   for (const theme of ['light', 'dark']) {
-    await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme);
+    // Mismo mecanismo que el usuario (setThemeMode → applyTheme): un
+    // setAttribute('data-theme') directo cambiaría el CSS pero dejaría los
+    // tokens DERIVADOS por JS (--accent-text, calculado contra la superficie
+    // del tema anterior) desincronizados → mediría un estado que la app nunca
+    // produce y daría falsos positivos de contraste (toast info, badges).
+    await page.evaluate(t => { themeMode = t; applyTheme(); }, theme);
     await runAxe(page, `página (${theme})`);
 
     // Modal «Receta desde CSV» abierto (nueva superficie de F3.4)

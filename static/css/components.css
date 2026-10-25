@@ -288,7 +288,7 @@
   .ribbon-breadcrumb.visible { display: flex; }
   .ribbon-breadcrumb svg {
     width: 12px; height: 12px; flex-shrink: 0;
-    stroke: var(--teal); stroke-width: 2; fill: none;
+    stroke: currentColor; stroke-width: 2; fill: none;
     stroke-linecap: round; stroke-linejoin: round;
   }
   .ribbon-breadcrumb span { color: var(--text); font-weight: 500; }
@@ -399,11 +399,9 @@
 
   /* Badge de archivo (filename) en ribbon */
   .badge {
-    display: inline-flex; align-items: center; gap: 0.3rem;
-    background: var(--teal-bg); border: 1px solid var(--teal-bd);
+    display: inline-flex; align-items: center; gap: 0.3rem;    background: var(--bg-input); border: 1px solid var(--border);
     padding: 0.2rem 0.65rem; border-radius: var(--radius-tag);
-    font-family: var(--font-mono);
-    font-size: 0.66rem; font-weight: 700; color: var(--teal);
+    font-family: var(--font-mono); font-size: 0.66rem; font-weight: 700; color: var(--text);
     white-space: nowrap; max-width: 260px;
     overflow: hidden; text-overflow: ellipsis;
   }
@@ -536,7 +534,7 @@
   .btn-col-vis svg { width: 13px; height: 13px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
   .col-vis-badge {
     display: none;
-    background: var(--teal); color: #fff;
+    background: var(--accent); color: var(--accent-contrast);
     border-radius: var(--radius-tag); padding: 0 5px;
     font-size: 0.6rem; font-weight: 700; line-height: 1.5;
     min-width: 16px; text-align: center;
@@ -1029,7 +1027,7 @@
     font-family: var(--font-head);
     font-size: 0.72rem;
     font-weight: 700;
-    color: var(--teal);
+    color: var(--text);
     margin-bottom: 0.55rem;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
@@ -1220,7 +1218,7 @@
     margin-bottom: 0.45rem;
   }
   #merge-right-info {
-    font-family: var(--font-mono); font-size: 0.7rem; color: var(--teal);
+    font-family: var(--font-mono); font-size: 0.7rem; color: var(--text2);
     max-width: 62%; text-align: right;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
@@ -1256,7 +1254,7 @@
      backdrop, claro u oscuro. */
   .toast.success { background: var(--bg-input); border: 1px solid var(--green); color: var(--green); }
   .toast.error   { background: var(--bg-input); border: 1px solid var(--red);   color: var(--red); }
-  .toast.info    { background: var(--bg-input); border: 1px solid var(--teal);   color: var(--teal); }
+  .toast.info    { background: var(--bg-input); border: 1px solid var(--accent); color: var(--accent-text); }
 
   /* ── LOADING ───────────────────────────────────────────── */
   .loading-overlay {
@@ -1386,7 +1384,7 @@
   }
   .ds-card-icon .icon-svg { width: 16px; height: 16px; }
   .ds-card-name { font-size: 0.8rem; font-weight: 700; color: var(--text); }
-  .ds-card-meta { font-size: 0.67rem; font-weight: 600; color: var(--teal); }
+  .ds-card-meta { font-size: 0.67rem; font-weight: 600; color: var(--text2); }
   .ds-card-desc { font-size: 0.7rem; color: var(--text2); line-height: 1.45; }
   .ds-dropzone {
     display: flex;
@@ -1424,7 +1422,7 @@
     padding: 0.55rem 0.8rem;
     margin-bottom: 0.75rem;
     background: var(--surface-glass);
-    border: 1px solid var(--teal-bd);
+    border: 1px solid var(--border);
     border-radius: var(--radius2);
     box-shadow: var(--shadow-glass-sm);
     font-family: var(--font-ui);
@@ -1444,11 +1442,11 @@
     display: inline-flex; align-items: center; gap: 0.3rem;
     padding: 0.12rem 0.55rem;
     border-radius: 999px;
-    background: var(--teal-bg);
-    border: 1px solid var(--teal-bd);
+    background: var(--surface2);
+    border: 1px solid var(--border-strong);
     font-family: var(--font-mono);
     font-size: 0.72rem;
-    color: var(--teal);          /* F0.6: --teal ya validada ≥4.6:1 en ambos temas */
+    color: var(--text);          /* tipo = neutro con borde fuerte (sin teal estructural) */
   }
   .type-chip-pct { color: var(--text-muted); font-size: 0.68rem; }
   .type-suggest-actions { display: flex; gap: 0.4rem; }
@@ -1483,11 +1481,11 @@
   .schema-summary code {
     font-family: var(--font-mono);
     font-size: 0.7rem;
-    background: var(--teal-bg);
-    border: 1px solid var(--teal-bd);
+    background: var(--bg-input);
+    border: 1px solid var(--border);
     border-radius: 4px;
     padding: 0 0.3rem;
-    color: var(--teal);
+    color: var(--text);
   }
   .schema-table {
     width: 100%;
@@ -1637,8 +1635,8 @@
     stroke-width: 1;
   }
   .lin-node-source rect {
-    stroke: var(--teal);
-    fill: var(--teal-bg);
+    stroke: var(--accent);
+    fill: var(--accent-subtle);
   }
   .lin-op {
     font-family: var(--font-ui);
@@ -1649,15 +1647,15 @@
   .lin-shape {
     font-family: var(--font-mono);
     font-size: 10.5px;
-    fill: var(--teal);
+    fill: var(--text2);
   }
   .lin-params {
     font-family: var(--font-mono);
     font-size: 10px;
     fill: var(--text2);
   }
-  .lin-edge { stroke: var(--teal-bd); stroke-width: 1.5; }
-  .lin-arrow-head { fill: var(--teal); }
+  .lin-edge { stroke: var(--border); stroke-width: 1.5; }
+  .lin-arrow-head { fill: var(--text2); }
   .lin-hint {
     text-align: center;
     font-size: 0.72rem;
@@ -1697,7 +1695,7 @@
   }
   .ep-meta-sep { color: var(--text2); }
   #ep-steps { white-space: nowrap; }
-  .ep-shape { font-family: var(--font-mono); color: var(--teal); }
+  .ep-shape { font-family: var(--font-mono); color: var(--text2); }
 
   .ep-progress-row { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.75rem; }
   .ep-progress {
@@ -1764,7 +1762,7 @@
     font-size: 0.74rem; color: var(--text2); margin-bottom: 0.85rem;
   }
   .sd-step-badge {
-    background: var(--teal-bg); border: 1px solid var(--teal-bd); color: var(--teal);
+    background: var(--surface2); border: 1px solid var(--border-strong); color: var(--text);
     font-family: var(--font-mono); font-size: 0.68rem; font-weight: 700;
     border-radius: 999px; padding: 0.15rem 0.55rem;
   }
@@ -1811,7 +1809,7 @@
     padding: 0.1rem 0.45rem;
   }
   .sd-tag-type { color: var(--orange); border-color: var(--orange-bd); background: var(--orange-bg); }
-  .sd-tag-cells { color: var(--teal); border-color: var(--teal-bd); background: var(--teal-bg); }
+  .sd-tag-cells { color: var(--text2); border-color: var(--border); background: var(--surface-glass); }
   .sd-tag.sd-pos { color: var(--green); }
   .sd-tag.sd-neg { color: var(--red); }
   .sd-unchanged { font-size: 0.68rem; color: var(--text-muted); padding-left: 0.2rem; }
@@ -1861,9 +1859,9 @@
     font-size: 0.72rem;
     padding: 0.15rem 0.5rem;
     border-radius: 6px;
-    background: var(--teal-bg);
-    border: 1px solid var(--teal-bd);
-    color: var(--teal2);
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text);
     max-width: 60%;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1896,9 +1894,9 @@
     width: 1.25rem;
     height: 1.25rem;
     border-radius: 50%;
-    background: var(--teal-bg);
-    border: 1px solid var(--teal-bd);
-    color: var(--teal2);
+    background: var(--surface2);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
     font-size: 0.68rem;
     font-weight: 600;
   }
@@ -2215,7 +2213,7 @@
     text-overflow: ellipsis;
   }
   .corr-heat tbody th { text-align: left; }
-  .corr-corner { color: var(--teal); }
+  .corr-corner { color: var(--text2); }
   .corr-hint { font-size: 0.68rem; color: var(--text-muted); margin: 0.45rem 0 0; }
 
   /* ── BARRA DE BENCHMARK — tiempo por paso (roadmap) ─────────────────── */
@@ -2247,9 +2245,9 @@
     font-family: var(--font-mono);
     font-size: 0.62rem;
     font-variant-numeric: tabular-nums;
-    color: var(--teal);
-    background: var(--teal-bg);
-    border: 1px solid var(--teal-bd);
+    color: var(--text2);
+    background: var(--bg-input);
+    border: 1px solid var(--border);
     border-radius: 999px;
     padding: 0.05rem 0.4rem;
     white-space: nowrap;

@@ -406,6 +406,14 @@ function updateCode(code) { document.getElementById('code-pre').textContent = co
 
 async function loadStats() {
   const grid = document.getElementById('stats-grid');
+  // Sesión vacía: sin dataset en el cliente NO se consulta al servidor, para
+  // que una carga fresca no pinte datos de sesiones anteriores.
+  if (!currentRawData) {
+    grid.innerHTML = '<div style="padding:2rem;color:var(--text2);font-size:0.82rem;text-align:center">Carga un archivo para ver el diagnóstico.</div>';
+    const topE = document.getElementById('diag-top');
+    if (topE) topE.innerHTML = '';
+    return;
+  }
   const res = await fetch('/stats');
   const data = await res.json();
   if (data.error) {
@@ -478,6 +486,11 @@ async function loadStats() {
 async function loadCorrelations() {
   const box = document.getElementById('corr-grid');
   if (!box) return;
+  // Sesión vacía (ver loadStats): sin dataset local no se pinta nada.
+  if (!currentRawData) {
+    box.innerHTML = '<p class="corr-hint">Carga un archivo para ver las correlaciones.</p>';
+    return;
+  }
   try {
     const res = await fetch('/correlations');
     const data = await res.json();
@@ -559,6 +572,11 @@ function renderDistBars() {
 async function loadLineage() {
   const wrap = document.getElementById('lin-wrap');
   if (!wrap) return;
+  // Sesión vacía (ver loadStats): sin dataset local no se pinta nada.
+  if (!currentRawData) {
+    wrap.innerHTML = '<div class="lin-empty">Carga un archivo para ver el linaje del pipeline.</div>';
+    return;
+  }
   const res = await fetch('/lineage');
   const data = await res.json();
   const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -621,6 +639,11 @@ async function loadLineage() {
 async function loadSchema() {
   const wrap = document.getElementById('schema-wrap');
   if (!wrap) return;
+  // Sesión vacía (ver loadStats): sin dataset local no se pinta nada.
+  if (!currentRawData) {
+    wrap.innerHTML = '<div class="schema-empty">Carga un archivo para ver el esquema y el perfilado de columnas.</div>';
+    return;
+  }
   const res = await fetch('/stats');
   const data = await res.json();
   const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
