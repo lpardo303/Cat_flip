@@ -153,5 +153,11 @@ jobs:
           mv artifacts/flatpak/SHA256SUMS.asc  artifacts/flatpak/SHA256SUMS.flatpak.asc
           gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1 ||
             gh release create "$GITHUB_REF_NAME" --generate-notes
-          gh release upload "$GITHUB_REF_NAME" \
-            artifacts/appimage/* artifacts/flatpak/* --clobber
+          # Solo ficheros: artifacts/flatpak/ también trae el directorio repo/
+          # (el ostree firmado, que sí queda en el artifact del run) y gh no
+          # puede subir directorios como assets.
+          gh release upload "$GITHUB_REF_NAME" --clobber \
+            artifacts/appimage/* \
+            artifacts/flatpak/*.flatpak \
+            artifacts/flatpak/*.flatpak.asc \
+            artifacts/flatpak/SHA256SUMS.flatpak
