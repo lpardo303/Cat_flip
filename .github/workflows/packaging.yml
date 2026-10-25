@@ -144,6 +144,13 @@ jobs:
           # con git (fallaría con «not a git repository»).
           GH_REPO: ${{ github.repository }}
         run: |
+          # Ambos formatos traen SHA256SUMS(.asc) con el mismo nombre y los
+          # assets de una release son planos: renombrarlos por formato para
+          # que gh no falle con 422 "already exists".
+          mv artifacts/appimage/SHA256SUMS     artifacts/appimage/SHA256SUMS.appimage
+          mv artifacts/appimage/SHA256SUMS.asc artifacts/appimage/SHA256SUMS.appimage.asc
+          mv artifacts/flatpak/SHA256SUMS      artifacts/flatpak/SHA256SUMS.flatpak
+          mv artifacts/flatpak/SHA256SUMS.asc  artifacts/flatpak/SHA256SUMS.flatpak.asc
           gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1 ||
             gh release create "$GITHUB_REF_NAME" --generate-notes
           gh release upload "$GITHUB_REF_NAME" \
