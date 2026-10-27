@@ -9,6 +9,17 @@ siguiente corte.
 
 ## [Sin publicar]
 
+### Arreglados
+
+- **Nulos de solo espacios normalizados al cargar** (Bug 4 al cargar): una
+  celda `"   "` sobrevivía al `/upload` y contaba como dato válido, así que
+  `/stats` subreportaba nulos y la barra de calidad salía ~1 punto inflada.
+  `read_table()` aplica ahora `normalize_read_nulls()` en los tres caminos
+  de carga (upload, frame derecho y CLI) y la expresión de carga encadena
+  `.replace(r'(?i)^\s*(?:nan|none|null)?\s*$', float('nan'), regex=True)`,
+  de modo que el código del panel Python y el script exportado reproducen
+  exactamente el df en memoria.
+
 ## [1.1.0] — 2026-10-25
 
 ### Añadido

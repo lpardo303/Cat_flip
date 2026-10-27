@@ -40,6 +40,25 @@ def _null_code(col):
             "  # vacíos/'nan' → nulo real (Bug 4)")
 
 
+# Alias público: `read_table` (app.py) lo encadena en el código de carga
+# para que el script exportado reproduzca exactamente el df de la app.
+NUL_REGEX = _NUL_REGEX
+
+
+def normalize_read_nulls(df):
+    """Vacíos/solo-espacios/'nan'/'none'/'null' en columnas de texto → NaN.
+
+    Bug 4 al cargar: `_normalize_nulls` solo corría dentro de las ops de
+    texto, así que una celda de solo espacios ("   ") sobrevivía al
+    `/upload` y contaba como dato válido — `/stats` subreportaba nulos y la
+    barra de calidad salía ~1 punto inflada. Se aplica en `read_table`
+    (upload, frame derecho y CLI) para medir nulos de verdad desde la carga.
+    """
+    for col in df.columns:
+        df[col] = _normalize_nulls(df[col])
+    return df
+
+
 # ── Estructural ─────────────────────────────────────────────────────────
 
 def op_unpivot(df, params):

@@ -14,8 +14,10 @@ import premium as premium_pkg
 
 from operations import (
     OPS,
+    NUL_REGEX,
     detect_pii_columns,
     detect_type_suggestions,
+    normalize_read_nulls,
     validate_rules,
     validate_schema,
 )
@@ -130,6 +132,15 @@ def _detect_delimiter(text):
     return best_c if best_n else ","
 
 
+# Cola que encadena la expresión de carga con la normalización de nulos
+# (Bug 4 al cargar): el código generado y el script exportado deben
+# reproducir el MISMO df que quedó en memoria, celda de solo espacios incluida.
+_NULLS_TAIL = (
+    f".replace(r'{NUL_REGEX}', float('nan'), regex=True)"
+    "  # vacíos/solo-espacios → nulo real (Bug 4)"
+)
+
+
 def read_table(file, sheet=None):
     """Lee un CSV/XLSX/XLS subido y devuelve (df, expresión pandas, encoding).
 
@@ -174,18 +185,23 @@ def read_table(file, sheet=None):
                 text = content.decode("latin-1")
         sep = _detect_delimiter(text)
         if encoding:
-            df = pd.read_csv(io.StringIO(text), sep=sep, encoding=encoding)
+            df = normalize_read_nulls(
+                pd.read_csv(io.StringIO(text), sep=sep, encoding=encoding)
+            )
             return (
                 df,
-                f"pd.read_csv('{file.filename}', sep={sep!r}, encoding={encoding!r})",
+                f"pd.read_csv('{file.filename}', sep={sep!r}, encoding={encoding!r})"
+                + _NULLS_TAIL,
                 encoding,
             )
-        df = pd.read_csv(io.StringIO(text), sep=sep)
-        return df, f"pd.read_csv('{file.filename}', sep={sep!r})", None
+        df = normalize_read_nulls(pd.read_csv(io.StringIO(text), sep=sep))
+        return df, f"pd.read_csv('{file.filename}', sep={sep!r})" + _NULLS_TAIL, None
     if sheet is None:
         sheet = request.form.get("sheet", 0) if has_request_context() else 0
-    df = pd.read_excel(file, sheet_name=int(sheet) if str(sheet).isdigit() else sheet)
-    return df, f"pd.read_excel('{file.filename}', sheet_name={repr(sheet)})", None
+    df = normalize_read_nulls(
+        pd.read_excel(file, sheet_name=int(sheet) if str(sheet).isdigit() else sheet)
+    )
+    return df, f"pd.read_excel('{file.filename}', sheet_name={repr(sheet)})" + _NULLS_TAIL, None
 
 
 @app.route("/upload", methods=["POST"])
