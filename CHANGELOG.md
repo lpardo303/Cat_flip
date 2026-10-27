@@ -26,6 +26,22 @@ siguiente corte.
   instalarlo. 40 tests nuevos (`connectors.py` al 100 % de cobertura) y
   `--cov=connectors` añadido al gate de la CI.
 
+- **Conector real de Amazon S3 (Open Core — segundo conector real)**: la
+  sección *Destino real* gana la tarjeta **S3**, que sube el dataset
+  completo como **CSV** (UTF-8, sin índice) a `s3://bucket/<prefijo>/<ruta>`:
+  **Probar conexión** (`head_bucket`) y exportación en modos *Sobrescribir
+  objeto* o *Fallar si existe*. Backend en `connectors.py`
+  (`clean_s3_params` con bucket validado como DNS, `s3_object_key` sin path
+  traversal y `_s3_mask` para credenciales) + rutas
+  `POST /connectors/s3/{test,export}` con el mismo gating server-side
+  (404 sin licencia; `/premium/status` ahora anuncia
+  `connectors: ["postgres", "s3"]`). `endpoint_url` opcional compatible
+  MinIO/R2 y credenciales opcionales — vacías no viajan y manda la cadena
+  por defecto de AWS (env, perfil o instancia). Driver **opcional**:
+  `boto3` en `requirements-connectors.txt`; sin él la app funciona igual y
+  la ruta explica cómo instalarlo. 27 tests nuevos con el SDK falso
+  inyectado en `sys.modules` (sin red ni credenciales reales).
+
 ### Arreglados
 
 - **Nulos de solo espacios normalizados al cargar** (Bug 4 al cargar): una

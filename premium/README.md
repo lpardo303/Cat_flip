@@ -31,7 +31,8 @@ llega a pintar el conector real.
 | Packaging firmado (`.exe` Windows) | ⏳ roadmap |
 | Auto-update integrado | ⏳ roadmap |
 | Conector real **PostgreSQL** — `/connectors/postgres/{test,export}` (lógica en `connectors.py`, gating con `premium_required`) | ✅ 2026-10-27 — driver opcional `psycopg` en `requirements-connectors.txt` |
-| Conectores reales (S3 / BigQuery) | ⏳ roadmap |
+| Conector real **Amazon S3** — `/connectors/s3/{test,export}` (CSV al bucket, gating `premium_required`) | ✅ 2026-10-27 — driver opcional `boto3` en `requirements-connectors.txt` |
+| Conector real **BigQuery** | ⏳ roadmap |
 
 Con licencia, el panel de tema del encabezado añade **Aurora** y **Solar**
 al grupo *Claro* (cada opción con su vista previa), agrupado en

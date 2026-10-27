@@ -1164,6 +1164,26 @@ const CONNECTORS = {
       { id: 'pg-mode', label: 'Si la tabla existe', type: 'select', options: ['Reemplazar tabla', 'Añadir filas'] },
     ],
   },
+  // Conector REAL (premium): S3 — sube el dataset completo como CSV al
+  // bucket. Credenciales vacías ⇒ cadena por defecto de AWS (env/perfil).
+  // Gated también en el servidor (404 sin licencia).
+  s3: {
+    name: 'Amazon S3',
+    real: true,
+    badge: 'PREMIUM',
+    action: 'Subir a S3',
+    warn: 'Conexión real: al exportar, el dataset completo se subirá como CSV al bucket que indiques. comprueba bucket, región y ruta — con «Sobrescribir» el objeto existente se reemplaza.',
+    fields: [
+      { id: 's3-bucket', label: 'Bucket', placeholder: 'mi-bucket-datos', required: true },
+      { id: 's3-region', label: 'Región', placeholder: 'eu-west-1', required: true },
+      { id: 's3-endpoint', label: 'Endpoint (opcional · MinIO/R2)', placeholder: 'https://s3.eu-west-1.amazonaws.com' },
+      { id: 's3-key-id', label: 'Access key ID (opcional)', placeholder: 'vacío = cadena por defecto de AWS' },
+      { id: 's3-secret', label: 'Secret access key', type: 'password', placeholder: 'vacío = cadena por defecto de AWS' },
+      { id: 's3-prefix', label: 'Prefijo (carpeta)', placeholder: 'etl/limpios' },
+      { id: 's3-key', label: 'Ruta destino', placeholder: 'empleados_limpios.csv', required: true },
+      { id: 's3-mode', label: 'Si el objeto existe', type: 'select', options: ['Sobrescribir objeto', 'Fallar si existe'] },
+    ],
+  },
 };
 
 let cnKind = null;    // conector abierto (para saber qué validar)
@@ -1194,11 +1214,11 @@ function openConnector(kind) {
     'Conector de demostración: la simulación no contacta con ningún servicio y tus datos nunca salen de tu equipo.';
   document.getElementById('cn-console').innerHTML = '';
   document.getElementById('cn-status').textContent = cfg.real
-    ? 'Conexión real — nada se envía hasta que pulses Exportar'
+    ? `Conexión real — nada se envía hasta que pulses ${cfg.action || 'Exportar'}`
     : 'Modo demo — nada sale de tu equipo';
   const send = document.getElementById('cn-send');
   send.disabled = false;
-  send.querySelector('span').textContent = cfg.real ? 'Exportar a tabla' : 'Simular envío';
+  send.querySelector('span').textContent = cfg.real ? (cfg.action || 'Exportar a tabla') : 'Simular envío';
   document.getElementById('cn-test').hidden = !cfg.real;
   document.getElementById('connector-overlay').classList.add('open');
   const first = document.querySelector('#cn-form input');
@@ -1243,6 +1263,7 @@ function sendConnector() {
 
   // Conector real: la exportación va al servidor (gated por licencia)
   if (cnKind === 'postgres') return sendPostgres();
+  if (cnKind === 's3') return sendS3();
 
   // Simulación animada — NUNCA se abre ninguna conexión (modo demo)
   const rows = currentRawData ? currentRawData.shape[0] : 0;
@@ -1278,13 +1299,13 @@ function sendConnector() {
   cnTimer = setTimeout(step, 120);
 }
 
-// ── Conector REAL de Postgres (premium) ────────────────────────────
-// A diferencia de los mocks de arriba, estos dos botones SÍ hablan con el
-// servidor: POST /connectors/postgres/{test,export}, gated por licencia
-// (404 sin ella). El SQL, el quoting de identificadores y el driver viven
-// en `connectors.py`; aquí solo se recogen los campos y se pinta la
-// consola. `cnLog` usa textContent, así que los valores del usuario nunca
-// se interpretan como HTML.
+// ── Conectores REALES (premium): Postgres y S3 ──────────────────────
+// A diferencia de los mocks de arriba, estos botones SÍ hablan con el
+// servidor: POST /connectors/{postgres,s3}/{test,export}, gated por
+// licencia (404 sin ella). La lógica (SQL/quoting, claves S3, driver
+// opcional) vive en `connectors.py`; aquí solo se recogen los campos y
+// se pinta la consola. `cnLog` usa textContent, así que los valores del
+// usuario nunca se interpretan como HTML.
 
 function pgField(id, fallback) {
   const el = document.getElementById(id);
@@ -1306,7 +1327,7 @@ function pgPayload() {
   };
 }
 
-async function pgPost(path, payload) {
+async function cnPost(path, payload) {
   const res = await fetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1319,14 +1340,25 @@ async function pgPost(path, payload) {
 
 async function testConnector() {
   const btn = document.getElementById('cn-test');
-  const payload = pgPayload();
+  const isS3 = cnKind === 's3';
+  const payload = isS3 ? s3Payload() : pgPayload();
   btn.disabled = true;
-  cnLog(`$ catflip probe --to postgres --host ${payload.host}:${payload.port}`, 'cn-cmd');
-  cnLog(`Conectando a ${payload.host}:${payload.port}/${payload.dbname}…`, 'cn-dim');
+  if (isS3) {
+    cnLog(`$ catflip probe --to s3 --bucket ${payload.bucket}`, 'cn-cmd');
+    cnLog(`Comprobando acceso a ${payload.bucket} (${payload.region})…`, 'cn-dim');
+  } else {
+    cnLog(`$ catflip probe --to postgres --host ${payload.host}:${payload.port}`, 'cn-cmd');
+    cnLog(`Conectando a ${payload.host}:${payload.port}/${payload.dbname}…`, 'cn-dim');
+  }
   try {
-    const data = await pgPost('/connectors/postgres/test', payload);
-    cnLog(`✔ Conexión correcta — ${data.version}`, 'cn-ok');
-    toast('Conexión a Postgres verificada', 'success');
+    const data = await cnPost(`/connectors/${cnKind}/test`, payload);
+    if (isS3) {
+      cnLog(`✔ Conexión correcta — ${data.bucket} en ${data.region}`, 'cn-ok');
+      toast('Conexión a S3 verificada', 'success');
+    } else {
+      cnLog(`✔ Conexión correcta — ${data.version}`, 'cn-ok');
+      toast('Conexión a Postgres verificada', 'success');
+    }
   } catch (e) {
     cnLog(`✘ ${e.message}`, 'cn-err');
     toast(e.message, 'error');
@@ -1346,7 +1378,7 @@ async function sendPostgres() {
   cnLog(`Conectando a ${payload.host}:${payload.port}/${payload.dbname}…`, 'cn-dim');
   cnLog(`Serializando ${rows} fila(s) × ${currentColumns.length} columna(s)…`, 'cn-dim');
   try {
-    const data = await pgPost('/connectors/postgres/export', payload);
+    const data = await cnPost('/connectors/postgres/export', payload);
     const modo = data.mode === 'replace' ? 'tabla reemplazada' : 'filas añadidas';
     cnLog(`✔ ${data.rows} fila(s) escritas en ${data.schema}.${data.table} (${modo})`, 'cn-ok');
     document.getElementById('cn-status').textContent = 'Exportación completada';
@@ -1360,6 +1392,50 @@ async function sendPostgres() {
   }
 }
 
+// ── Conector REAL de S3 (premium) ─────────────────────────────────
+// `s3Payload` recoge los campos del modal y `sendS3` sube el dataset como
+// CSV a s3://bucket/<prefijo>/<ruta>. El SDK (boto3), la validación de la
+// clave y el enmascarado de credenciales viven en `connectors.py`.
+
+function s3Payload() {
+  const mode = document.getElementById('s3-mode');
+  return {
+    bucket: pgField('s3-bucket'),
+    region: pgField('s3-region'),
+    endpoint_url: pgField('s3-endpoint'),
+    aws_access_key_id: pgField('s3-key-id'),
+    aws_secret_access_key: pgField('s3-secret'),
+    prefix: pgField('s3-prefix'),
+    key: pgField('s3-key'),
+    mode: mode && mode.value === 'Fallar si existe' ? 'fail' : 'overwrite',
+  };
+}
+
+async function sendS3() {
+  const payload = s3Payload();
+  const send = document.getElementById('cn-send');
+  const rows = currentRawData ? currentRawData.shape[0] : 0;
+  send.disabled = true;
+  document.getElementById('cn-console').innerHTML = '';
+  document.getElementById('cn-status').textContent = 'Exportando…';
+  const dest = payload.prefix ? `${payload.prefix}/${payload.key}` : payload.key;
+  cnLog(`$ catflip send --to s3 --bucket ${payload.bucket} --key ${dest}`, 'cn-cmd');
+  cnLog(`Región ${payload.region}${payload.endpoint_url ? ` · endpoint ${payload.endpoint_url}` : ''}…`, 'cn-dim');
+  cnLog(`Serializando ${rows} fila(s) × ${currentColumns.length} columna(s) a CSV…`, 'cn-dim');
+  try {
+    const data = await cnPost('/connectors/s3/export', payload);
+    const modo = data.mode === 'overwrite' ? 'objeto sobrescrito' : 'objeto nuevo sin sobrescribir';
+    cnLog(`✔ ${data.rows} fila(s) · ${data.bytes} bytes subidos a s3://${data.bucket}/${data.key} (${modo})`, 'cn-ok');
+    document.getElementById('cn-status').textContent = 'Exportación completada';
+    toast(`Exportadas ${data.rows} filas a s3://${data.bucket}/${data.key}`, 'success');
+  } catch (e) {
+    cnLog(`✘ ${e.message}`, 'cn-err');
+    document.getElementById('cn-status').textContent = 'La exportación ha fallado';
+    toast(e.message, 'error');
+  } finally {
+    send.disabled = false;
+  }
+}
 // ── VALIDACIÓN DE ESQUEMA — reglas no-nulo / único / regex / rango ──────
 // Reglas que viven en el servidor (se limpian al subir otro archivo) y
 // SOLO anotan: no entran en la receta ni en el script. `svDraft` es el
