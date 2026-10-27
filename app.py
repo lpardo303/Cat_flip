@@ -13,12 +13,15 @@ from functools import wraps
 # /premium/status y /premium/themes/<id>.css — sin ella, 404/lista vacía)
 import premium as premium_pkg
 
-# Conectores reales (Open Core): lógica pura + driver opcional (psycopg)
+# Conectores reales (Open Core): lógica pura + driver opcional (psycopg/boto3)
 from connectors import (
     ConnectorError,
     clean_conn_params,
+    clean_s3_params,
     export_to_postgres,
+    export_to_s3,
     test_connection,
+    test_s3_connection,
 )
 
 from operations import (
@@ -1316,14 +1319,14 @@ def premium_status():
     (Open Core).
 
     Sin licencia devuelve listas vacías: el front no puede ni conocer los
-    ids de los temas ni saber que existe el conector de Postgres, y el CSS
+    ids de los temas ni saber qué conectores existen (Postgres, S3), y el CSS
     se niega aparte en /premium/themes/<id>.css. SOLO LEE.
     """
     if premium_pkg.is_licensed():
         return jsonify({
             "licensed": True,
             "themes": premium_pkg.theme_manifest(),
-            "connectors": ["postgres"],
+            "connectors": ["postgres", "s3"],
         })
     return jsonify({"licensed": False, "themes": [], "connectors": []})
 
@@ -1387,6 +1390,34 @@ def connectors_postgres_export():
         mode = data.get("mode") or "replace"
         result = export_to_postgres(
             current_df, params, table.strip(), schema=schema.strip(), mode=mode
+        )
+    except ConnectorError as e:
+        return jsonify({"error": str(e)}), e.status
+    return jsonify(result)
+
+
+@app.route("/connectors/s3/test", methods=["POST"])
+@premium_required
+def connectors_s3_test():
+    """Prueba de acceso (`head_bucket`) — no toca el dataset."""
+    data = request.get_json(silent=True) or {}
+    try:
+        return jsonify(test_s3_connection(clean_s3_params(data)))
+    except ConnectorError as e:
+        return jsonify({"error": str(e)}), e.status
+
+
+@app.route("/connectors/s3/export", methods=["POST"])
+@premium_required
+def connectors_s3_export():
+    """Sube `current_df` (el dataset completo) como CSV al objeto del bucket."""
+    if current_df is None:
+        return jsonify({"error": "No hay datos cargados."}), 400
+    data = request.get_json(silent=True) or {}
+    try:
+        params = clean_s3_params(data)
+        result = export_to_s3(
+            current_df, params, data.get("key"), mode=data.get("mode") or "overwrite"
         )
     except ConnectorError as e:
         return jsonify({"error": str(e)}), e.status

@@ -22,7 +22,9 @@ Reglas de seguridad:
   en el mensaje de una excepción.
 """
 
+import io
 import math
+import re
 from itertools import islice
 
 import pandas as pd
@@ -243,4 +245,209 @@ def export_to_postgres(df, params, table, schema="public", mode="replace"):
         "mode": mode,
         "rows": rows,
         "columns": len(names),
+    }
+
+
+
+# ── S3 ──────────────────────────────────────────────────────────────────
+# Mismo patrón que Postgres: driver opcional perezoso, parámetros limpios,
+# secretos nunca concatenados ni reflejados y claves de objeto sin path
+# traversal. El dataset viaja como CSV (UTF-8, sin índice) con `put_object`,
+# que en S3 es una operación atómica por objeto.
+
+_REQUIRED_S3 = (("bucket", "bucket"), ("region", "región"))
+_BUCKET_RE = re.compile(r"^[a-z0-9][a-z0-9.\-]{1,61}[a-z0-9]$")
+_MAX_KEY = 1024
+_S3_CLIENT_KEYS = ("endpoint_url", "aws_access_key_id", "aws_secret_access_key")
+
+
+def _load_boto3():
+    """Importa el driver de AWS en el momento de usarlo (opcional)."""
+    try:
+        import boto3
+    except ImportError as exc:
+        raise ConnectorError(
+            "Driver «boto3» no instalado. Ejecuta: "
+            "pip install -r requirements-connectors.txt"
+        ) from exc
+    return boto3
+
+
+def _s3_mask(message, params):
+    """Enmascara las credenciales por si el SDK las reflejara en un error."""
+    text = str(message)
+    for key in ("aws_secret_access_key", "aws_access_key_id"):
+        secret = params.get(key)
+        if secret:
+            text = text.replace(secret, "***")
+    return text
+
+
+def clean_s3_params(payload):
+    """Valida y normaliza los parámetros S3 recibidos del front.
+
+    Obligatorios: `bucket` y `region`. Opcionales: `endpoint_url`
+    (compatible MinIO/R2), credenciales explícitas — si viajan vacías no se
+    tocan y manda la cadena por defecto de boto3 (variables de entorno,
+    perfil o instancia) — y `prefix`, la carpeta lógica del bucket.
+
+    El dict devuelto no es una URL: `bucket` y `region` identifican el
+    destino y el resto se pasa tal cual a ``boto3.client``.
+    """
+    if not isinstance(payload, dict):
+        raise ConnectorError("Se espera un objeto JSON con los datos de conexión.")
+
+    params = {}
+    for key, label in _REQUIRED_S3:
+        value = payload.get(key)
+        if not isinstance(value, str) or not value.strip():
+            raise ConnectorError(f"Falta el campo obligatorio «{label}» ({key}).")
+        if "\x00" in value:
+            raise ConnectorError(f"El campo «{key}» no puede contener caracteres nulos.")
+        params[key] = value.strip()
+
+    if not _BUCKET_RE.match(params["bucket"]):
+        raise ConnectorError(
+            "El nombre de bucket no es válido: de 3 a 63 caracteres, en "
+            "minúsculas, dígitos, puntos y guiones, sin empezar ni terminar "
+            "en punto o guion."
+        )
+
+    endpoint = payload.get("endpoint_url")
+    if endpoint not in (None, ""):
+        if not isinstance(endpoint, str):
+            raise ConnectorError("El endpoint debe ser texto.")
+        endpoint = endpoint.strip()
+        if not re.match(r"^https?://[^\s/]+$", endpoint):
+            raise ConnectorError("El endpoint debe empezar por http:// o https://.")
+        params["endpoint_url"] = endpoint
+
+    for key in ("aws_access_key_id", "aws_secret_access_key"):
+        value = payload.get(key)
+        if value in (None, ""):
+            continue
+        if not isinstance(value, str):
+            raise ConnectorError(f"El campo «{key}» debe ser texto.")
+        if "\x00" in value:
+            raise ConnectorError(f"El campo «{key}» no puede contener caracteres nulos.")
+        params[key] = value
+
+    prefix = payload.get("prefix")
+    if prefix in (None, ""):
+        return params
+    if not isinstance(prefix, str):
+        raise ConnectorError("El prefijo debe ser texto.")
+    if "\x00" in prefix:
+        raise ConnectorError("El prefijo no puede contener caracteres nulos.")
+    prefix = "/".join(seg for seg in prefix.strip().strip("/").split("/") if seg)
+    if ".." in prefix.split("/"):
+        raise ConnectorError("El prefijo no puede contener «..».")
+    if prefix:
+        params["prefix"] = prefix
+    return params
+
+
+def s3_object_key(prefix, filename):
+    """Clave final del objeto: `prefijo/archivo.csv` sin traversal ni NUL."""
+    if not isinstance(filename, str) or not filename.strip():
+        raise ConnectorError("Falta el campo obligatorio «ruta destino» (key).")
+    if "\x00" in filename:
+        raise ConnectorError("La ruta destino no puede contener caracteres nulos.")
+    name = "/".join(
+        seg for seg in filename.strip().strip("/").split("/") if seg and seg != "."
+    )
+    if not name:
+        raise ConnectorError("La ruta destino no puede estar vacía.")
+    if ".." in name.split("/"):
+        raise ConnectorError("La ruta destino no puede contener «..».")
+    if len(name) > _MAX_KEY:
+        raise ConnectorError(
+            f"La ruta destino no puede superar {_MAX_KEY} caracteres."
+        )
+    prefix = (prefix or "").strip().strip("/")
+    return f"{prefix}/{name}" if prefix else name
+
+
+def _s3_client(params):
+    """Cliente S3 con región y kwargs opcionales (endpoint/credenciales)."""
+    boto3 = _load_boto3()
+    kwargs = {k: params[k] for k in _S3_CLIENT_KEYS if k in params}
+    return boto3.client("s3", region_name=params["region"], **kwargs)
+
+
+def test_s3_connection(params):
+    """`head_bucket` contra el bucket: valida credenciales, región y acceso."""
+    boto3 = _load_boto3()  # error accionable si falta (y para la versión)
+    try:
+        client = _s3_client(params)
+        client.head_bucket(Bucket=params["bucket"])
+    except Exception as exc:
+        raise ConnectorError(
+            f"No se pudo conectar a S3: {_s3_mask(exc, params)}"
+        ) from exc
+    return {
+        "success": True,
+        "bucket": params["bucket"],
+        "region": params["region"],
+        "driver": f"boto3 {boto3.__version__}",
+    }
+
+
+def export_to_s3(df, params, key, mode="overwrite"):
+    """Sube el DataFrame completo como CSV a ``s3://bucket/<key>``.
+
+    * `overwrite` — reemplaza el objeto si ya existe.
+    * `fail` — error accionable si la clave ya existe (se comprueba con
+      `head_object` antes de subir).
+
+    El CSV se genera en memoria (UTF-8, sin índice) y se sube con
+    `put_object`: en S3 la subida de un objeto es atómica, así que un fallo
+    no deja medio fichero en el bucket.
+    """
+    if mode not in ("overwrite", "fail"):
+        raise ConnectorError("El modo debe ser «overwrite» o «fail».")
+    if df is None or df.shape[1] == 0:
+        raise ConnectorError("El dataset no tiene columnas que exportar.")
+
+    names = [str(c) for c in df.columns]
+    if len(set(names)) != len(names):
+        raise ConnectorError(
+            "El dataset tiene nombres de columna duplicados; "
+            "renómbralos antes de exportar."
+        )
+
+    object_key = s3_object_key(params.get("prefix"), key)
+    buffer = io.StringIO()
+    df.to_csv(buffer, index=False)
+    data = buffer.getvalue().encode("utf-8")
+
+    try:
+        client = _s3_client(params)
+        if mode == "fail":
+            exists = True
+            try:
+                client.head_object(Bucket=params["bucket"], Key=object_key)
+            except Exception:
+                exists = False  # 404 u otro error: lo dirá la subida si toca
+            if exists:
+                raise ConnectorError(
+                    f"El objeto «{object_key}» ya existe en el bucket; "
+                    "usa el modo «overwrite» o elige otra ruta."
+                )
+        client.put_object(Bucket=params["bucket"], Key=object_key, Body=data)
+    except ConnectorError:
+        raise
+    except Exception as exc:
+        raise ConnectorError(
+            f"No se pudo exportar a S3: {_s3_mask(exc, params)}"
+        ) from exc
+
+    return {
+        "success": True,
+        "bucket": params["bucket"],
+        "key": object_key,
+        "mode": mode,
+        "rows": int(df.shape[0]),
+        "columns": len(names),
+        "bytes": len(data),
     }
