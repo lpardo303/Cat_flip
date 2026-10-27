@@ -20,6 +20,14 @@ siguiente corte.
   de modo que el código del panel Python y el script exportado reproducen
   exactamente el df en memoria.
 
+- **Tintes de la pastilla % Calidad derivados de los tokens**: las variantes
+  `.q-green/.q-amber/.q-red` de `.metric-quality` llevaban `rgba()`
+  hardcodeados de la paleta anterior, así que su relleno y borde no seguían
+  al tema (claro/oscuro/Aurora/Solar) ni al re-tuneo de
+  `--green/--yellow/--red`. Ahora se derivan con
+  `color-mix(in srgb, var(--token) …, transparent)` con los mismos
+  porcentajes de antes. Gate de axe en verde: 15 corridas, 0 violaciones.
+
 ## [1.1.0] — 2026-10-25
 
 ### Añadido
