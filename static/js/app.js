@@ -278,11 +278,17 @@ function applyTheme() {
 // amplía el panel con los temas del manifiesto del servidor.
 // Un id premium guardado sin licencia degrada a 'auto' aquí mismo.
 async function initPremiumThemes() {
+  let connectors = [];
   try {
     const res = await fetch('/premium/status');
     const data = await res.json();
     premiumThemes = (data.licensed && Array.isArray(data.themes)) ? data.themes : [];
+    connectors = Array.isArray(data.connectors) ? data.connectors : [];
   } catch (e) { premiumThemes = []; }
+  // Conectores reales: la sección «Destino real» solo existe con licencia
+  // (el servidor además devuelve 404 en /connectors/* sin ella).
+  const pgSection = document.getElementById('pg-section');
+  if (pgSection) pgSection.hidden = connectors.indexOf('postgres') === -1;
   if (themeOrder().indexOf(themeMode) === -1) themeMode = 'auto';
   preloadPremiumCss();   // solo con licencia: la lista viene vacía sin ella
   buildThemeMenu();

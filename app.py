@@ -7,10 +7,19 @@ import re
 import json
 import base64
 import time
+from functools import wraps
 
 # Open Core: gating de features premium (la licencia decide qué sirve
 # /premium/status y /premium/themes/<id>.css — sin ella, 404/lista vacía)
 import premium as premium_pkg
+
+# Conectores reales (Open Core): lógica pura + driver opcional (psycopg)
+from connectors import (
+    ConnectorError,
+    clean_conn_params,
+    export_to_postgres,
+    test_connection,
+)
 
 from operations import (
     OPS,
@@ -1303,14 +1312,20 @@ def benchmark():
 # ── OPEN CORE / PREMIUM ───────────────────────────────────────────────
 @app.route("/premium/status", methods=["GET"])
 def premium_status():
-    """Licencia premium y manifiesto de temas (Open Core).
+    """Licencia premium, manifiesto de temas y conectores disponibles
+    (Open Core).
 
-    Sin licencia devuelve la lista vacía: el front no puede ni conocer los
-    ids, y el CSS se niega aparte en /premium/themes/<id>.css. SOLO LEE.
+    Sin licencia devuelve listas vacías: el front no puede ni conocer los
+    ids de los temas ni saber que existe el conector de Postgres, y el CSS
+    se niega aparte en /premium/themes/<id>.css. SOLO LEE.
     """
     if premium_pkg.is_licensed():
-        return jsonify({"licensed": True, "themes": premium_pkg.theme_manifest()})
-    return jsonify({"licensed": False, "themes": []})
+        return jsonify({
+            "licensed": True,
+            "themes": premium_pkg.theme_manifest(),
+            "connectors": ["postgres"],
+        })
+    return jsonify({"licensed": False, "themes": [], "connectors": []})
 
 
 @app.route("/premium/themes/<theme_id>.css", methods=["GET"])
@@ -1324,6 +1339,58 @@ def premium_theme_css(theme_id):
     if css is None:
         return jsonify({"error": "No encontrado."}), 404
     return css, 200, {"Content-Type": "text/css; charset=utf-8"}
+
+
+# ── CONECTORES REALES (Open Core) ───────────────────────────────
+# Gating: sin licencia la ruta no existe (404), igual que el CSS premium.
+# La lógica pura (validación, quoting de identificadores, dtypes y driver
+# opcional) vive en `connectors.py`; aquí solo se monta la respuesta.
+
+def premium_required(view):
+    """Decorador de gating: exige `premium.is_licensed()` o devuelve 404."""
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if not premium_pkg.is_licensed():
+            return jsonify({
+                "error": "Conector premium: esta instalación no tiene licencia."
+            }), 404
+        return view(*args, **kwargs)
+    return wrapper
+
+
+@app.route("/connectors/postgres/test", methods=["POST"])
+@premium_required
+def connectors_postgres_test():
+    """Prueba de conexión (`SELECT version()`) — no toca el dataset."""
+    data = request.get_json(silent=True) or {}
+    try:
+        return jsonify(test_connection(clean_conn_params(data)))
+    except ConnectorError as e:
+        return jsonify({"error": str(e)}), e.status
+
+
+@app.route("/connectors/postgres/export", methods=["POST"])
+@premium_required
+def connectors_postgres_export():
+    """Escribe `current_df` (el dataset completo, no el preview) en la tabla."""
+    if current_df is None:
+        return jsonify({"error": "No hay datos cargados."}), 400
+    data = request.get_json(silent=True) or {}
+    try:
+        params = clean_conn_params(data)
+        table = data.get("table")
+        if not isinstance(table, str) or not table.strip():
+            raise ConnectorError("Falta el campo obligatorio «tabla» (table).")
+        schema = data.get("schema") or "public"
+        if not isinstance(schema, str) or not schema.strip():
+            raise ConnectorError("El esquema debe ser texto (por defecto «public»).")
+        mode = data.get("mode") or "replace"
+        result = export_to_postgres(
+            current_df, params, table.strip(), schema=schema.strip(), mode=mode
+        )
+    except ConnectorError as e:
+        return jsonify({"error": str(e)}), e.status
+    return jsonify(result)
 
 
 if __name__ == "__main__":

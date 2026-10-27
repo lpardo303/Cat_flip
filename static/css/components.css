@@ -392,9 +392,13 @@
     flex-shrink: 0;
   }
   .metric-quality.visible { display: inline-flex; }
-  .metric-quality.q-green { background: rgba(45,158,107,0.12); border-color: rgba(45,158,107,0.28); color: var(--green); }
-  .metric-quality.q-amber { background: rgba(192,138,26,0.12);  border-color: rgba(192,138,26,0.30); color: var(--yellow); }
-  .metric-quality.q-red   { background: rgba(217,79,79,0.12);   border-color: rgba(217,79,79,0.28);  color: var(--red); }
+  /* Tintes derivados de los tokens semánticos (regla 1 de context/skills/ui-ux:
+     sin rgba sueltos en componentes). Siguen al tema (light/dark/Aurora/Solar)
+     y al re-tuneo de --green/--yellow/--red; mismos porcentajes que los
+     literales viejos. */
+  .metric-quality.q-green { background: color-mix(in srgb, var(--green) 12%, transparent);  border-color: color-mix(in srgb, var(--green) 28%, transparent);  color: var(--green); }
+  .metric-quality.q-amber { background: color-mix(in srgb, var(--yellow) 12%, transparent); border-color: color-mix(in srgb, var(--yellow) 30%, transparent); color: var(--yellow); }
+  .metric-quality.q-red   { background: color-mix(in srgb, var(--red) 12%, transparent);    border-color: color-mix(in srgb, var(--red) 28%, transparent);    color: var(--red); }
   .metric-quality svg { width: 12px; height: 12px; stroke: currentColor; stroke-width: 2.2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
 
   /* Badge de archivo (filename) en ribbon */
@@ -1985,6 +1989,18 @@
     color: var(--orange);
   }
 
+  /* Badge del título de sección para el conector real (premium) */
+  .cn-premium-badge {
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    background: var(--accent-subtle);
+    border: 1px solid var(--accent-glow);
+    color: var(--accent-text);
+  }
+
   .cn-warn {
     font-size: 0.72rem;
     color: var(--yellow);
@@ -2043,6 +2059,7 @@
   .cn-cmd { color: var(--accent-text); }
   .cn-dim { color: var(--text-muted); }
   .cn-ok { color: var(--green); }
+  .cn-err { color: var(--red); }
 
   .cn-status { margin-right: auto; font-size: 0.72rem; color: var(--text2); }
 

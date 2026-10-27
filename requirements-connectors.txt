@@ -1,0 +1,5 @@
+# Dependencias OPCIONALES de los conectores reales (Open Core).
+# El core MIT funciona sin ellas: sin instalar este fichero la app arranca
+# normal y la ruta /connectors/postgres/* responde 400 con esta misma
+# instrucción. Instalación: pip install -r requirements-connectors.txt
+psycopg[binary]==3.3.6

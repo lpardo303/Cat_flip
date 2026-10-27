@@ -29,7 +29,7 @@ def test_status_sin_licencia_es_lista_vacia(client, monkeypatch):
     monkeypatch.delenv("CATFLIP_PREMIUM_KEY", raising=False)
     resp = status(client)
     assert resp.status_code == 200
-    assert resp.get_json() == {"licensed": False, "themes": []}
+    assert resp.get_json() == {"licensed": False, "themes": [], "connectors": []}
 
 
 def test_status_con_licencia_expone_manifiesto(client, monkeypatch):
@@ -64,7 +64,11 @@ def test_status_licencia_expone_mode_para_agrupar(client, monkeypatch):
 def test_manifest_sin_licencia_sigue_vacio(client, monkeypatch):
     """`mode` no filtra la existencia de la lista: sigue gated."""
     monkeypatch.delenv("CATFLIP_PREMIUM_KEY", raising=False)
-    assert status(client).get_json() == {"licensed": False, "themes": []}
+    assert status(client).get_json() == {
+        "licensed": False,
+        "themes": [],
+        "connectors": [],
+    }
 
 
 # ── /premium/themes/<id>.css ───────────────────────────────────────────

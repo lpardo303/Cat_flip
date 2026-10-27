@@ -1145,6 +1145,25 @@ const CONNECTORS = {
       { id: 'wh-format', label: 'Formato del cuerpo', type: 'select', options: ['JSON Records', 'CSV'] },
     ],
   },
+  // Conector REAL (premium): `real` cambia el modal a modo conexión — badge,
+  // aviso, botón «Probar conexión» y envío a /connectors/postgres/* en vez
+  // de la simulación animada. Gated también en el servidor (404 sin licencia).
+  postgres: {
+    name: 'PostgreSQL',
+    real: true,
+    badge: 'PREMIUM',
+    warn: 'Conexión real: al exportar, el dataset completo viajará al servidor que indiques. comprueba host, esquema y tabla — con «Reemplazar» la tabla destino se reescribe.',
+    fields: [
+      { id: 'pg-host', label: 'Host', placeholder: '127.0.0.1', required: true },
+      { id: 'pg-port', label: 'Puerto', placeholder: '5432' },
+      { id: 'pg-dbname', label: 'Base de datos', placeholder: 'analytics', required: true },
+      { id: 'pg-user', label: 'Usuario', placeholder: 'postgres', required: true },
+      { id: 'pg-password', label: 'Contraseña', type: 'password', placeholder: 'opcional si tu entorno la maneja' },
+      { id: 'pg-schema', label: 'Esquema', placeholder: 'public' },
+      { id: 'pg-table', label: 'Tabla destino', placeholder: 'empleados_limpios', required: true },
+      { id: 'pg-mode', label: 'Si la tabla existe', type: 'select', options: ['Reemplazar tabla', 'Añadir filas'] },
+    ],
+  },
 };
 
 let cnKind = null;    // conector abierto (para saber qué validar)
@@ -1168,11 +1187,19 @@ function openConnector(kind) {
     return `<label class="cn-field"><span>${escapeHtml(f.label)}</span>${input}</label>`;
   }).join('');
 
+  // El modal es compartido: los mocks conservan el marco DEMO y el conector
+  // real cambia badge, aviso, botón principal y muestra «Probar conexión».
+  document.getElementById('cn-badge').textContent = cfg.badge || 'DEMO';
+  document.getElementById('cn-warn').textContent = cfg.warn ||
+    'Conector de demostración: la simulación no contacta con ningún servicio y tus datos nunca salen de tu equipo.';
   document.getElementById('cn-console').innerHTML = '';
-  document.getElementById('cn-status').textContent = 'Modo demo — nada sale de tu equipo';
+  document.getElementById('cn-status').textContent = cfg.real
+    ? 'Conexión real — nada se envía hasta que pulses Exportar'
+    : 'Modo demo — nada sale de tu equipo';
   const send = document.getElementById('cn-send');
   send.disabled = false;
-  send.querySelector('span').textContent = 'Simular envío';
+  send.querySelector('span').textContent = cfg.real ? 'Exportar a tabla' : 'Simular envío';
+  document.getElementById('cn-test').hidden = !cfg.real;
   document.getElementById('connector-overlay').classList.add('open');
   const first = document.querySelector('#cn-form input');
   if (first) first.focus();
@@ -1214,6 +1241,9 @@ function sendConnector() {
     return;
   }
 
+  // Conector real: la exportación va al servidor (gated por licencia)
+  if (cnKind === 'postgres') return sendPostgres();
+
   // Simulación animada — NUNCA se abre ninguna conexión (modo demo)
   const rows = currentRawData ? currentRawData.shape[0] : 0;
   const fmtEl = document.querySelector('#cn-form select');
@@ -1246,6 +1276,88 @@ function sendConnector() {
     }
   };
   cnTimer = setTimeout(step, 120);
+}
+
+// ── Conector REAL de Postgres (premium) ────────────────────────────
+// A diferencia de los mocks de arriba, estos dos botones SÍ hablan con el
+// servidor: POST /connectors/postgres/{test,export}, gated por licencia
+// (404 sin ella). El SQL, el quoting de identificadores y el driver viven
+// en `connectors.py`; aquí solo se recogen los campos y se pinta la
+// consola. `cnLog` usa textContent, así que los valores del usuario nunca
+// se interpretan como HTML.
+
+function pgField(id, fallback) {
+  const el = document.getElementById(id);
+  const value = el ? String(el.value).trim() : '';
+  return value || fallback || '';
+}
+
+function pgPayload() {
+  const mode = document.getElementById('pg-mode');
+  return {
+    host: pgField('pg-host'),
+    port: pgField('pg-port'),
+    dbname: pgField('pg-dbname'),
+    user: pgField('pg-user'),
+    password: pgField('pg-password'),
+    schema: pgField('pg-schema', 'public'),
+    table: pgField('pg-table'),
+    mode: mode && mode.value === 'Añadir filas' ? 'append' : 'replace',
+  };
+}
+
+async function pgPost(path, payload) {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `El servidor respondió ${res.status}`);
+  return data;
+}
+
+async function testConnector() {
+  const btn = document.getElementById('cn-test');
+  const payload = pgPayload();
+  btn.disabled = true;
+  cnLog(`$ catflip probe --to postgres --host ${payload.host}:${payload.port}`, 'cn-cmd');
+  cnLog(`Conectando a ${payload.host}:${payload.port}/${payload.dbname}…`, 'cn-dim');
+  try {
+    const data = await pgPost('/connectors/postgres/test', payload);
+    cnLog(`✔ Conexión correcta — ${data.version}`, 'cn-ok');
+    toast('Conexión a Postgres verificada', 'success');
+  } catch (e) {
+    cnLog(`✘ ${e.message}`, 'cn-err');
+    toast(e.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function sendPostgres() {
+  const payload = pgPayload();
+  const send = document.getElementById('cn-send');
+  const rows = currentRawData ? currentRawData.shape[0] : 0;
+  send.disabled = true;
+  document.getElementById('cn-console').innerHTML = '';
+  document.getElementById('cn-status').textContent = 'Exportando…';
+  cnLog(`$ catflip send --to postgres --table ${payload.schema}.${payload.table}`, 'cn-cmd');
+  cnLog(`Conectando a ${payload.host}:${payload.port}/${payload.dbname}…`, 'cn-dim');
+  cnLog(`Serializando ${rows} fila(s) × ${currentColumns.length} columna(s)…`, 'cn-dim');
+  try {
+    const data = await pgPost('/connectors/postgres/export', payload);
+    const modo = data.mode === 'replace' ? 'tabla reemplazada' : 'filas añadidas';
+    cnLog(`✔ ${data.rows} fila(s) escritas en ${data.schema}.${data.table} (${modo})`, 'cn-ok');
+    document.getElementById('cn-status').textContent = 'Exportación completada';
+    toast(`Exportadas ${data.rows} filas a ${data.schema}.${data.table}`, 'success');
+  } catch (e) {
+    cnLog(`✘ ${e.message}`, 'cn-err');
+    document.getElementById('cn-status').textContent = 'La exportación ha fallado';
+    toast(e.message, 'error');
+  } finally {
+    send.disabled = false;
+  }
 }
 
 // ── VALIDACIÓN DE ESQUEMA — reglas no-nulo / único / regex / rango ──────

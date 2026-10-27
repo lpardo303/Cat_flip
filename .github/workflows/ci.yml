@@ -31,6 +31,7 @@ jobs:
           --cov=app
           --cov=operations
           --cov=cli
+          --cov=connectors
           --cov-report=term-missing
           --cov-fail-under=93
 
