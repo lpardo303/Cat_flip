@@ -1989,6 +1989,18 @@
     color: var(--orange);
   }
 
+  /* Badge del título de sección para el conector real (premium) */
+  .cn-premium-badge {
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    background: var(--accent-subtle);
+    border: 1px solid var(--accent-glow);
+    color: var(--accent-text);
+  }
+
   .cn-warn {
     font-size: 0.72rem;
     color: var(--yellow);
@@ -2047,6 +2059,7 @@
   .cn-cmd { color: var(--accent-text); }
   .cn-dim { color: var(--text-muted); }
   .cn-ok { color: var(--green); }
+  .cn-err { color: var(--red); }
 
   .cn-status { margin-right: auto; font-size: 0.72rem; color: var(--text2); }
 

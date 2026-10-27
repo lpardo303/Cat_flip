@@ -9,6 +9,23 @@ siguiente corte.
 
 ## [Sin publicar]
 
+### Añadido
+
+- **Conector real de PostgreSQL (Open Core — primer conector real)**: nueva
+  sección *Destino real* en el panel derecho (solo con licencia) con modal
+  de conexión — **Probar conexión** (`SELECT version()`) y **Exportar a
+  tabla** en modos *Reemplazar tabla* (DROP + CREATE con tipos derivados de
+  los dtypes de pandas) o *Añadir filas*, en una única transacción. Backend
+  en `connectors.py` + rutas `POST /connectors/postgres/{test,export}` con
+  gating server-side (404 sin licencia; `/premium/status` pasa a anunciar
+  `connectors: ["postgres"]` para que el front ni siquiera pinte la
+  sección). Identificadores comillados con `quote_ident`, valores siempre
+  parametrizados y contraseña nunca reflejada en respuestas ni errores.
+  Driver **opcional**: `pip install -r requirements-connectors.txt`
+  (`psycopg` v3); sin él la app funciona igual y la ruta explica cómo
+  instalarlo. 40 tests nuevos (`connectors.py` al 100 % de cobertura) y
+  `--cov=connectors` añadido al gate de la CI.
+
 ### Arreglados
 
 - **Nulos de solo espacios normalizados al cargar** (Bug 4 al cargar): una

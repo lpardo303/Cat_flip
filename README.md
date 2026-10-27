@@ -23,6 +23,7 @@
 * 📅 **Auto-Mapeo de Tipos:** Al cargar un archivo, un motor heurístico analiza cada columna de texto del esquema completo y una barra te ofrece convertirlas con un clic a `datetime`, `int` o `float` cuando ≥90% de los valores lo permiten — cada conversión queda como paso deshacible en la receta.
 * 📤 **Exportación en 5 formatos:** CSV, Excel XLSX, **Parquet** (columnar, preserva tipos), **JSON Records** (array de objetos con nulos `null` y fechas ISO, round-trip con `pd.read_json(orient='records')`) y **SQL** (script DDL + INSERT portable a PostgreSQL/SQLite con tipos derivados del dtype real, lotes de 100 filas y escapado de comillas — se ejecuta tal cual).
 * 🧪 **Destinos (demo):** Simulador visual de conectores **BigQuery**, **Snowflake** y **Webhook REST**: configura proyecto/tabla o URL, valida el formulario y verás en consola el paquete que se enviaría — sin que nada salga de tu equipo (cero peticiones de red, badge DEMO permanente).
+* 🐘 **Destino real PostgreSQL (Open Core):** Con licencia premium, la sección *Destino real* conecta con tu servidor mediante [psycopg](https://www.psycopg.org/) y exporta el dataset completo a una tabla: **Probar conexión** (`SELECT version()`) y exportación en modos **Reemplazar tabla** (DDL con tipos derivados de los dtypes de pandas) o **Añadir filas**, transaccional, con identificadores comillados y valores parametrizados. El driver es opcional (`pip install -r requirements-connectors.txt`): sin él la app arranca igual y la ruta te dice cómo instalarlo; sin licencia premium la ruta responde 404.
 * 🛡️ **Validación de esquema:** Define reglas por columna — **no-nulo**, **único**, **regex** y **rango** (mín/máx inclusivo) — y Cat_flip pinta de rojo las celdas que las incumplen con el motivo en el tooltip, con badge de conteo y resumen por columna. Solo marcan: nunca tocan los datos ni entran en la receta, se revalidan solas tras cada operación/deshacer y se limpian al cargar otro archivo.
 * 📊 **Perfilado de Datos:** Diagnóstico estadístico instantáneo de tus columnas (nulos, valores únicos, mínimos, máximos) y **heatmap de correlaciones de Pearson** entre columnas numéricas — teal para positivas, rojo para negativas, celdas sin variación como «—» — con refresco automático tras cada operación.
 * 💻 **100% Local y Privado:** Sin bases de datos ni envíos a la nube; todo el procesamiento ocurre de forma segura en la memoria RAM de tu equipo.
@@ -55,6 +56,12 @@ Asegúrate de tener **Python 3.10+** instalado en tu sistema.
 3. **Instala las dependencias:**
    ```bash
    pip install -r requirements.txt
+   ```
+
+   *Opcional — conector real de Postgres (función premium; sin ella la app
+   funciona igual):*
+   ```bash
+   pip install -r requirements-connectors.txt
    ```
 
 4. **Ejecuta la aplicación:**
@@ -147,7 +154,7 @@ El core es **MIT** y nunca se degrada: sin licencia la app funciona igual, sin t
 
 ## ⭐ Premium (Open Core)
 
-Junto al core vive el paquete [`premium/`](premium/), con gating **server-side**: la licencia se activa con la env var `CATFLIP_PREMIUM_KEY` o el fichero `premium.key` (ignorado por git), y sin ella `/premium/status` devuelve la lista vacía y `/premium/themes/<id>.css` responde 404. Hoy contiene los **temas Aurora y Solar**; en el roadmap, auto-update, `.exe` firmado y conectores reales (Postgres/S3/BigQuery). El packaging firmado de Linux (Flatpak/AppImage) ya vive en [`packaging/`](packaging/README.md). Detalles y guía para ampliarlo en [premium/README.md](premium/README.md).
+Junto al core vive el paquete [`premium/`](premium/), con gating **server-side**: la licencia se activa con la env var `CATFLIP_PREMIUM_KEY` o el fichero `premium.key` (ignorado por git), y sin ella `/premium/status` devuelve la lista vacía y `/premium/themes/<id>.css` responde 404. Hoy contiene los **temas Aurora y Solar** y el **conector real de Postgres** (`/connectors/postgres/*`, driver opcional en `requirements-connectors.txt`); en el roadmap, auto-update, `.exe` firmado y más conectores (S3/BigQuery). El packaging firmado de Linux (Flatpak/AppImage) ya vive en [`packaging/`](packaging/README.md). Detalles y guía para ampliarlo en [premium/README.md](premium/README.md).
 
 ## 📄 Licencia
 

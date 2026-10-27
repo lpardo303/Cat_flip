@@ -18,8 +18,9 @@ echo "tu-clave" > premium/premium.key   # premium.key está en .gitignore
 ```
 
 El gating vive en el servidor: `/premium/status` devuelve `themes: []` y
-`/premium/themes/<id>.css` responde **404** sin licencia. El front nunca
-recibe CSS premium que no deba ver.
+`connectors: []`, y `/premium/themes/<id>.css` y `/connectors/*` responden
+**404** sin licencia. El front nunca recibe CSS premium que no deba ver ni
+llega a pintar el conector real.
 
 ## Qué hay dentro ahora
 
@@ -29,7 +30,8 @@ recibe CSS premium que no deba ver.
 | Packaging firmado (Flatpak + AppImage, Linux) | ✅ 2026-10-25 — `packaging/`, firmado GPG (ver `packaging/README.md`) |
 | Packaging firmado (`.exe` Windows) | ⏳ roadmap |
 | Auto-update integrado | ⏳ roadmap |
-| Conectores reales (Postgres / S3 / BigQuery) | ⏳ roadmap |
+| Conector real **PostgreSQL** — `/connectors/postgres/{test,export}` (lógica en `connectors.py`, gating con `premium_required`) | ✅ 2026-10-27 — driver opcional `psycopg` en `requirements-connectors.txt` |
+| Conectores reales (S3 / BigQuery) | ⏳ roadmap |
 
 Con licencia, el panel de tema del encabezado añade **Aurora** y **Solar**
 al grupo *Claro* (cada opción con su vista previa), agrupado en
@@ -38,7 +40,9 @@ manifiesto: lo manda el servidor, el front no lo adivina.
 
 ## Cómo añadir un feature premium nuevo
 
-1. Crea el módulo/carpeta dentro de `premium/`.
+1. Crea el módulo/carpeta dentro de `premium/` — o en la raíz, como
+   `connectors.py`, si depende del core (pandas); el gating igual va en la
+   ruta, nunca solo en el módulo.
 2. Regístralo en `THEMES` (temas) o expórtalo desde `premium/__init__.py`.
 3. Sírvelo desde un endpoint de `app.py` que empiece comprobando
    `premium.is_licensed()` — nunca expongas el recurso sin esa comprobación.

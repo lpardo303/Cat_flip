@@ -394,6 +394,21 @@
         </div>
       </div>
 
+      <!-- Destino real (premium) — conector Postgres, gated por licencia -->
+      <div class="panel-section" id="pg-section" hidden>
+        <div class="section-title">
+          <svg class="icon-svg" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>
+          <span>Destino real</span>
+          <span class="cn-premium-badge">PREMIUM</span>
+        </div>
+        <div class="cn-grid">
+          <button type="button" class="cn-card" onclick="openConnector('postgres')" aria-label="Exportar el dataset a una base de datos PostgreSQL (conexión real, premium)">
+            <svg class="icon-svg" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>
+            <span>Postgres</span>
+          </button>
+        </div>
+      </div>
+
       <!-- Validación de esquema — reglas no-nulo / único / regex / rango -->
       <div class="panel-section">
         <div class="section-title">
@@ -609,10 +624,10 @@
     <h2 id="cn-title">
       <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 2v20"/><path d="M5 8h14"/><path d="M5 16h14"/><ellipse cx="12" cy="8" rx="7" ry="3"/><ellipse cx="12" cy="16" rx="7" ry="3"/></svg>
       <span id="cn-name">Conector</span>
-      <span class="cn-demo-badge">DEMO</span>
+      <span class="cn-demo-badge" id="cn-badge">DEMO</span>
     </h2>
 
-    <div class="cn-warn" role="note">
+    <div class="cn-warn" id="cn-warn" role="note">
       Conector de demostración: la simulación no contacta con ningún servicio y tus datos nunca salen de tu equipo.
     </div>
 
@@ -623,6 +638,7 @@
     <div class="modal-footer">
       <span class="cn-status" id="cn-status">Modo demo — nada sale de tu equipo</span>
       <button class="btn btn-secondary" onclick="closeConnector()">Cerrar</button>
+      <button class="btn btn-secondary" id="cn-test" onclick="testConnector()" hidden>Probar conexión</button>
       <button class="btn btn-primary" id="cn-send" onclick="sendConnector()">
         <svg class="icon-svg" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
         <span>Simular envío</span>
