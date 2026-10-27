@@ -148,3 +148,60 @@ def test_operation_response_sends_null_cells(client):
     body = _post_op(client, "replace", {"column": "Nombre", "old_value": "Bob", "new_value": ""}).get_json()
     # "Bob" → "" → nulo real → JSON null
     assert body["data"]["data"] == [["Alice"], [None]]
+
+
+# ── Carga: Bug 4 también al cargar (QA visual 2026-10-26) ──────────────
+# Antes de este fix `_normalize_nulls` solo corría dentro de las ops de
+# texto: una celda de solo espacios ("   ") sobrevivía al /upload, contaba
+# como dato válido y la barra de calidad salía inflada (~1 punto en el
+# dataset del QA).
+
+def test_upload_solo_espacios_cuenta_como_nulo(client):
+    r = _upload(client, "a,b\n1,   \n2,x\n")
+
+    assert r.status_code == 200
+    assert app_module.current_df["b"].isna().sum() == 1
+    assert r.get_json()["data"]["nulls"]["b"] == 1
+    assert client.get("/stats").get_json()["stats"]["b"]["nulls"] == 1
+
+
+def test_upload_codigo_de_carga_reproduce_el_df(client, monkeypatch):
+    """Paridad: ejecutar el código de carga devuelve el MISMO df en memoria.
+
+    El script exportado (receta/`.py`) arranca por esa línea, así que si
+    aquí no cuadra, el usuario que ejecute el guion vería otros nulos.
+    """
+    csv_text = "a,b\n1,   \n2,nan\n3,None\n4,x\n"
+    r = _upload(client, csv_text, filename="espacios.csv")
+    code = r.get_json()["code"]
+
+    assert "float('nan')" in code  # la normalización viaja en el código
+
+    real_read_csv = pd.read_csv
+
+    def _from_memory(*args, **kwargs):
+        # El código llama a pd.read_csv('espacios.csv', ...): se redirige al
+        # CSV en memoria para no depender de un fichero en disco.
+        kwargs.pop("encoding", None)
+        return real_read_csv(io.StringIO(csv_text), **kwargs)
+
+    monkeypatch.setattr(pd, "read_csv", _from_memory)
+    ns = {}
+    exec(code, ns)
+    pd.testing.assert_frame_equal(ns["df"], app_module.current_df)
+
+
+def test_upload_right_normaliza_solo_espacios(client):
+    # 2 columnas a propósito: en un CSV de una sola columna pandas se come
+    # la línea de solo espacios como línea en blanco (skip_blank_lines) y la
+    # celda ni llegaría al df — el caso real es una celda dentro de una fila
+    # con datos, como en el dataset del QA.
+    r = client.post(
+        "/upload_right",
+        data={"file": (io.BytesIO(b"id,col\n1,   \n2,ok\n"), "der.csv")},
+        content_type="multipart/form-data",
+    )
+
+    assert r.status_code == 200
+    assert app_module.right_df["col"].isna().sum() == 1
+    assert "float('nan')" in app_module.right_code
