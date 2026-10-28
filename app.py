@@ -1447,18 +1447,27 @@ def version_check():
     `update_available` solo es True si la release es interpretably más
     nueva; `checked=False` significa que GitHub no se pudo consultar (sin
     red, rate limit…). El front, en cualquier otro caso, no pinta nada.
+
+    `?dismissed=<tag>` es la versión que el usuario ya descartó (la
+    guarda el front en localStorage): el aviso no vuelve a aparecer
+    mientras la release no supere TAMBIÉN a esa. Solo suprime si el tag
+    descartado es interpretable — un valor corrupto en localStorage no
+    puede callar los avisos para siempre. La caché solo guarda el fetch
+    de GitHub, así que este cálculo es por petición y no la contamina.
     """
     current = app_version()
     release = _cached_release()
     latest = release.get("tag_name") if release else None
+    update = bool(release and current and is_newer(latest, current))
+    dismissed = (request.args.get("dismissed") or "").strip()
+    if update and dismissed and parse_version(dismissed) is not None:
+        update = is_newer(latest, dismissed)
     return jsonify({
         "current": current,
         "latest": latest,
         "html_url": release.get("html_url") if release else None,
         "published_at": release.get("published_at") if release else None,
-        "update_available": bool(
-            release and current and is_newer(latest, current)
-        ),
+        "update_available": update,
         "checked": release is not None,
     })
 

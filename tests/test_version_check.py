@@ -42,8 +42,8 @@ def fresh(monkeypatch, release):
     return calls
 
 
-def check(client):
-    resp = client.get("/version/check")
+def check(client, query=""):
+    resp = client.get("/version/check" + query)
     assert resp.status_code == 200
     return resp.get_json()
 
@@ -188,6 +188,43 @@ def test_fetch_release_json_que_no_es_objeto_es_none(monkeypatch):
         lambda req, timeout=None: FakeResp(b"[]"),
     )
     assert app_module._fetch_release("x/y") is None
+
+
+# ── Versión descartada (?dismissed=) ─────────────────────────────────
+def test_dismissed_igual_a_la_release_suprime_el_aviso(client, monkeypatch):
+    """El usuario cerró el aviso de v9.9.9: no debe volver a aparecer."""
+    fresh(monkeypatch, fake_release("v9.9.9"))
+    data = check(client, "?dismissed=v9.9.9")
+    assert data["checked"] is True
+    assert data["latest"] == "v9.9.9"      # la release sigue ahí
+    assert data["update_available"] is False  # …pero ya no avisa
+
+
+def test_dismissed_mas_viejo_sigue_avisando(client, monkeypatch):
+    """Descartó 1.0 y sale 9.9.9: es otra versión, hay que avisar."""
+    fresh(monkeypatch, fake_release("v9.9.9"))
+    assert check(client, "?dismissed=v1.0.0")["update_available"] is True
+
+
+def test_dismissed_mas_nuevo_que_la_release_suprime(client, monkeypatch):
+    """Rollback (release 9.9.9, ya se descartó la 99): sin aviso."""
+    fresh(monkeypatch, fake_release("v9.9.9"))
+    assert check(client, "?dismissed=v99.0.0")["update_available"] is False
+
+
+def test_dismissed_corrupto_no_calla_los_avisos(client, monkeypatch):
+    """Un valor ilegible en localStorage no puede suprimir para siempre."""
+    fresh(monkeypatch, fake_release("v9.9.9"))
+    assert check(client, "?dismissed=nightly")["update_available"] is True
+    assert check(client, "?dismissed=")["update_available"] is True
+
+
+def test_dismissed_no_toca_el_cache(client, monkeypatch):
+    """El descarte se calcula por petición: no contamina la caché de GitHub."""
+    calls = fresh(monkeypatch, fake_release("v9.9.9"))
+    assert check(client, "?dismissed=v9.9.9")["update_available"] is False
+    assert check(client)["update_available"] is True   # sin parámetro
+    assert calls["n"] == 1                             # un solo fetch
 
 
 # ── Cache ───────────────────────────────────────────────────────────

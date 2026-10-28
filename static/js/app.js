@@ -301,24 +301,52 @@ initPremiumThemes();
 // (sin red, con rate limit o tag ilegible responde checked=false y aquí
 // no ocurre nada). Se lanza después del primer pintado para no competir
 // con los avisos de carga; el enlace abre la release en pestaña nueva.
+// La última versión DESCARTADA viaja como `?dismissed=` para que el
+// servidor suprima el aviso hasta que haya algo más nuevo que ella.
+const VERSION_DISMISS_KEY = 'catflip-version-dismissed';
+
 async function checkNewVersion() {
+  let dismissed = '';
+  try { dismissed = localStorage.getItem(VERSION_DISMISS_KEY) || ''; } catch (e) {}
   let data;
   try {
-    const res = await fetch('/version/check');
+    const qs = dismissed ? '?dismissed=' + encodeURIComponent(dismissed) : '';
+    const res = await fetch('/version/check' + qs);
     if (!res.ok) return;
     data = await res.json();
   } catch (e) { return; }
   if (!data || !data.update_available || !data.html_url) return;
   const url = String(data.html_url);
   if (!/^https?:\/\//.test(url)) return;  // el enlace se abre en el navegador del usuario
-  toast(
-    `Nueva versión ${escapeHtml(String(data.latest || ''))} disponible — ` +
-    `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">ver release</a>`,
-    'info',
-    8000
-  );
+  showVersionToast(String(data.latest || ''), url);
 }
 setTimeout(checkNewVersion, 2000);
+
+// Toast propio con botón ×: cerrarlo DE VERDAD (no el auto-cierre a los
+// 8 s) guarda la versión en localStorage — el aviso no vuelve a aparecer
+// para esa versión, pero sí para una más nueva. El auto-cierre no
+// descarta nada: si el usuario no decidió, la próxima carga vuelve a
+// mostrarlo.
+function showVersionToast(latest, url) {
+  const t = document.createElement('div');
+  t.className = 'toast info';
+  t.innerHTML = '<span>' + icon('info') + '</span>' +
+    '<span>Nueva versión ' + escapeHtml(latest) + ' disponible — ' +
+    '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener noreferrer">ver release</a></span>';
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'toast-close';
+  close.setAttribute('aria-label', 'Descartar este aviso de versión nueva');
+  close.title = 'No volver a avisar con esta versión';
+  close.innerHTML = icon('x');
+  close.addEventListener('click', () => {
+    try { localStorage.setItem(VERSION_DISMISS_KEY, latest); } catch (e) {}
+    t.remove();
+  });
+  t.appendChild(close);
+  document.getElementById('toast-container').appendChild(t);
+  setTimeout(() => t.remove(), 8000);
+}
 
 // Cambios del sistema: solo re-aplican si el usuario no forzó claro/oscuro
 if (schemeMQ) {
