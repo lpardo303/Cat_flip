@@ -7,6 +7,8 @@ import re
 import json
 import base64
 import time
+import urllib.error
+import urllib.request
 from functools import wraps
 
 # Open Core: gating de features premium (la licencia decide qué sirve
@@ -1346,6 +1348,119 @@ def premium_theme_css(theme_id):
     if css is None:
         return jsonify({"error": "No encontrado."}), 404
     return css, 200, {"Content-Type": "text/css; charset=utf-8"}
+
+
+# ── AVISO DE VERSIÓN NUEVA ────────────────────────────────────────
+# El servidor compara la ÚLTIMA release publicada en GitHub con
+# `package.json` y el front pinta un toast con enlace solo si hay algo
+# más nuevo. Best-effort: sin red, con rate limit o con un tag ilegible
+# se responde 200 sin aviso — jamás bloquea ni rompe la app. SOLO LEE.
+# El resultado queda cacheado (1 h si fue OK, 5 min si falló) para no
+# agotar el rate limit anónimo de api.github.com (60 req/h por IP).
+_RELEASE_TTL_OK = 3600
+_RELEASE_TTL_ERR = 300
+_RELEASE_REPO = os.environ.get("CATFLIP_GITHUB_REPO", "lpardo303/Cat_flip")
+_RELEASE_CACHE = {"at": 0.0, "release": None, "failed": False}
+
+
+def app_version():
+    """Versión actual desde `package.json` (None si no se puede leer).
+
+    Los builds congelados lo incluyen como dato en ambos specs, y en
+    desarrollo y en el bundle comparten patrón: el fichero vive junto a
+    `app.py`, así que basta la ruta relativa a `__file__`.
+    """
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "package.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            version = json.load(f).get("version")
+    except (OSError, ValueError):
+        return None
+    return version if isinstance(version, str) and version else None
+
+
+def parse_version(tag):
+    """«v1.4.0» → (1, 4, 0); cualquier tag no numérico → None."""
+    if not isinstance(tag, str):
+        return None
+    m = re.match(r"^v?(\d+(?:\.\d+)*)", tag.strip())
+    if not m:
+        return None
+    return tuple(int(p) for p in m.group(1).split("."))
+
+
+def is_newer(latest_tag, current_version):
+    """True SOLO si `latest_tag` es estrictamente más nueva.
+
+    Comparación numérica por componente (1.10 > 1.9 — nada lexicográfico)
+    con relleno de longitudes distintas («1.4» == «1.4.0»). Si cualquiera
+    de las dos no se puede interpretar, no se anuncia nada: ante la duda
+    el usuario no ve un aviso falso.
+    """
+    a, b = parse_version(latest_tag), parse_version(current_version)
+    if a is None or b is None:
+        return False
+    n = max(len(a), len(b))
+    a += (0,) * (n - len(a))
+    b += (0,) * (n - len(b))
+    return a > b
+
+
+def _fetch_release(repo):
+    """Última release de GitHub o None — CUALQUIER fallo es None.
+
+    Best-effort a propósito: sin red, timeout, 403 por rate limit o JSON
+    inesperado significan simplemente «esta vez no hay aviso».
+    """
+    url = f"https://api.github.com/repos/{repo}/releases/latest"
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": f"CatFlip/{app_version() or 'dev'}",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _cached_release():
+    """Release con caché: 1 h si fue OK, 5 min si falló (reintentar pronto)."""
+    now = time.time()
+    ttl = _RELEASE_TTL_ERR if _RELEASE_CACHE["failed"] else _RELEASE_TTL_OK
+    if _RELEASE_CACHE["at"] and now - _RELEASE_CACHE["at"] < ttl:
+        return _RELEASE_CACHE["release"]
+    release = _fetch_release(_RELEASE_REPO)
+    _RELEASE_CACHE.update(at=now, release=release, failed=release is None)
+    return release
+
+
+@app.route("/version/check", methods=["GET"])
+def version_check():
+    """Aviso de versión nueva: última release de GitHub vs `package.json`.
+
+    `update_available` solo es True si la release es interpretably más
+    nueva; `checked=False` significa que GitHub no se pudo consultar (sin
+    red, rate limit…). El front, en cualquier otro caso, no pinta nada.
+    """
+    current = app_version()
+    release = _cached_release()
+    latest = release.get("tag_name") if release else None
+    return jsonify({
+        "current": current,
+        "latest": latest,
+        "html_url": release.get("html_url") if release else None,
+        "published_at": release.get("published_at") if release else None,
+        "update_available": bool(
+            release and current and is_newer(latest, current)
+        ),
+        "checked": release is not None,
+    })
 
 
 # ── CONECTORES REALES (Open Core) ───────────────────────────────

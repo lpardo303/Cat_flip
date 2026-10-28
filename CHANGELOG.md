@@ -9,6 +9,20 @@ siguiente corte.
 
 ## [Sin publicar]
 
+### Añadido
+
+- **Aviso de versión nueva**: la app consulta la última release publicada
+  en GitHub contra `package.json` (`GET /version/check`) y, solo si hay
+  algo más nuevo, muestra un toast no intrusivo con enlace a la release
+  (8 s, desaparece solo). Best-effort: sin red, con rate limit o con un
+  tag ilegible responde 200 sin aviso — nunca bloquea la carga ni rompe
+  la app. La respuesta queda cacheada 1 h si fue OK y 5 min si falló (no
+  agota el rate limit anónimo de api.github.com), la comparación es
+  numérica por componente (1.10 > 1.9) y el enlace del toast hereda el
+  color del texto (subrayado, contraste AA). El `package.json` viaja ya
+  como dato en los specs de AppImage/Flatpak y Windows, así que los
+  bundles congelados también saben su versión. 19 tests nuevos.
+
 ## [1.3.0] — 2026-10-28
 
 ### Añadido

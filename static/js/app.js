@@ -296,6 +296,30 @@ async function initPremiumThemes() {
 }
 initPremiumThemes();
 
+// Aviso de versión nueva: el servidor compara la última release de
+// GitHub con package.json y solo pinta el toast si hay algo más nuevo
+// (sin red, con rate limit o tag ilegible responde checked=false y aquí
+// no ocurre nada). Se lanza después del primer pintado para no competir
+// con los avisos de carga; el enlace abre la release en pestaña nueva.
+async function checkNewVersion() {
+  let data;
+  try {
+    const res = await fetch('/version/check');
+    if (!res.ok) return;
+    data = await res.json();
+  } catch (e) { return; }
+  if (!data || !data.update_available || !data.html_url) return;
+  const url = String(data.html_url);
+  if (!/^https?:\/\//.test(url)) return;  // el enlace se abre en el navegador del usuario
+  toast(
+    `Nueva versión ${escapeHtml(String(data.latest || ''))} disponible — ` +
+    `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">ver release</a>`,
+    'info',
+    8000
+  );
+}
+setTimeout(checkNewVersion, 2000);
+
 // Cambios del sistema: solo re-aplican si el usuario no forzó claro/oscuro
 if (schemeMQ) {
   const onSchemeChange = () => { if (themeMode === 'auto') applyTheme(); };
