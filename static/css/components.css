@@ -1259,6 +1259,11 @@
   .toast.success { background: var(--bg-input); border: 1px solid var(--green); color: var(--green); }
   .toast.error   { background: var(--bg-input); border: 1px solid var(--red);   color: var(--red); }
   .toast.info    { background: var(--bg-input); border: 1px solid var(--accent); color: var(--accent-text); }
+  /* Enlace del aviso de versión nueva: hereda el color del toast (el azul
+     por defecto del navegador falla el contraste en oscuro) y se
+     distingue por subrayado, no solo por color. */
+  .toast a { color: inherit; text-decoration: underline; }
+  .toast a:hover, .toast a:focus-visible { text-decoration-thickness: 2px; }
 
   /* ── LOADING ───────────────────────────────────────────── */
   .loading-overlay {

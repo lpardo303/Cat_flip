@@ -8,6 +8,8 @@ datas = [
     (os.path.join(ROOT, "app.py"), "."),
     (os.path.join(ROOT, "operations.py"), "."),
     (os.path.join(ROOT, "cli.py"), "."),
+    # Versión del bundle para /version/check (aviso de versión nueva)
+    (os.path.join(ROOT, "package.json"), "."),
     (os.path.join(ROOT, "premium"), "premium"),
     (os.path.join(ROOT, "static"), "static"),
     (os.path.join(ROOT, "templates"), "templates"),

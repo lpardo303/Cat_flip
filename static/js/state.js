@@ -162,13 +162,15 @@ function updateUndoRedoButtons(canUndo, canRedo) {
 function showLoading() { document.getElementById('loading').classList.add('open'); }
 function hideLoading() { document.getElementById('loading').classList.remove('open'); }
 
-function toast(msg, type='success') {
+// `duration` (ms): los avisos habituales viven 3.5 s; el de versión nueva
+// se queda un poco más (8 s) para dar tiempo a pulsar su enlace.
+function toast(msg, type='success', duration=3500) {
   const t = document.createElement('div');
   t.className = 'toast ' + type;
   const icons = {success:'check',error:'x',info:'info'};
   t.innerHTML = '<span>' + icon(icons[type]||'info') + '</span><span>' + msg + '</span>';
   document.getElementById('toast-container').appendChild(t);
-  setTimeout(() => t.remove(), 3500);
+  setTimeout(() => t.remove(), duration);
 }
 
 function enableOps() {
