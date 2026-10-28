@@ -379,10 +379,6 @@
           <span>Destinos (demo)</span>
         </div>
         <div class="cn-grid">
-          <button type="button" class="cn-card" onclick="openConnector('bigquery')" aria-label="Simular envío a Google BigQuery (demo)">
-            <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9Z"/><circle cx="12" cy="12" r="2.5"/></svg>
-            <span>BigQuery</span>
-          </button>
           <button type="button" class="cn-card" onclick="openConnector('snowflake')" aria-label="Simular envío a Snowflake (demo)">
             <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 2v20"/><path d="m20 6-16 12"/><path d="m4 6 16 12"/></svg>
             <span>Snowflake</span>
@@ -394,7 +390,7 @@
         </div>
       </div>
 
-      <!-- Destino real (premium) — conectores Postgres y S3, gated por licencia -->
+      <!-- Destino real (premium) — conectores Postgres, S3 y BigQuery, gated por licencia -->
       <div class="panel-section" id="pg-section" hidden>
         <div class="section-title">
           <svg class="icon-svg" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>
@@ -409,6 +405,10 @@
           <button type="button" class="cn-card" onclick="openConnector('s3')" aria-label="Exportar el dataset a un bucket S3 como CSV (subida real, premium)">
             <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
             <span>S3</span>
+          </button>
+          <button type="button" class="cn-card" onclick="openConnector('bigquery')" aria-label="Exportar el dataset a una tabla de Google BigQuery (conexión real, premium)">
+            <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9Z"/><circle cx="12" cy="12" r="2.5"/></svg>
+            <span>BigQuery</span>
           </button>
         </div>
       </div>

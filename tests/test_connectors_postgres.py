@@ -126,7 +126,7 @@ def test_status_sin_licencia_no_anuncia_el_conector(client, monkeypatch):
 
 def test_status_con_licencia_anuncia_postgres(client, licensed):
     data = client.get("/premium/status").get_json()
-    assert data["connectors"] == ["postgres", "s3"]
+    assert data["connectors"] == ["postgres", "s3", "bigquery"]
 
 
 def test_export_sin_datos_responde_400(client, licensed, fake_pg):

@@ -288,7 +288,7 @@ async function initPremiumThemes() {
   // Conectores reales: la sección «Destino real» solo existe con licencia
   // (el servidor además devuelve 404 en /connectors/* sin ella).
   const pgSection = document.getElementById('pg-section');
-  if (pgSection) pgSection.hidden = connectors.indexOf('postgres') === -1;
+  if (pgSection) pgSection.hidden = connectors.length === 0;
   if (themeOrder().indexOf(themeMode) === -1) themeMode = 'auto';
   preloadPremiumCss();   // solo con licencia: la lista viene vacía sin ella
   buildThemeMenu();

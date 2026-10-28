@@ -363,7 +363,11 @@ def test_status_anuncia_s3_solo_con_licencia(client, monkeypatch):
     monkeypatch.delenv("CATFLIP_PREMIUM_KEY", raising=False)
     assert client.get("/premium/status").get_json()["connectors"] == []
     monkeypatch.setenv("CATFLIP_PREMIUM_KEY", "demo")
-    assert client.get("/premium/status").get_json()["connectors"] == ["postgres", "s3"]
+    assert client.get("/premium/status").get_json()["connectors"] == [
+        "postgres",
+        "s3",
+        "bigquery",
+    ]
 
 
 def test_export_s3_sin_datos_con_licencia(client, monkeypatch):

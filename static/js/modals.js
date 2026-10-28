@@ -1111,21 +1111,13 @@ function closeCsvRecipe() {
   if (overlay) overlay.classList.remove('open');
 }
 
-// ── Conectores mock (Destinos demo) ────────────────────────────────────
-// BigQuery, Snowflake y Webhook REST son SIMULACIONES de UI (F3.4 spec:
-// "solo UI, sin integración real"): este bloque NO hace fetch ni toca la
-// red en ningún punto — sirve para ensayar la configuración y ver el
-// paquete que se «enviaría», con aviso de modo demo permanente.
+// ── Conectores (Destinos demo y reales) ──────────────────────────────────
+// Snowflake y Webhook REST son SIMULACIONES de UI (F3.4 spec: "solo UI,
+// sin integración real"): esas entradas NO hacen fetch ni tocan la red en
+// ningún punto — sirven para ensayar la configuración y ver el paquete
+// que se «enviaría», con aviso de modo demo permanente. Las entradas con
+// `real: true` (Postgres, S3, BigQuery) SÍ hablan con el servidor.
 const CONNECTORS = {
-  bigquery: {
-    name: 'Google BigQuery',
-    fields: [
-      { id: 'bq-project', label: 'Proyecto', placeholder: 'mi-proyecto-42', required: true },
-      { id: 'bq-dataset', label: 'Dataset', placeholder: 'analytics', required: true },
-      { id: 'bq-table', label: 'Tabla destino', placeholder: 'empleados_limpios', required: true },
-      { id: 'bq-format', label: 'Formato del paquete', type: 'select', options: ['JSON Records', 'CSV'] },
-    ],
-  },
   snowflake: {
     name: 'Snowflake',
     fields: [
@@ -1182,6 +1174,26 @@ const CONNECTORS = {
       { id: 's3-prefix', label: 'Prefijo (carpeta)', placeholder: 'etl/limpios' },
       { id: 's3-key', label: 'Ruta destino', placeholder: 'empleados_limpios.csv', required: true },
       { id: 's3-mode', label: 'Si el objeto existe', type: 'select', options: ['Sobrescribir objeto', 'Fallar si existe'] },
+    ],
+  },
+  // Conector REAL (premium): BigQuery — carga el dataset completo en
+  // `<dataset>.<tabla>` (WRITE_TRUNCATE / WRITE_APPEND con autodetect).
+  // Credencial vacía ⇒ cadena por defecto del SDK (Application Default
+  // Credentials: env, gcloud o la instancia). Gated también en el
+  // servidor (404 sin licencia).
+  bigquery: {
+    name: 'Google BigQuery',
+    real: true,
+    badge: 'PREMIUM',
+    action: 'Exportar a tabla',
+    warn: 'Conexión real: al exportar, el dataset completo se cargará en la tabla que indiques. comprueba proyecto, dataset y tabla — con «Reemplazar» la tabla destino se reescribe.',
+    fields: [
+      { id: 'bq-project', label: 'Proyecto', placeholder: 'mi-proyecto-42', required: true },
+      { id: 'bq-dataset', label: 'Dataset', placeholder: 'analytics', required: true },
+      { id: 'bq-table', label: 'Tabla destino', placeholder: 'empleados_limpios', required: true },
+      { id: 'bq-creds', label: 'Cuenta de servicio (JSON, opcional)', type: 'password', placeholder: 'vacío = credenciales del entorno (ADC)' },
+      { id: 'bq-location', label: 'Ubicación (opcional)', placeholder: 'US, EU…' },
+      { id: 'bq-mode', label: 'Si la tabla existe', type: 'select', options: ['Reemplazar tabla', 'Añadir filas'] },
     ],
   },
 };
@@ -1264,6 +1276,7 @@ function sendConnector() {
   // Conector real: la exportación va al servidor (gated por licencia)
   if (cnKind === 'postgres') return sendPostgres();
   if (cnKind === 's3') return sendS3();
+  if (cnKind === 'bigquery') return sendBigQuery();
 
   // Simulación animada — NUNCA se abre ninguna conexión (modo demo)
   const rows = currentRawData ? currentRawData.shape[0] : 0;
@@ -1299,13 +1312,13 @@ function sendConnector() {
   cnTimer = setTimeout(step, 120);
 }
 
-// ── Conectores REALES (premium): Postgres y S3 ──────────────────────
+// ── Conectores REALES (premium): Postgres, S3 y BigQuery ────────────
 // A diferencia de los mocks de arriba, estos botones SÍ hablan con el
-// servidor: POST /connectors/{postgres,s3}/{test,export}, gated por
-// licencia (404 sin ella). La lógica (SQL/quoting, claves S3, driver
-// opcional) vive en `connectors.py`; aquí solo se recogen los campos y
-// se pinta la consola. `cnLog` usa textContent, así que los valores del
-// usuario nunca se interpretan como HTML.
+// servidor: POST /connectors/{postgres,s3,bigquery}/{test,export}, gated
+// por licencia (404 sin ella). La lógica (SQL/quoting, claves S3, jobs de
+// BigQuery, drivers opcionales) vive en `connectors.py`; aquí solo se
+// recogen los campos y se pinta la consola. `cnLog` usa textContent, así
+// que los valores del usuario nunca se interpretan como HTML.
 
 function pgField(id, fallback) {
   const el = document.getElementById(id);
@@ -1338,23 +1351,35 @@ async function cnPost(path, payload) {
   return data;
 }
 
+// Payload del conector abierto (el mismo dispatch que sendConnector).
+function cnPayload() {
+  if (cnKind === 's3') return s3Payload();
+  if (cnKind === 'bigquery') return bqPayload();
+  return pgPayload();
+}
+
 async function testConnector() {
   const btn = document.getElementById('cn-test');
-  const isS3 = cnKind === 's3';
-  const payload = isS3 ? s3Payload() : pgPayload();
+  const payload = cnPayload();
   btn.disabled = true;
-  if (isS3) {
+  if (cnKind === 's3') {
     cnLog(`$ catflip probe --to s3 --bucket ${payload.bucket}`, 'cn-cmd');
     cnLog(`Comprobando acceso a ${payload.bucket} (${payload.region})…`, 'cn-dim');
+  } else if (cnKind === 'bigquery') {
+    cnLog(`$ catflip probe --to bigquery --project ${payload.project}`, 'cn-cmd');
+    cnLog(`Consultando el proyecto ${payload.project}…`, 'cn-dim');
   } else {
     cnLog(`$ catflip probe --to postgres --host ${payload.host}:${payload.port}`, 'cn-cmd');
     cnLog(`Conectando a ${payload.host}:${payload.port}/${payload.dbname}…`, 'cn-dim');
   }
   try {
     const data = await cnPost(`/connectors/${cnKind}/test`, payload);
-    if (isS3) {
+    if (cnKind === 's3') {
       cnLog(`✔ Conexión correcta — ${data.bucket} en ${data.region}`, 'cn-ok');
       toast('Conexión a S3 verificada', 'success');
+    } else if (cnKind === 'bigquery') {
+      cnLog(`✔ Conexión correcta — ${data.project} (${data.driver})`, 'cn-ok');
+      toast('Conexión a BigQuery verificada', 'success');
     } else {
       cnLog(`✔ Conexión correcta — ${data.version}`, 'cn-ok');
       toast('Conexión a Postgres verificada', 'success');
@@ -1428,6 +1453,51 @@ async function sendS3() {
     cnLog(`✔ ${data.rows} fila(s) · ${data.bytes} bytes subidos a s3://${data.bucket}/${data.key} (${modo})`, 'cn-ok');
     document.getElementById('cn-status').textContent = 'Exportación completada';
     toast(`Exportadas ${data.rows} filas a s3://${data.bucket}/${data.key}`, 'success');
+  } catch (e) {
+    cnLog(`✘ ${e.message}`, 'cn-err');
+    document.getElementById('cn-status').textContent = 'La exportación ha fallado';
+    toast(e.message, 'error');
+  } finally {
+    send.disabled = false;
+  }
+}
+
+// ── Conector REAL de BigQuery (premium) ────────────────────────────
+// `bqPayload` recoge los campos del modal y `sendBigQuery` carga el
+// dataset completo en `<dataset>.<tabla>` con WRITE_TRUNCATE (Reemplazar)
+// o WRITE_APPEND (Añadir filas). El SDK (google-cloud-bigquery), la
+// validación de dataset/tabla y el enmascado de la clave privada viven en
+// `connectors.py`; la credencial opcional NUNCA se muestra ni se registra
+// en la consola.
+
+function bqPayload() {
+  const mode = document.getElementById('bq-mode');
+  return {
+    project: pgField('bq-project'),
+    dataset: pgField('bq-dataset'),
+    table: pgField('bq-table'),
+    credentials: pgField('bq-creds'),
+    location: pgField('bq-location'),
+    mode: mode && mode.value === 'Añadir filas' ? 'append' : 'replace',
+  };
+}
+
+async function sendBigQuery() {
+  const payload = bqPayload();
+  const send = document.getElementById('cn-send');
+  const rows = currentRawData ? currentRawData.shape[0] : 0;
+  send.disabled = true;
+  document.getElementById('cn-console').innerHTML = '';
+  document.getElementById('cn-status').textContent = 'Exportando…';
+  cnLog(`$ catflip send --to bigquery --table ${payload.dataset}.${payload.table}`, 'cn-cmd');
+  cnLog(`Proyecto ${payload.project}${payload.location ? ` · ubicación ${payload.location}` : ''}${payload.credentials ? '' : ' · credenciales del entorno (ADC)'}…`, 'cn-dim');
+  cnLog(`Serializando ${rows} fila(s) × ${currentColumns.length} columna(s)…`, 'cn-dim');
+  try {
+    const data = await cnPost('/connectors/bigquery/export', payload);
+    const modo = data.mode === 'replace' ? 'tabla reemplazada' : 'filas añadidas';
+    cnLog(`✔ ${data.rows} fila(s) cargadas en ${data.dataset}.${data.table} (${modo})`, 'cn-ok');
+    document.getElementById('cn-status').textContent = 'Exportación completada';
+    toast(`Exportadas ${data.rows} filas a ${data.dataset}.${data.table}`, 'success');
   } catch (e) {
     cnLog(`✘ ${e.message}`, 'cn-err');
     document.getElementById('cn-status').textContent = 'La exportación ha fallado';
