@@ -22,6 +22,15 @@ siguiente corte.
   color del texto (subrayado, contraste AA). El `package.json` viaja ya
   como dato en los specs de AppImage/Flatpak y Windows, así que los
   bundles congelados también saben su versión. 19 tests nuevos.
+- **El aviso de versión no vuelve a aparecer tras cerrarlo**: el toast
+  gana un botón **×** (con nombre accesible) que recuerda la versión
+  descartada en `localStorage` (`catflip-version-dismissed`) y la manda
+  como `?dismissed=` a `/version/check`, que suprime el aviso mientras
+  la release no supere TAMBIÉN a la descartada — con una release más
+  nueva que la descartada se vuelve a avisar, y un valor corrupto en
+  `localStorage` no puede callar los avisos para siempre. El
+  auto-cierre a los 8 s no descarta nada: solo el × decide. Cálculo por
+  petición, no contamina la caché de GitHub. +5 tests (24 en total).
 
 ## [1.3.0] — 2026-10-28
 
