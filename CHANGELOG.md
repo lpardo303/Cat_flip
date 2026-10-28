@@ -9,6 +9,8 @@ siguiente corte.
 
 ## [Sin publicar]
 
+## [1.4.0] — 2026-10-28
+
 ### Añadido
 
 - **Aviso de versión nueva**: la app consulta la última release publicada
