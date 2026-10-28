@@ -239,10 +239,15 @@ jobs:
           # directorio repo/ (el ostree firmado, que sí queda en el artifact del
           # run) y los assets de una release solo aceptan ficheros con nombre
           # único. `*.flatpak` ya cubre SHA256SUMS.flatpak y `*.flatpak.asc`
-          # cubre SHA256SUMS.flatpak.asc: añadirlos aparte duplicaría.
+          # cubre SHA256SUMS.flatpak.asc: añadirlos aparte duplicaría. En
+          # windows NO hay esa casualidad (SHA256SUMS.windows no acaba en
+          # .exe), así que sus checksums se suben aparte: sin estas dos
+          # líneas la release sale sin SHA256SUMS.windows(.asc).
           gh release upload "$GITHUB_REF_NAME" --clobber \
             artifacts/appimage/* \
             artifacts/flatpak/*.flatpak \
             artifacts/flatpak/*.flatpak.asc \
             artifacts/windows/*.exe \
-            artifacts/windows/*.exe.asc
+            artifacts/windows/*.exe.asc \
+            artifacts/windows/SHA256SUMS.windows \
+            artifacts/windows/SHA256SUMS.windows.asc
