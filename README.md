@@ -156,7 +156,7 @@ El core es **MIT** y nunca se degrada: sin licencia la app funciona igual, sin t
 
 ## ⭐ Premium (Open Core)
 
-Junto al core vive el paquete [`premium/`](premium/), con gating **server-side**: la licencia se activa con la env var `CATFLIP_PREMIUM_KEY` o el fichero `premium.key` (ignorado por git), y sin ella `/premium/status` devuelve la lista vacía y `/premium/themes/<id>.css` responde 404. Hoy contiene los **temas Aurora y Solar** y los **conectores reales de Postgres y S3** (`/connectors/{postgres,s3}/*`, drivers opcionales en `requirements-connectors.txt`); en el roadmap, auto-update, `.exe` firmado y el conector BigQuery. El packaging firmado de Linux (Flatpak/AppImage) ya vive en [`packaging/`](packaging/README.md). Detalles y guía para ampliarlo en [premium/README.md](premium/README.md).
+Junto al core vive el paquete [`premium/`](premium/), con gating **server-side**: la licencia se activa con la env var `CATFLIP_PREMIUM_KEY` o el fichero `premium.key` (ignorado por git), y sin ella `/premium/status` devuelve la lista vacía y `/premium/themes/<id>.css` responde 404. Hoy contiene los **temas Aurora y Solar** y los **conectores reales de Postgres, S3 y BigQuery** (`/connectors/{postgres,s3,bigquery}/*`, drivers opcionales en `requirements-connectors.txt`); en el roadmap, auto-update. El packaging firmado vive en [`packaging/`](packaging/README.md) — Linux (Flatpak/AppImage) y Windows (`.exe` onefile). Detalles y guía para ampliarlo en [premium/README.md](premium/README.md).
 
 ## 📄 Licencia
 

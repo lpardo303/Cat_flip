@@ -1,13 +1,14 @@
-# 📦 Packaging firmado de Cat_flip (AppImage + Flatpak)
+# 📦 Packaging firmado de Cat_flip (AppImage + Flatpak + .exe Windows)
 
-Builds **locales y reproducibles** del core MIT en dos formatos, ambos firmados
-con GPG y con `SHA256SUMS` firmados. Nada se publica desde aquí: los artefactos
-quedan en `dist/` (ignorado por git).
+Builds **locales y reproducibles** del core MIT en tres formatos, todos
+firmados con GPG y con `SHA256SUMS` firmados. Nada se publica desde aquí: los
+artefactos quedan en `dist/` (ignorado por git).
 
 | Formato | Script | Artefactos |
 |---|---|---|
 | AppImage | `packaging/appimage/build.sh` | `dist/appimage/CatFlip-<ver>-x86_64.AppImage` + `.asc` + `SHA256SUMS` + `SHA256SUMS.asc` |
 | Flatpak | `packaging/flatpak/build.sh` | `dist/flatpak/repo/` (ostree firmado) + `dist/flatpak/CatFlip-<ver>.flatpak` + `.asc` + `SHA256SUMS(.asc)` |
+| .exe Windows | `packaging/windows/build.sh` (Git Bash) | `dist/windows/CatFlip-<ver>-x64.exe` (onefile) + `.asc` + `SHA256SUMS(.asc)` |
 
 Los dos formatos envuelven **el mismo binario** `dist/CatFlip/` que genera
 PyInstaller desde `packaging/appimage/catflip.spec` (`entry.py` ejecuta
@@ -52,9 +53,18 @@ build para).
 ```bash
 packaging/appimage/build.sh                  # congelado + AppImage + firma
 packaging/flatpak/build.sh                   # congelado + flatpak + firma
+packaging/windows/build.sh                   # Git Bash: congelado + .exe + firma
 SKIP_FROZEN=1 packaging/appimage/build.sh    # reutiliza dist/CatFlip ya construido
 SKIP_FROZEN=1 packaging/flatpak/build.sh
 ```
+
+**Windows**: el build se hace en **Git Bash**, no en PowerShell — `gpg` y
+`sha256sum` viven en `/usr/bin` de Git for Windows y no están en el PATH de
+PowerShell (así lo lleva la CI: job `windows` con `shell: bash`). El spec
+`packaging/windows/catflip.spec` produce un **onefile** `dist/CatFlip.exe`
+que el script renombra y firma; reutiliza `packaging/appimage/entry.py`.
+Local solo funciona en un host Windows (en Linux el artefacto no lleva
+`.exe` y el script lo rechaza).
 
 El primer build tarda ~1 min (PyInstaller) + ~2,5 min (flatpak-builder).
 Los pines de herramientas viven en `packaging/appimage/pins.env`.
@@ -112,8 +122,14 @@ los valida.
   instala `flatpak-builder` con apt y el runtime 26.08 en `--user`, y usa
   `FLATPAK_BUILDER_CMD=flatpak-builder` (sin el sandbox de
   `org.flatpak.Builder` no existe el problema de la instalación de sistema).
+- **windows** (`windows-latest`, todo en `shell: bash`): primer paso de
+  comprobación (`command -v gpg` + `sha256sum` — están en Git Bash, no en el
+  PATH de PowerShell), pip, `packaging/windows/build.sh`, **smoke** (el
+  `.exe` arranca en el runner y sirve `/` + `/premium/status`) y verificación
+  de firmas/checksums.
 - **release** (solo en tag): crea la release si no existe y adjunta los
-  artefactos con `gh release upload`.
+  artefactos con `gh release upload` (AppImage, flatpak y `.exe`, con los
+  `SHA256SUMS.*` renombrados por formato).
 
 ### Secreto obligatorio
 
@@ -140,5 +156,6 @@ Ubuntu 22.04) exigiría construir en un contenedor antiguo.
 
 - **No publicado**: ni Flathub ni AppImageHub (la release de GitHub en tags
   sí se publica sola).
-- Solo Linux: el `.exe` firmado de Windows y el auto-update siguen en el
+- El `.exe` de Windows se **construye y firma en la CI** (no hay build
+  local posible fuera de un host Windows); el auto-update sigue en el
   roadmap Open Core (`premium/README.md`).

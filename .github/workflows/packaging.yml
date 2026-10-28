@@ -127,10 +127,90 @@ jobs:
           path: dist/flatpak/
           if-no-files-found: error
 
+  windows:
+    name: .exe firmado (Windows)
+    runs-on: windows-latest
+    # gpg y sha256sum NO están en el PATH de PowerShell: existen en Git
+    # Bash (Git for Windows /usr/bin). Todo el job corre en bash y el
+    # primer paso comprueba los dos binarios antes de gastar minutos.
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Comprueba gpg y sha256sum (Git Bash)
+        run: |
+          command -v gpg || {
+            echo "::error::Sin gpg en el runner; usa Git Bash o instala GnuPG (choco install gnupg)"
+            exit 1
+          }
+          gpg --version | head -2
+          command -v sha256sum
+
+      - name: Importa la clave de firma
+        env:
+          GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
+        run: |
+          if [ -z "$GPG_SIGNING_KEY" ]; then
+            echo "::error::Falta el secreto GPG_SIGNING_KEY (clave privada armored de packaging/gpg/FINGERPRINT)"
+            exit 1
+          fi
+          echo "$GPG_SIGNING_KEY" | gpg --batch --import
+
+      - name: Construye y firma el .exe
+        run: packaging/windows/build.sh
+
+      - name: Smoke — el .exe arranca y sirve /
+        run: |
+          EXE="$(ls dist/windows/CatFlip-*.exe | head -1)"
+          echo "→ arrancando $EXE"
+          "$EXE" > /tmp/catflip-smoke.log 2>&1 &
+          PID=$!
+          for i in $(seq 1 60); do
+            curl -sf -o /dev/null http://127.0.0.1:5050/ && break
+            sleep 1
+          done
+          if ! curl -sf -o /dev/null http://127.0.0.1:5050/; then
+            echo "::error::/ no responde en 60 s"
+            cat /tmp/catflip-smoke.log
+            kill "$PID" 2>/dev/null || true
+            exit 1
+          fi
+          curl -s http://127.0.0.1:5050/premium/status
+          echo
+          kill "$PID" 2>/dev/null || true
+
+      - name: Verifica firmas y checksums
+        run: |
+          cd dist/windows
+          gpg --verify ./*.exe.asc ./*.exe
+          gpg --verify SHA256SUMS.asc SHA256SUMS
+          sha256sum -c SHA256SUMS
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/windows/
+          if-no-files-found: error
+
   release:
     name: Adjunta los paquetes a la release
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [appimage, flatpak]
+    needs: [appimage, flatpak, windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -144,13 +224,15 @@ jobs:
           # con git (fallaría con «not a git repository»).
           GH_REPO: ${{ github.repository }}
         run: |
-          # Ambos formatos traen SHA256SUMS(.asc) con el mismo nombre y los
+          # Cada formato trae SHA256SUMS(.asc) con el mismo nombre y los
           # assets de una release son planos: renombrarlos por formato para
           # que gh no falle con 422 "already exists".
           mv artifacts/appimage/SHA256SUMS     artifacts/appimage/SHA256SUMS.appimage
           mv artifacts/appimage/SHA256SUMS.asc artifacts/appimage/SHA256SUMS.appimage.asc
           mv artifacts/flatpak/SHA256SUMS      artifacts/flatpak/SHA256SUMS.flatpak
           mv artifacts/flatpak/SHA256SUMS.asc  artifacts/flatpak/SHA256SUMS.flatpak.asc
+          mv artifacts/windows/SHA256SUMS      artifacts/windows/SHA256SUMS.windows
+          mv artifacts/windows/SHA256SUMS.asc  artifacts/windows/SHA256SUMS.windows.asc
           gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1 ||
             gh release create "$GITHUB_REF_NAME" --generate-notes
           # Solo ficheros y sin duplicados: artifacts/flatpak/ también trae el
@@ -161,4 +243,6 @@ jobs:
           gh release upload "$GITHUB_REF_NAME" --clobber \
             artifacts/appimage/* \
             artifacts/flatpak/*.flatpak \
-            artifacts/flatpak/*.flatpak.asc
+            artifacts/flatpak/*.flatpak.asc \
+            artifacts/windows/*.exe \
+            artifacts/windows/*.exe.asc
