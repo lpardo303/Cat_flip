@@ -5,3 +5,9 @@
 psycopg[binary]==3.3.6
 # S3: mismo contrato — sin este driver la ruta responde 400 accionable.
 boto3==1.35.0
+# BigQuery: mismo contrato — sin estos drivers la ruta responde 400
+# accionable. `pyarrow` es el que convierte el DataFrame a Parquet para el
+# job de carga y `db-dtypes` acompaña al SDK en el intercambio con pandas.
+google-cloud-bigquery[pandas]==3.46.2
+db-dtypes==1.9.0
+pyarrow==26.0.0

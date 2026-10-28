@@ -6,10 +6,10 @@ las rutas ``/connectors/*``, que están gated por licencia premium
 (``premium.is_licensed()``). Sin licencia la ruta responde 404 y aquí no se
 ejecuta nada.
 
-Driver: **psycopg v3** como dependencia *opcional*
-(``requirements-connectors.txt``). Se importa perezosamente dentro de cada
-operación, así la app arranca perfectamente sin él y el error que ve el
-usuario es accionable.
+Drivers: **psycopg v3**, **boto3** y **google-cloud-bigquery** como
+dependencias *opcionales* (``requirements-connectors.txt``). Se importan
+perezosamente dentro de cada operación, así la app arranca perfectamente
+sin ellos y el error que ve el usuario es accionable.
 
 Reglas de seguridad:
 
@@ -450,4 +450,220 @@ def export_to_s3(df, params, key, mode="overwrite"):
         "rows": int(df.shape[0]),
         "columns": len(names),
         "bytes": len(data),
+    }
+
+
+# ── BigQuery ────────────────────────────────────────────────────────
+# Tercer conector real: mismo contrato que Postgres y S3 — driver
+# opcional perezoso, parámetros validados antes de tocar el SDK, credenciales
+# de cuenta de servicio nunca reflejadas y destino `dataset.tabla` con cada
+# segmento validado (aquí NO se concatena SQL: el SDK recibe la tabla como
+# identificador y el `test_connection` solo emite «SELECT 1» literal).
+
+_REQUIRED_BQ = (("project", "proyecto"), ("dataset", "dataset"))
+# Identificador de dataset/columna de BigQuery: letras, dígitos y guiones
+# bajos, empezando por letra o guion bajo, hasta 1024 caracteres.
+_BQ_FIELD_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,1023}$")
+# Campos mínimos de una clave de cuenta de servicio (archivo .json de GCP).
+_SA_FIELDS = ("type", "client_email", "private_key")
+
+
+def _load_bigquery():
+    """Importa el SDK de Google en el momento de usarlo (opcional).
+
+    Devuelve ``(bigquery, service_account)``: los dos módulos que necesita
+    el conector viven en el mismo paquete `google-cloud-bigquery`.
+    """
+    try:
+        import google.cloud.bigquery as bigquery
+        from google.oauth2 import service_account
+    except ImportError as exc:
+        raise ConnectorError(
+            "Driver «google-cloud-bigquery» no instalado. Ejecuta: "
+            "pip install -r requirements-connectors.txt"
+        ) from exc
+    return bigquery, service_account
+
+
+def _bq_mask(message, params):
+    """Enmascara la clave privada si un error del SDK la reflejara."""
+    text = str(message)
+    creds = params.get("credentials")
+    if isinstance(creds, dict):
+        for key in ("private_key", "private_key_id"):
+            secret = creds.get(key)
+            if isinstance(secret, str) and secret:
+                text = text.replace(secret, "***")
+    return text
+
+
+def clean_bq_params(payload):
+    """Valida y normaliza los parámetros de BigQuery recibidos del front.
+
+    Obligatorios: `project` (proyecto de trabajo/facturación) y `dataset`.
+    Opcionales: `location` (US/EU/…, por defecto manda la del dataset) y
+    `credentials`, el **contenido JSON** de una clave de cuenta de servicio
+    — si viaja vacío se usa la cadena por defecto del SDK (Application
+    Default Credentials: `GOOGLE_APPLICATION_CREDENTIALS`, `gcloud auth
+    application-default login` o la identidad de la instancia).
+
+    El JSON de la cuenta se valida aquí (campos mínimos) y se guarda ya
+    parseado: el privado nunca viaja en claro a los mensajes de error.
+    """
+    if not isinstance(payload, dict):
+        raise ConnectorError("Se espera un objeto JSON con los datos de conexión.")
+
+    params = {}
+    for key, label in _REQUIRED_BQ:
+        value = payload.get(key)
+        if not isinstance(value, str) or not value.strip():
+            raise ConnectorError(f"Falta el campo obligatorio «{label}» ({key}).")
+        if "\x00" in value:
+            raise ConnectorError(f"El campo «{key}» no puede contener caracteres nulos.")
+        params[key] = value.strip()
+
+    if not _BQ_FIELD_RE.match(params["dataset"]):
+        raise ConnectorError(
+            "El dataset no es válido: de 1 a 1024 caracteres, letras, "
+            "dígitos y guiones bajos, empezando por letra o guion bajo."
+        )
+
+    location = payload.get("location")
+    if location not in (None, ""):
+        if not isinstance(location, str):
+            raise ConnectorError("La ubicación debe ser texto (por ejemplo «EU»).")
+        if "\x00" in location:
+            raise ConnectorError("La ubicación no puede contener caracteres nulos.")
+        params["location"] = location.strip()
+
+    credentials = payload.get("credentials")
+    if credentials in (None, ""):
+        return params
+    if not isinstance(credentials, dict):
+        raise ConnectorError(
+            "La cuenta de servicio debe ser el objeto JSON de la clave "
+            "(pega el contenido del fichero .json)."
+        )
+    missing = [f for f in _SA_FIELDS if not isinstance(credentials.get(f), str) or not credentials[f].strip()]
+    if missing:
+        raise ConnectorError(
+            "La clave de cuenta de servicio no parece válida: faltan los "
+            "campos " + ", ".join(missing) + "."
+        )
+    for field in _SA_FIELDS:
+        if "\x00" in credentials[field]:
+            raise ConnectorError("La clave de cuenta de servicio no puede contener caracteres nulos.")
+    params["credentials"] = credentials
+    return params
+
+
+def _bq_client(params, bigquery, service_account):
+    """Cliente con proyecto (y ubicación) y, si viaja, cuenta de servicio."""
+    kwargs = {"project": params["project"]}
+    if params.get("location"):
+        kwargs["location"] = params["location"]
+    creds = params.get("credentials")
+    if creds:
+        kwargs["credentials"] = service_account.Credentials.from_service_account_info(
+            dict(creds)
+        )
+    return bigquery.Client(**kwargs)
+
+
+def test_bq_connection(params):
+    """`SELECT 1` contra BigQuery: valida proyecto, credenciales y red."""
+    bigquery, service_account = _load_bigquery()
+    try:
+        client = _bq_client(params, bigquery, service_account)
+        job = client.query("SELECT 1")
+        job.result()
+    except Exception as exc:
+        raise ConnectorError(
+            f"No se pudo conectar a BigQuery: {_bq_mask(exc, params)}"
+        ) from exc
+    return {
+        "success": True,
+        "project": params["project"],
+        "driver": f"google-cloud-bigquery {bigquery.__version__}",
+    }
+
+
+def export_to_bigquery(df, params, table, mode="replace"):
+    """Carga el DataFrame completo en la tabla `<dataset>.<tabla>`.
+
+    * `replace` — `WRITE_TRUNCATE` con `autodetect`: la tabla se crea si no
+      existe y, si existe, se reescribe con los datos y el esquema nuevos.
+    * `append` — `WRITE_APPEND` a la tabla existente; antes se comprueba con
+      `get_table` para devolver un aviso accionable si la tabla no existe.
+
+    El identificador viaja como destino del job (no se interpola en SQL) y
+    el trabajo se espera con `job.result()`: si algo falla, la API no deja
+    la tabla a medias (el job no se aprueba).
+    """
+    if mode not in ("replace", "append"):
+        raise ConnectorError("El modo debe ser «replace» o «append».")
+    if not isinstance(table, str) or not table.strip():
+        raise ConnectorError("Falta el campo obligatorio «tabla» (table).")
+    table = table.strip()
+    if not _BQ_FIELD_RE.match(table):
+        raise ConnectorError(
+            "La tabla no es válida: de 1 a 1024 caracteres, letras, "
+            "dígitos y guiones bajos, empezando por letra o guion bajo."
+        )
+    if df is None or df.shape[1] == 0:
+        raise ConnectorError("El dataset no tiene columnas que exportar.")
+
+    names = [str(c) for c in df.columns]
+    if len(set(names)) != len(names):
+        raise ConnectorError(
+            "El dataset tiene nombres de columna duplicados; "
+            "renómbralos antes de exportar."
+        )
+    invalid = [n for n in names if not _BQ_FIELD_RE.match(n)]
+    if invalid:
+        shown = ", ".join(repr(n) for n in invalid[:5])
+        more = f" (+{len(invalid) - 5})" if len(invalid) > 5 else ""
+        raise ConnectorError(
+            "BigQuery no admite estos nombres de columna (letras, dígitos y "
+            f"guiones bajos, empezando por letra o guion bajo): {shown}{more}. "
+            "Renómbralos antes de exportar."
+        )
+
+    bigquery, service_account = _load_bigquery()
+    destination = f"{params['dataset']}.{table}"
+    config = bigquery.LoadJobConfig()
+    if mode == "replace":
+        config.write_disposition = bigquery.WriteDisposition.WRITE_TRUNCATE
+        config.create_disposition = bigquery.CreateDisposition.CREATE_IF_NEEDED
+    else:
+        config.write_disposition = bigquery.WriteDisposition.WRITE_APPEND
+    config.autodetect = True
+
+    try:
+        client = _bq_client(params, bigquery, service_account)
+        if mode == "append":
+            try:
+                client.get_table(destination)
+            except Exception:
+                raise ConnectorError(
+                    f"La tabla «{destination}» no existe en BigQuery; usa el "
+                    "modo «replace» para crearla o créala antes de añadir filas."
+                )
+        job = client.load_table_from_dataframe(df, destination, job_config=config)
+        job.result()
+    except ConnectorError:
+        raise
+    except Exception as exc:
+        raise ConnectorError(
+            f"No se pudo exportar a BigQuery: {_bq_mask(exc, params)}"
+        ) from exc
+
+    return {
+        "success": True,
+        "project": params["project"],
+        "dataset": params["dataset"],
+        "table": table,
+        "mode": mode,
+        "rows": int(df.shape[0]),
+        "columns": len(names),
     }

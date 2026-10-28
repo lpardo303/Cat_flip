@@ -32,7 +32,7 @@ llega a pintar el conector real.
 | Auto-update integrado | ⏳ roadmap |
 | Conector real **PostgreSQL** — `/connectors/postgres/{test,export}` (lógica en `connectors.py`, gating con `premium_required`) | ✅ 2026-10-27 — driver opcional `psycopg` en `requirements-connectors.txt` |
 | Conector real **Amazon S3** — `/connectors/s3/{test,export}` (CSV al bucket, gating `premium_required`) | ✅ 2026-10-27 — driver opcional `boto3` en `requirements-connectors.txt` |
-| Conector real **BigQuery** | ⏳ roadmap |
+| Conector real **Google BigQuery** — `/connectors/bigquery/{test,export}` (carga en `dataset.tabla`, gating `premium_required`) | ✅ 2026-10-28 — driver opcional `google-cloud-bigquery` en `requirements-connectors.txt` |
 
 Con licencia, el panel de tema del encabezado añade **Aurora** y **Solar**
 al grupo *Claro* (cada opción con su vista previa), agrupado en

@@ -13,13 +13,17 @@ from functools import wraps
 # /premium/status y /premium/themes/<id>.css — sin ella, 404/lista vacía)
 import premium as premium_pkg
 
-# Conectores reales (Open Core): lógica pura + driver opcional (psycopg/boto3)
+# Conectores reales (Open Core): lógica pura + driver opcional
+# (psycopg / boto3 / google-cloud-bigquery)
 from connectors import (
     ConnectorError,
+    clean_bq_params,
     clean_conn_params,
     clean_s3_params,
+    export_to_bigquery,
     export_to_postgres,
     export_to_s3,
+    test_bq_connection,
     test_connection,
     test_s3_connection,
 )
@@ -1326,7 +1330,7 @@ def premium_status():
         return jsonify({
             "licensed": True,
             "themes": premium_pkg.theme_manifest(),
-            "connectors": ["postgres", "s3"],
+            "connectors": ["postgres", "s3", "bigquery"],
         })
     return jsonify({"licensed": False, "themes": [], "connectors": []})
 
@@ -1418,6 +1422,37 @@ def connectors_s3_export():
         params = clean_s3_params(data)
         result = export_to_s3(
             current_df, params, data.get("key"), mode=data.get("mode") or "overwrite"
+        )
+    except ConnectorError as e:
+        return jsonify({"error": str(e)}), e.status
+    return jsonify(result)
+
+
+@app.route("/connectors/bigquery/test", methods=["POST"])
+@premium_required
+def connectors_bigquery_test():
+    """Prueba de conexión (`SELECT 1`) — no toca el dataset."""
+    data = request.get_json(silent=True) or {}
+    try:
+        return jsonify(test_bq_connection(clean_bq_params(data)))
+    except ConnectorError as e:
+        return jsonify({"error": str(e)}), e.status
+
+
+@app.route("/connectors/bigquery/export", methods=["POST"])
+@premium_required
+def connectors_bigquery_export():
+    """Carga `current_df` (el dataset completo) en `<dataset>.<tabla>`."""
+    if current_df is None:
+        return jsonify({"error": "No hay datos cargados."}), 400
+    data = request.get_json(silent=True) or {}
+    try:
+        params = clean_bq_params(data)
+        table = data.get("table")
+        if not isinstance(table, str) or not table.strip():
+            raise ConnectorError("Falta el campo obligatorio «tabla» (table).")
+        result = export_to_bigquery(
+            current_df, params, table.strip(), mode=data.get("mode") or "replace"
         )
     except ConnectorError as e:
         return jsonify({"error": str(e)}), e.status

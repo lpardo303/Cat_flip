@@ -9,6 +9,33 @@ siguiente corte.
 
 ## [Sin publicar]
 
+### Añadido
+
+- **Conector real de Google BigQuery (Open Core — tercer conector real)**:
+  la sección *Destino real* gana la tarjeta **BigQuery**, que carga el
+  dataset completo en `dataset.tabla` de Google BigQuery como job de carga
+  (`load_table_from_dataframe` + `job.result()`): **Probar conexión**
+  (`SELECT 1`) y exportación en modos *Reemplazar tabla* (`WRITE_TRUNCATE`
+  con `autodetect` y `CREATE_IF_NEEDED`, así la tabla se crea si no existe)
+  o *Añadir filas* (`WRITE_APPEND`, con `get_table` previo para avisar si la
+  tabla no existe). Backend en `connectors.py`
+  (`clean_bq_params` con identificador de dataset/tabla validado
+  `^[A-Za-z_][A-Za-z0-9_]{0,1023}$`, clave de cuenta de servicio opcional
+  con sus campos mínimos y `_bq_mask` para la clave privada) + rutas
+  `POST /connectors/bigquery/{test,export}` con el mismo gating server-side
+  (404 sin licencia; `/premium/status` ahora anuncia
+  `connectors: ["postgres", "s3", "bigquery"]`). Sin clave, manda la
+  cadena por defecto del SDK (Application Default Credentials). El destino
+  viaja como identificador del job, nunca concatenado en SQL. Front: la
+  tarjeta BigQuery deja la sección *Destinos (demo)* — que queda con
+  Snowflake y Webhook — y pasa a *Destino real* con `real: true`, campos
+  proyecto/dataset/tabla/clave JSON/ubicación/modo y envío por
+  `bqPayload`/`sendBigQuery`. Drivers **opcionales**:
+  `google-cloud-bigquery`, `db-dtypes` y `pyarrow` en
+  `requirements-connectors.txt`; sin ellos la app funciona igual y la ruta
+  explica cómo instalarlos. 30 tests nuevos con el SDK falso inyectado en
+  `sys.modules` (sin red ni credenciales reales) — `connectors.py` al 100 %.
+
 ## [1.2.0] — 2026-10-27
 
 ### Añadido
