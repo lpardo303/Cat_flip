@@ -11,6 +11,22 @@ siguiente corte.
 
 ### Añadido
 
+- **Packaging firmado de Windows (`.exe`, Open Core)**: carpeta
+  `packaging/windows/` con el spec PyInstaller **onefile**
+  (`catflip.spec`, reutiliza `entry.py` del AppImage) y
+  `build.sh` — en **Git Bash** — que produce
+  `dist/windows/CatFlip-<ver>-x64.exe`, firma con GPG la clave de
+  `packaging/gpg/` y genera `SHA256SUMS(.asc)` con el mismo patrón que
+  AppImage y Flatpak. El workflow `packaging.yml` gana el job **windows**
+  (`windows-latest`, `defaults.run.shell: bash` porque `gpg` y `sha256sum`
+  existen en Git for Windows y **no** en el PATH de PowerShell): abre con
+  la comprobación de ambos binarios, importa `GPG_SIGNING_KEY`, construye,
+  hace **smoke real** (el `.exe` arranca en el runner y sirve `/` y
+  `/premium/status`) y verifica firmas + checksums. El tramo `release` pasa
+  a adjuntar también `CatFlip-<ver>-x64.exe` y `SHA256SUMS.windows(.asc)`.
+  Verificado en local: `bash -n`, actionlint 1.7.7 sobre los dos
+  workflows y el spec ejecutado con PyInstaller 6.22.3.
+
 - **Conector real de Google BigQuery (Open Core — tercer conector real)**:
   la sección *Destino real* gana la tarjeta **BigQuery**, que carga el
   dataset completo en `dataset.tabla` de Google BigQuery como job de carga

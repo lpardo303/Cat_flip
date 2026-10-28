@@ -28,7 +28,7 @@ llega a pintar el conector real.
 | --- | --- |
 | Temas visuales **Aurora** (violeta) y **Solar** (ámbar) con vista previa en el selector | ✅ |
 | Packaging firmado (Flatpak + AppImage, Linux) | ✅ 2026-10-25 — `packaging/`, firmado GPG (ver `packaging/README.md`) |
-| Packaging firmado (`.exe` Windows) | ⏳ roadmap |
+| Packaging firmado (`.exe` Windows) — `packaging/windows/`, onefile firmado + smoke en la CI | ✅ 2026-10-28 — job `windows` de `packaging.yml` (`shell: bash` por gpg/sha256sum en Git Bash) |
 | Auto-update integrado | ⏳ roadmap |
 | Conector real **PostgreSQL** — `/connectors/postgres/{test,export}` (lógica en `connectors.py`, gating con `premium_required`) | ✅ 2026-10-27 — driver opcional `psycopg` en `requirements-connectors.txt` |
 | Conector real **Amazon S3** — `/connectors/s3/{test,export}` (CSV al bucket, gating `premium_required`) | ✅ 2026-10-27 — driver opcional `boto3` en `requirements-connectors.txt` |
