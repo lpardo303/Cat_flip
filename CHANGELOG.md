@@ -35,6 +35,13 @@ siguiente corte.
   es bool, y los mixtos con cadenas o las columnas vacías siguen siendo
   `text`. Detectado con el smoke real contra un `postgres:16` de verdad y
   cubierto desde entonces por el job `pg-smoke` de la CI.
+- **El build del Flatpak ya no depende del orden de `readdir`**: el
+  script elegía la rama del bundle con el primer fichero que encontrara
+  bajo `refs/`, y ahí conviven las refs `appstream`/`appstream2`, que se
+  llaman como la arquitectura (`x86_64`). Cuando salía esa, `flatpak
+  build-bundle` pedía `app/<id>/x86_64/x86_64` y el job fallaba con
+  «Refspec not found». Ahora se lee solo la ref de la propia app y de
+  forma ordenada.
 
 ## [1.4.1] — 2026-10-29
 

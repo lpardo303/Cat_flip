@@ -49,8 +49,18 @@ rm -rf "$OUT/repo"
   "$BUILD/dir" "$MANIFEST"
 
 # 3) Rama real que exportó el builder (no asumir «master»).
-BRANCH="$(find "$OUT/repo/refs" -type f -printf '%f\n' | head -1)"
-[ -n "$BRANCH" ] || { echo "✗ el repo no tiene refs"; exit 1; }
+#    Ojo: `refs/` contiene además las refs `appstream`/`appstream2`, que
+#    son ficheros llamados como la arquitectura (`x86_64`): un
+#    `find ... | head -1` sobre TODOS los refs depende del orden de
+#    readdir y a veces devolvía «x86_64», con lo que el bundle pedía
+#    `app/<id>/x86_64/x86_64` y revienta con «Refspec not found»
+#    (flake del packaging de v1.5.0). Se lee solo la ref de NUESTRA app
+#    (`app/<id>/<arquitectura>/<rama>`) y se ordena para que sea
+#    determinista.
+BRANCH="$(find "$OUT/repo/refs/heads/app/$APP_ID" \
+  -mindepth 2 -maxdepth 2 -type f -printf '%f\n' 2>/dev/null \
+  | sort | head -n1 || true)"
+[ -n "$BRANCH" ] || { echo "✗ el repo no tiene refs de $APP_ID"; exit 1; }
 echo "→ rama: $BRANCH"
 
 # 4) Bundle + checksums firmados
