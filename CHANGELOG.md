@@ -9,6 +9,22 @@ siguiente corte.
 
 ## [Sin publicar]
 
+## [1.4.1] — 2026-10-29
+
+### Arreglados
+
+- **El aviso de versión nueva ya funciona en los bundles congelados**:
+  PyInstaller empaquetaba `libssl` pero **ningún almacén de CAs**, así que
+  toda llamada HTTPS a `api.github.com` fallaba en silencio
+  (`checked:false`) y ni el AppImage ni el `.exe` llegaban a mostrar el
+  aviso (en desarrollo, con las CAs del sistema, sí funcionaba). Ambos
+  specs empaquetan ahora `certifi` (`cacert.pem`) como dato y `entry.py`
+  fija `SSL_CERT_FILE` a esa ruta al arrancar, respetando la variable si
+  el usuario ya la ha puesto. El smoke del `.exe` en la CI del packaging
+  pasa a comprobar `GET /version/check` con `checked:true` (con reintentos
+  por el rate limit anónimo), de modo que una regresión de CAs rompe el
+  build en la CI en vez de llegar al usuario.
+
 ## [1.4.0] — 2026-10-28
 
 ### Añadido
