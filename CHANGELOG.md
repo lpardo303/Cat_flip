@@ -9,6 +9,14 @@ siguiente corte.
 
 ## [Sin publicar]
 
+### Añadido
+
+- **Documentación de los smokes reales de conectores**
+  (`CONTRIBUTING.md`): cómo levantar el `postgres:16` y el LocalStack S3
+  en podman y qué variables de entorno activan `pg-smoke` y `s3-smoke`
+  en local, con el detalle de credenciales por defecto y de lo que
+  comprueba cada smoke.
+
 ## [1.4.1] — 2026-10-29
 
 ### Arreglados
