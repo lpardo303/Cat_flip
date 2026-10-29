@@ -43,6 +43,53 @@ jobs:
           node --check static/js/api.js
           node --check static/js/modals.js
 
+  # Smoke real del conector Postgres: el driver hablando con un servidor de
+  # verdad (DDL derivado de los dtypes, nulos reales, rollback). Los tests
+  # unitarios usan un driver falso; esto es lo que los complementa y lo que
+  # pilló el bug del boolean con nulos. El test se salta sin CATFLIP_PG_SMOKE.
+  pg-smoke:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: catflip
+          POSTGRES_PASSWORD: smoke_pg_2026
+          POSTGRES_DB: catflip_smoke
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U catflip -d catflip_smoke"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      CATFLIP_PG_SMOKE: "1"
+      CATFLIP_PG_HOST: 127.0.0.1
+      CATFLIP_PG_PORT: "5432"
+      CATFLIP_PG_DB: catflip_smoke
+      CATFLIP_PG_USER: catflip
+      CATFLIP_PG_PASSWORD: smoke_pg_2026
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+            requirements-connectors.txt
+
+      - name: Install dependencies (con el driver psycopg)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt -r requirements-connectors.txt
+
+      - name: Smoke real del conector Postgres
+        run: pytest tests/test_connectors_postgres_live.py -v
+
   axe:
     runs-on: ubuntu-latest
     # Licencia premium para que el gate cubra también las 2 paletas
