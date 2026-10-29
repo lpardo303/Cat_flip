@@ -141,6 +141,15 @@ def pg_type_for(series):
     if pd.api.types.is_datetime64_any_dtype(dtype):
         tz = getattr(dtype, "tz", None)
         return "timestamptz" if tz is not None else "timestamp"
+    # object con solo bools y nulos: pandas tipa [True, None] como object (no
+    # como bool), así que sin esta rama la columna saldría como text y los
+    # valores se guardarían como «true»/«false» de texto. `infer_dtype` con
+    # skipna=True solo dice «boolean» si TODO lo no-nulo es bool: un mixto con
+    # cadenas o una columna vacía siguen siendo text.
+    if pd.api.types.is_object_dtype(dtype) and pd.api.types.infer_dtype(
+        series, skipna=True
+    ) == "boolean":
+        return "boolean"
     # object (str, fechas como texto desde CSV), string de pandas 3, categorías…
     return "text"
 
