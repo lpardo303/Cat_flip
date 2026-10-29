@@ -196,11 +196,13 @@ jobs:
           # a empaquetar ssl sin almacén de CAs, checked:false y el aviso de
           # versión muere en silencio (regresión de 1.4.0 → 1.4.1). Reintentar
           # por si el rate limit anónimo de api.github.com da un false puntual.
+          # grep y NO python: en Git Bash /tmp no es la ruta que ve un
+          # Python nativo de Windows, así que open('/tmp/…') fallaría.
           OK=0
           for i in 1 2 3; do
             curl -sf -o /tmp/version.json http://127.0.0.1:5050/version/check || true
             cat /tmp/version.json; echo
-            if python -c "import json,sys; d=json.load(open('/tmp/version.json')); sys.exit(0 if d.get('checked') is True else 1)" 2>/dev/null; then
+            if grep -Eq '"checked"[[:space:]]*:[[:space:]]*true' /tmp/version.json; then
               OK=1; break
             fi
             sleep 3
