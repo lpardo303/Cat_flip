@@ -9,6 +9,8 @@ ejecuta. La salida es `dist/CatFlip.exe`, que `build.sh` renombra a
 """
 import os
 
+import certifi
+
 ROOT = os.path.abspath(os.path.join(os.path.dirname(SPEC), "..", ".."))
 
 datas = [
@@ -17,6 +19,10 @@ datas = [
     (os.path.join(ROOT, "cli.py"), "."),
     # Versión del bundle para /version/check (aviso de versión nueva)
     (os.path.join(ROOT, "package.json"), "."),
+    # Almacén de CAs: PyInstaller no empaqueta ninguno y sin él el aviso
+    # de versión (HTTPS a api.github.com) falla en los bundles congelados.
+    # `entry.py` fija SSL_CERT_FILE a esta ruta al arrancar.
+    (certifi.where(), "certifi"),
     (os.path.join(ROOT, "premium"), "premium"),
     (os.path.join(ROOT, "static"), "static"),
     (os.path.join(ROOT, "templates"), "templates"),

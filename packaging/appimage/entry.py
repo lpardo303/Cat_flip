@@ -19,6 +19,13 @@ import sys
 
 if getattr(sys, "frozen", False):
     base = sys._MEIPASS
+    # PyInstaller empaqueta libssl pero NINGÚN almacén de CAs: sin esto
+    # todo HTTPS (el aviso de versión a api.github.com) falla en silencio
+    # en el bundle. `certifi` viaja como dato en ambos specs; solo lo fijamos
+    # si el usuario no ha puesto ya su propio SSL_CERT_FILE.
+    _ca = os.path.join(base, "certifi", "cacert.pem")
+    if os.path.isfile(_ca) and "SSL_CERT_FILE" not in os.environ:
+        os.environ["SSL_CERT_FILE"] = _ca
 else:
     base = os.path.dirname(os.path.abspath(__file__))
 

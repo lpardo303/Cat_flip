@@ -174,7 +174,7 @@ jobs:
       - name: Construye y firma el .exe
         run: packaging/windows/build.sh
 
-      - name: Smoke — el .exe arranca y sirve /
+      - name: Smoke — el .exe arranca, sirve / y consulta GitHub
         run: |
           EXE="$(ls dist/windows/CatFlip-*.exe | head -1)"
           echo "→ arrancando $EXE"
@@ -192,6 +192,24 @@ jobs:
           fi
           curl -s http://127.0.0.1:5050/premium/status
           echo
+          # /version/check es el ÚNICO HTTPS del bundle: si PyInstaller vuelve
+          # a empaquetar ssl sin almacén de CAs, checked:false y el aviso de
+          # versión muere en silencio (regresión de 1.4.0 → 1.4.1). Reintentar
+          # por si el rate limit anónimo de api.github.com da un false puntual.
+          OK=0
+          for i in 1 2 3; do
+            curl -sf -o /tmp/version.json http://127.0.0.1:5050/version/check || true
+            cat /tmp/version.json; echo
+            if python -c "import json,sys; d=json.load(open('/tmp/version.json')); sys.exit(0 if d.get('checked') is True else 1)" 2>/dev/null; then
+              OK=1; break
+            fi
+            sleep 3
+          done
+          if [ "$OK" != 1 ]; then
+            echo "::error::/version/check no alcanza api.github.com (checked:false) — ¿faltan las CAs en el bundle?"
+            kill "$PID" 2>/dev/null || true
+            exit 1
+          fi
           kill "$PID" 2>/dev/null || true
 
       - name: Verifica firmas y checksums
