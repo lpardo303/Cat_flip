@@ -54,8 +54,72 @@ CATFLIP_PREMIUM_KEY=local python app.py   # http://127.0.0.1:5050
    #  falla: no se omiten las superficies premium en silencio)
    ```
 
-4. Abre un PR contra `main`. Los jobs de CI (`test` y `axe`) deben estar
-   en verde; `main` está protegida (1 review aprobatoria + checks de estado).
+4. Abre un PR contra `main`. Los jobs de CI (`test`, `pg-smoke`,
+   `s3-smoke` y `axe`) deben estar en verde; `main` está protegida
+   (1 review aprobatoria + checks de estado).
+
+## 🐘 Smoke real de conectores (Postgres y S3)
+
+La CI levanta dos servidores de verdad y ejecuta los conectores contra
+ellos (jobs `pg-smoke` y `s3-smoke`). Esos tests **se saltan sin su
+variable de entorno**, así que la suite normal no necesita nada de esto:
+
+| Job | Contenedor | Variable que lo activa | Fichero |
+| --- | --- | --- | --- |
+| `pg-smoke` | `postgres:16` | `CATFLIP_PG_SMOKE=1` | `tests/test_connectors_postgres_live.py` |
+| `s3-smoke` | `localstack/localstack:4.13.1` | `CATFLIP_S3_SMOKE=1` | `tests/test_connectors_s3_live.py` |
+
+Solo hacen falta un motor de contenedores (podman o docker) y los
+drivers opcionales:
+
+```bash
+pip install -r requirements-connectors.txt
+```
+
+**Postgres:**
+
+```bash
+podman run -d --name catflip-pg-test \
+  -e POSTGRES_USER=catflip -e POSTGRES_PASSWORD=smoke_pg_2026 \
+  -e POSTGRES_DB=catflip_smoke -p 5432:5432 postgres:16
+
+CATFLIP_PG_SMOKE=1 .venv/bin/python -m pytest \
+  tests/test_connectors_postgres_live.py -v
+
+podman rm -f catflip-pg-test      # al terminar
+```
+
+Credenciales y destino por defecto, sobrescribibles con
+`CATFLIP_PG_HOST`, `CATFLIP_PG_PORT`, `CATFLIP_PG_DB`, `CATFLIP_PG_USER`
+y `CATFLIP_PG_PASSWORD`: usuario `catflip`, contraseña `smoke_pg_2026`,
+base `catflip_smoke` en `127.0.0.1:5432`.
+
+**S3** — LocalStack, porque MinIO dejó de distribuirse en 2026 y su tag
+`latest` exige `LOCALSTACK_AUTH_TOKEN` (por eso va pineado a `4.13.1`):
+
+```bash
+podman run -d --name catflip-s3-test -p 4566:4566 \
+  localstack/localstack:4.13.1
+
+CATFLIP_S3_SMOKE=1 .venv/bin/python -m pytest \
+  tests/test_connectors_s3_live.py -v
+
+podman rm -f catflip-s3-test      # al terminar
+```
+
+Endpoint y credenciales por defecto, sobrescribibles con
+`CATFLIP_S3_ENDPOINT`, `CATFLIP_S3_REGION`, `CATFLIP_S3_BUCKET`,
+`CATFLIP_S3_ACCESS_KEY` y `CATFLIP_S3_SECRET_KEY`: `http://127.0.0.1:4566`,
+`us-east-1`, bucket `catflip-smoke`, `test`/`test` (el bucket lo crea el
+propio test, el conector solo hace `head`). LocalStack tarda unos
+segundos en estar listo; si falla la primera conexión, repite.
+
+Qué comprueba cada smoke: la conexión real (`SELECT version()` / 
+`head_bucket`), el DDL derivado de los dtypes leído de
+`information_schema`, la subida y relectura del CSV (prefijo y bytes),
+`fail` frente a `overwrite`, nulos reales, el rollback de una transacción
+a mitad de lote y que ninguna credencial se refleje en un mensaje de
+error.
 
 ## 🧪 Convenciones de código
 
