@@ -17,6 +17,18 @@ siguiente corte.
   en local, con el detalle de credenciales por defecto y de lo que
   comprueba cada smoke.
 
+### Arreglados
+
+- **Las columnas booleanas con nulos ya no se exportan como texto a
+  Postgres**: una columna con `True`/`False` y huecos llega a pandas como
+  `object` (no como `bool`), así que el DDL del modo *replace* creaba la
+  columna `text` y los valores se guardaban como `"true"`/`"false"` de
+  texto — al releerlos ya no eran booleanos. `pg_type_for` consulta ahora
+  el contenido de la serie: genera `boolean` solo si **todo** lo no-nulo
+  es bool, y los mixtos con cadenas o las columnas vacías siguen siendo
+  `text`. Detectado con el smoke real contra un `postgres:16` de verdad y
+  cubierto desde entonces por el job `pg-smoke` de la CI.
+
 ## [1.4.1] — 2026-10-29
 
 ### Arreglados
