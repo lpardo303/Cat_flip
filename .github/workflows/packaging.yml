@@ -56,6 +56,60 @@ jobs:
       - name: Construye y firma el AppImage
         run: packaging/appimage/build.sh
 
+      # El AppImage se construía y firmaba sin ejecutarlo nunca: un bundle
+      # roto (sin CAs, sin package.json) salía verde y llegaba al usuario.
+      # Mismo smoke que el job de Windows.
+      - name: Smoke — el AppImage arranca, sirve / y consulta GitHub
+        run: |
+          VERSION="$(python3 -c "import json; print(json.load(open('package.json'))['version'])")"
+          # En un tag, la release y los artefactos deben llevar la MISMA
+          # versión que package.json (los binarios se nombran con ella).
+          if [[ "$GITHUB_REF" == refs/tags/* && "v$VERSION" != "$GITHUB_REF_NAME" ]]; then
+            echo "::error::tag $GITHUB_REF_NAME ≠ package.json $VERSION"
+            exit 1
+          fi
+          IMG="$(ls dist/appimage/CatFlip-*.AppImage | head -1)"
+          echo "→ arrancando $IMG (package.json $VERSION, ref $GITHUB_REF_NAME)"
+          # FUSE no siempre está en el runner: se extrae y se lanza AppRun,
+          # que además es el squashfs real que se distribuye.
+          chmod +x "$IMG"
+          (cd dist/appimage && "./$(basename "$IMG")" --appimage-extract > /dev/null)
+          (cd dist/appimage/squashfs-root && exec ./AppRun > /tmp/catflip-appimage-smoke.log 2>&1) &
+          PID=$!
+          for i in $(seq 1 60); do
+            curl -sf -o /dev/null http://127.0.0.1:5050/ && break
+            sleep 1
+          done
+          if ! curl -sf -o /dev/null http://127.0.0.1:5050/; then
+            echo "::error::/ no responde en 60 s"
+            cat /tmp/catflip-appimage-smoke.log
+            kill "$PID" 2>/dev/null || true
+            exit 1
+          fi
+          # /version/check es el ÚNICO HTTPS del bundle: si PyInstaller vuelve
+          # a empaquetar ssl sin almacén de CAs, checked:false y el aviso de
+          # versión muere en silencio (regresión 1.4.0 → 1.4.1). `current`
+          # sale del package.json EMPAQUETADO: comprueba que viaja en el
+          # bundle y que coincide con el de la release. Reintentos por el
+          # rate limit anónimo de api.github.com.
+          OK=0
+          for i in 1 2 3; do
+            curl -sf -o /tmp/version.json http://127.0.0.1:5050/version/check || true
+            cat /tmp/version.json; echo
+            if grep -Eq '"checked"[[:space:]]*:[[:space:]]*true' /tmp/version.json && \
+               grep -Eq "\"current\"[[:space:]]*:[[:space:]]*\"$VERSION\"" /tmp/version.json; then
+              OK=1; break
+            fi
+            sleep 3
+          done
+          kill "$PID" 2>/dev/null || true
+          if [ "$OK" != 1 ]; then
+            echo "::error::/version/check no responde con checked:true y current=$VERSION — ¿faltan CAs o package.json en el bundle?"
+            cat /tmp/catflip-appimage-smoke.log
+            exit 1
+          fi
+          echo "✓ AppImage E2E: / y /version/check con current=$VERSION"
+
       - name: Verifica firmas y checksums
         run: |
           cd dist/appimage

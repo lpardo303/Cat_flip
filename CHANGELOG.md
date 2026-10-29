@@ -9,6 +9,15 @@ siguiente corte.
 
 ## [Sin publicar]
 
+### Añadido
+
+- **Smoke E2E del AppImage en la CI**: el job de AppImage ejecuta el
+  bundle recién construido y falla si `/` no responde, si
+  `/version/check` no da `checked:true` (regresión de CAs) o si
+  `current` no coincide con `package.json` — antes se construía y
+  firmaba sin ejecutarlo nunca. En un tag además se comprueba que el
+  tag y `package.json` llevan la misma versión.
+
 ## [1.5.0] — 2026-10-29
 
 ### Añadido
