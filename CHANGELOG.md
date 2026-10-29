@@ -16,6 +16,11 @@ siguiente corte.
   en podman y qué variables de entorno activan `pg-smoke` y `s3-smoke`
   en local, con el detalle de credenciales por defecto y de lo que
   comprueba cada smoke.
+- **`scripts/smoke.sh`**: los dos smokes en un solo comando — levanta
+  los contenededores, espera a que estén sanos, ejecuta los tests
+  reales y los **limpia siempre** (también si algo falla o hay Ctrl+C),
+  con `--pg` / `--s3` para correr uno solo. Detecta podman o docker y
+  usa el `.venv` si existe.
 
 ### Arreglados
 
