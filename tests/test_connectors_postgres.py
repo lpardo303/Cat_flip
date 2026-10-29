@@ -308,6 +308,21 @@ def test_pg_type_for_mapea_dtypes():
     assert pg_type_for(pd.Series(tz)) == "timestamptz"
 
 
+def test_pg_type_for_bool_con_nulos_es_boolean():
+    """[True, None] es `object` en pandas: la columna debe salir boolean.
+
+    Regresión del smoke real contra postgres:16 — sin esto el DDL creaba
+    `text` y los valores se guardaban como «true»/«false» de texto.
+    """
+    assert pg_type_for(pd.Series([True, False, None])) == "boolean"
+    assert pg_type_for(pd.Series([True, False, np.nan])) == "boolean"
+    assert pg_type_for(pd.Series([np.bool_(True), None])) == "boolean"
+    # pero solo cuando TODO lo no-nulo es bool
+    assert pg_type_for(pd.Series([True, None, "sí"])) == "text"
+    assert pg_type_for(pd.Series(["True", "False"], dtype=object)) == "text"
+    assert pg_type_for(pd.Series([None, None], dtype=object)) == "text"
+
+
 def test_row_batches_convierte_nulos_y_numpy():
     df = pd.DataFrame(
         {
