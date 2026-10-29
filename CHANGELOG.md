@@ -9,6 +9,8 @@ siguiente corte.
 
 ## [Sin publicar]
 
+## [1.5.0] — 2026-10-29
+
 ### Añadido
 
 - **Documentación de los smokes reales de conectores**
@@ -325,7 +327,10 @@ diagnóstico y CI de accesibilidad.
   escritorio — sustituido por el diálogo nativo de archivo.
 - Auto-mapeo de fechas: `dayfirst` mal inferido para días ISO > 12.
 
-[Sin publicar]: https://github.com/lpardo303/Cat_flip/compare/v1.3.0...HEAD
+[Sin publicar]: https://github.com/lpardo303/Cat_flip/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/lpardo303/Cat_flip/compare/v1.4.1...v1.5.0
+[1.4.1]: https://github.com/lpardo303/Cat_flip/compare/v1.4.0...v1.4.1
+[1.4.0]: https://github.com/lpardo303/Cat_flip/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/lpardo303/Cat_flip/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/lpardo303/Cat_flip/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/lpardo303/Cat_flip/compare/v1.0.0...v1.1.0
