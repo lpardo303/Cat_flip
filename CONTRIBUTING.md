@@ -76,6 +76,20 @@ drivers opcionales:
 pip install -r requirements-connectors.txt
 ```
 
+**Atajo**: `scripts/smoke.sh` hace todo lo de esta sección en un comando
+— levanta los contenededores, espera a que estén sanos, ejecuta los dos
+smokes y los **limpia siempre** (también si un test falla o cortas con
+Ctrl+C):
+
+```bash
+scripts/smoke.sh            # ambos
+scripts/smoke.sh --pg       # solo Postgres
+scripts/smoke.sh --s3       # solo S3
+scripts/smoke.sh --help     # variables que acepta
+```
+
+Los pasos manuales, por si prefieres tener los contenededores a mano:
+
 **Postgres:**
 
 ```bash
