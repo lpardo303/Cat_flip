@@ -189,10 +189,10 @@ jobs:
   # Los workflows solo se validaban ejecutándolos de verdad: actionlint
   # revisa sintaxis YAML, expressions y —con shellcheck en PATH— el shell
   # de cada `run:` (p. ej. variables declaradas sin usar). Si faltara
-  # shellcheck esos checks se saltarían en silencio, por eso se comprueba
-  # explícitamente en lugar de fiarse de la imagen del runner. El mismo
-  # shellcheck pasa además por los scripts del repo (`scripts/*.sh`), que
-  # solo se ejecutaban a mano en local.
+  # shellcheck esos checks se saltarían en silencio, por eso ambos
+  # binarios se instalan aquí fijados con checksum en lugar de fiarse de
+  # la imagen del runner. El mismo shellcheck pasa además por los scripts
+  # del repo (`scripts/*.sh`), que solo se ejecutaban a mano en local.
   actionlint:
     runs-on: ubuntu-latest
     steps:
@@ -207,6 +207,20 @@ jobs:
           sudo install -m 755 /tmp/actionlint /usr/local/bin/actionlint
           actionlint -version
 
+      - name: Instala shellcheck 0.11.0 (con checksum)
+        # Fijado como actionlint: la imagen del runner trae una versión
+        # que cambia con el tiempo (0.11.0 añadió SC2329, ausente en el
+        # 0.10.0 que había en local) y el mismo fichero debe pasar en
+        # local y en la CI. /usr/local/bin va antes que /usr/bin en PATH,
+        # así que pisa el shellcheck de la imagen.
+        run: |
+          curl -sSfL -o /tmp/shellcheck.tgz \
+            https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.gz
+          echo "b7af85e41cc99489dcc21d66c6d5f3685138f06d34651e6d34b42ec6d54fe6f6  /tmp/shellcheck.tgz" | sha256sum -c -
+          tar -xzf /tmp/shellcheck.tgz -C /tmp shellcheck-v0.11.0/shellcheck
+          sudo install -m 755 /tmp/shellcheck-v0.11.0/shellcheck /usr/local/bin/shellcheck
+          shellcheck --version | sed -n '2p'
+
       - name: Valida los workflows (actionlint + shellcheck)
         run: |
           if ! command -v shellcheck > /dev/null; then
@@ -218,8 +232,8 @@ jobs:
       - name: Shellcheck de los scripts del repo
         # shellcheck ya se comprobó en el paso anterior (si faltara, el job
         # se habría cortado ahí); severity por defecto = style, la máxima.
-        # La versión varía con la imagen del runner (SC2329 no existe en
-        # 0.10.0), así que se imprime para poder diagnosticar sin biszar.
+        # La versión está fijada arriba; se imprime de todas formas como
+        # constancia en el log.
         run: |
           shellcheck --version | sed -n '2p'
           shellcheck scripts/*.sh
