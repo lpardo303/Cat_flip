@@ -1,0 +1,40 @@
+# Dependabot: version updates para los pins que sí son dependencias.
+#
+# Dos ecosistemas con destinos distintos:
+#   - github-actions: los `uses:` de ci.yml, packaging.yml y
+#     tool-versions.yml. (Los binarios fijados con sha256sum — actionlint
+#     y shellcheck — NO son actions: de ellos se ocupa el workflow
+#     «Avisos de versiones fijadas», que abre un issue.)
+#   - pip: requirements.txt (+ requirements-dev y requirements-connectors)
+#     en la raíz.
+#
+# Agrupado por ecosistema: un PR semanal como mucho para cada uno, en vez
+# de un PR por dependencia. Todo PR pasa por la CI (actionlint incluido),
+# así que un update roto se ve antes de mergear.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "ci"
+
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    groups:
+      python:
+        patterns: ["*"]
+    commit-message:
+      prefix: "deps"
