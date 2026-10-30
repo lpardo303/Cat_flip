@@ -281,8 +281,9 @@ jobs:
 
       - name: Smoke — el .exe arranca, sirve / y consulta GitHub
         run: |
+          VERSION="$(python3 -c "import json; print(json.load(open('package.json'))['version'])")"
           EXE="$(ls dist/windows/CatFlip-*.exe | head -1)"
-          echo "→ arrancando $EXE"
+          echo "→ arrancando $EXE (package.json $VERSION, ref $GITHUB_REF_NAME)"
           "$EXE" > /tmp/catflip-smoke.log 2>&1 &
           PID=$!
           # El proceso se mata SIEMPRE al salir del paso (antes el kill iba
@@ -306,11 +307,13 @@ jobs:
           # contra el rate limit vive en scripts/smoke_version_check.sh,
           # compartido por los tres smokes (4 intentos, espera base de 305 s
           # > _RELEASE_TTL_ERR, estirada al reset del rate limit — lo que
-          # reventó este job en el PR #46). Este smoke pasa SIN versión
-          # esperada: solo exige checked:true (no compara `current`).
+          # reventó este job en el PR #46). Como AppImage y Flatpak exige
+          # además que el current EMPAQUETADO sea el del tag: si no coincide,
+          # fallo duro sin reintentar.
           bash scripts/smoke_version_check.sh \
             http://127.0.0.1:5050/version/check \
-            /tmp/catflip-smoke.log
+            /tmp/catflip-smoke.log "$VERSION"
+          echo "✓ .exe E2E: / y /version/check con current=$VERSION"
 
       - name: Verifica firmas y checksums
         run: |

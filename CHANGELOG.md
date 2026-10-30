@@ -31,10 +31,11 @@ siguiente corte.
 - **El backoff de `/version/check` sale del workflow a
   `scripts/smoke_version_check.sh`**: el mismo bloque de ~40 líneas estaba
   triplicado en los tres smokes (AppImage, `.exe` y Flatpak). El script
-  compartido conserva el comportamiento de cada uno — AppImage y Flatpak
-  exigen además que el `current` empaquetado sea el del tag, el `.exe` solo
-  `checked:true` — con idéntico backoff (base de 305 s, estirada al reset,
-  tope de 10 min) y volcado del log del binario al fallar. El paso de
+  recibe la versión esperada como argumento opcional y **los tres la pasan
+  ya**: el smoke del `.exe` pasa a exigir que el `current` empaquetado sea
+  el del tag (antes solo `checked:true`) y gana su línea `✓` final como los
+  otros dos. Idéntico backoff para los tres (base de 305 s, estirada al
+  reset, tope de 10 min) y volcado del log del binario al fallar. El paso de
   Windows gana de paso un `trap` que mata el `.exe` en todos los caminos de
   salida, también si el check falla.
 
