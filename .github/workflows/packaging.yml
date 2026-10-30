@@ -23,9 +23,9 @@ jobs:
     name: AppImage firmado
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
           cache: pip
@@ -118,7 +118,7 @@ jobs:
           gpg --verify SHA256SUMS.asc SHA256SUMS
           sha256sum -c SHA256SUMS
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: appimage
           path: dist/appimage/
@@ -128,9 +128,9 @@ jobs:
     name: Flatpak firmado
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
           cache: pip
@@ -246,7 +246,7 @@ jobs:
             /tmp/catflip-flatpak-smoke.log "$VERSION"
           echo "✓ Flatpak E2E: / y /version/check con current=$VERSION"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: flatpak
           path: dist/flatpak/
@@ -262,9 +262,9 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
           cache: pip
@@ -352,7 +352,7 @@ jobs:
           gpg --verify SHA256SUMS.asc SHA256SUMS
           sha256sum -c SHA256SUMS
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows
           path: dist/windows/
@@ -364,7 +364,7 @@ jobs:
     needs: [appimage, flatpak, windows]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
 
