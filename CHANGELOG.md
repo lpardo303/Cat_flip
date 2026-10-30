@@ -31,6 +31,11 @@ siguiente corte.
   ahora `actionlint`/`shellcheck` solo corrían a mano en local, así que
   una regresión en el YAML pasaba inadvertida hasta el siguiente dispatch
   de packaging.
+- **Shellcheck de `scripts/` en la CI**: el job `actionlint` pasa ahora
+  `shellcheck` por los scripts del repo (`scripts/*.sh`: `smoke.sh` y
+  `smoke_version_check.sh`) además de por los `run:` de los workflows —
+  antes solo se ejecutaban a mano en local. Los dos scripts ya estaban
+  limpios (0 avisos en severidad `style`, la máxima).
 
 ### Cambiado
 
