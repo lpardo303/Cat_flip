@@ -18,6 +18,17 @@ siguiente corte.
   firmaba sin ejecutarlo nunca. En un tag además se comprueba que el
   tag y `package.json` llevan la misma versión.
 
+### Arreglados
+
+- **El smoke del `.exe` ya no lo tumba el rate limit de api.github.com**:
+  el reintento de `/version/check` dormía 3 s, pero el servidor cachea el
+  fallo 300 s (`_RELEASE_TTL_ERR`), así que los tres intentos releían la
+  misma caché y jamás volvían a consultar a GitHub — tres `checked:false`
+  falsos hundían el job. El backoff arranca ahora en 305 s y crece por
+  intento, y si `/rate_limit` reporta la ventana agotada se estira hasta su
+  reset (+15 s, máx. 10 min por intento) antes de fallar, distinguiendo
+  en el mensaje un rate limit sostenido de un problema real de CAs.
+
 ## [1.5.0] — 2026-10-29
 
 ### Añadido
