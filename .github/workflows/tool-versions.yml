@@ -1,0 +1,112 @@
+# Compara las versiones fijadas en ci.yml (actionlint y shellcheck) con la
+# última release de cada proyecto en GitHub y abre un issue cuando hay una
+# nueva.
+#
+# Los pins viven SOLO en ci.yml (versión + sha256sum de sus tarballs): este
+# workflow los lee de ahí, así que nunca hay dos sitios que actualizar. Si
+# desapareciera un pin, el job falla con ::error:: en lugar de mirar para
+# otro lado.
+name: Avisos de versiones fijadas
+
+on:
+  schedule:
+    - cron: '23 6 * * 1'   # lunes 06:23 UTC (fuera de :00 para evitar picos)
+  workflow_dispatch:        # para probarlo a mano
+
+permissions:
+  contents: read
+  issues: write             # abrir el issue cuando haya versión nueva
+
+jobs:
+  avisar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compara los pins con las últimas releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import sys
+          import urllib.request
+
+          # (proyecto GitHub, patrón del pin en ci.yml)
+          PINS = [
+              ("rhysd/actionlint", r"rhysd/actionlint/releases/download/v([0-9][0-9A-Za-z.\-]*)"),
+              ("koalaman/shellcheck", r"koalaman/shellcheck/releases/download/v([0-9][0-9A-Za-z.\-]*)"),
+          ]
+
+          ci = open(".github/workflows/ci.yml", encoding="utf-8").read()
+          token = os.environ["GH_TOKEN"]
+          propio = os.environ["GITHUB_REPOSITORY"]
+          HEADERS = {
+              "Authorization": "Bearer " + token,
+              "Accept": "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28",
+              "User-Agent": "cat-flip-tool-versions",
+          }
+
+
+          def api(method, path, payload=None):
+              data = json.dumps(payload).encode() if payload is not None else None
+              headers = dict(HEADERS)
+              if data:
+                  headers["Content-Type"] = "application/json"
+              req = urllib.request.Request(
+                  "https://api.github.com" + path, data=data, method=method, headers=headers
+              )
+              with urllib.request.urlopen(req, timeout=30) as resp:
+                  return json.load(resp)
+
+
+          def clave(version):
+              """'1.7.12' -> (1, 7, 12); sufijos no numéricos ordenan después."""
+              partes = []
+              for p in version.split("."):
+                  partes.append((0, int(p)) if p.isdigit() else (1, p))
+              return tuple(partes)
+
+
+          nuevas = []
+          for proyecto, patron in PINS:
+              m = re.search(patron, ci)
+              if not m:
+                  print(f"::error::no encuentro el pin de {proyecto} en ci.yml")
+                  sys.exit(1)
+              fijada = m.group(1)
+              ultima = api("GET", f"/repos/{proyecto}/releases/latest")["tag_name"].lstrip("v")
+              print(f"{proyecto}: fijada {fijada} — última {ultima}")
+              if clave(ultima) > clave(fijada):
+                  nuevas.append((proyecto, fijada, ultima))
+              elif clave(ultima) < clave(fijada):
+                  print(f"::notice::{proyecto}: el pin {fijada} es más nuevo que la release {ultima}")
+
+          if not nuevas:
+              print("Todo al día: no hay nada que abrir.")
+              sys.exit(0)
+
+          # No duplicar: si ya hay un issue abierto con ese título, se salta.
+          abiertos = api("GET", f"/repos/{propio}/issues?state=open&per_page=100")
+          titulos = {i["title"] for i in abiertos if "pull_request" not in i}
+          for proyecto, fijada, ultima in nuevas:
+              nombre = proyecto.split("/")[1]
+              titulo = f"Nueva versión de {nombre}: {ultima} (fijada {fijada})"
+              if titulo in titulos:
+                  print(f"Ya hay un issue abierto: {titulo}")
+                  continue
+              cuerpo = (
+                  f"La versión fijada de **{nombre}** en `.github/workflows/ci.yml` "
+                  f"es `{fijada}` y la última release es "
+                  f"[`{ultima}`](https://github.com/{proyecto}/releases/latest).\n\n"
+                  f"Al actualizarla, recalcular también el `sha256sum` del tarball "
+                  f"que verifica el paso de instalación correspondiente.\n\n"
+                  f"_Abierto automáticamente por el workflow "
+                  f"«Avisos de versiones fijadas»._"
+              )
+              api("POST", f"/repos/{propio}/issues", {"title": titulo, "body": cuerpo})
+              print(f"Issue abierto: {titulo}")
+          PY

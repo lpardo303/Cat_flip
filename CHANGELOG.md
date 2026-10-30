@@ -43,6 +43,13 @@ siguiente corte.
   resultado no dependa de la versión que traiga la imagen del runner, el
   job **fija shellcheck 0.11.0 con checksum** (`sha256sum -c`), igual que
   ya hacía con actionlint, e imprime la versión en el log como constancia.
+- **Aviso de versiones fijadas desactualizadas**: workflow programado
+  (`tool-versions.yml`, semanal + manual) que lee los pins de actionlint
+  y shellcheck **directamente de `ci.yml`** (un solo sitio que actualizar)
+  y los compara con la última release de cada proyecto en GitHub; si hay
+  una nueva, abre un issue con la versión y el recordatorio de recalcular
+  el `sha256sum`, sin duplicar si ya hay uno abierto. Si un pin
+  desapareciera, el job falla con `::error::` en lugar de mirar al lado.
 
 ### Cambiado
 
