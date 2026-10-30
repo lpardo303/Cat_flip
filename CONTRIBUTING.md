@@ -55,8 +55,8 @@ CATFLIP_PREMIUM_KEY=local python app.py   # http://127.0.0.1:5050
    ```
 
 4. Abre un PR contra `main`. Los jobs de CI (`test`, `pg-smoke`,
-   `s3-smoke` y `axe`) deben estar en verde; `main` está protegida
-   (1 review aprobatoria + checks de estado).
+   `s3-smoke`, `axe` y `actionlint`) deben estar en verde; `main` está
+   protegida (1 review aprobatoria + checks de estado).
 
 ## 🐘 Smoke real de conectores (Postgres y S3)
 
