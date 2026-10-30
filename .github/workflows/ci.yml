@@ -169,7 +169,7 @@ jobs:
       - name: Start app
         run: |
           python app.py > /tmp/catflip.log 2>&1 &
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             curl -sf http://127.0.0.1:5050/ > /dev/null && break
             sleep 1
           done
@@ -185,3 +185,30 @@ jobs:
           name: axe-violations
           path: violations.json
           if-no-files-found: ignore
+
+  # Los workflows solo se validaban ejecutándolos de verdad: actionlint
+  # revisa sintaxis YAML, expressions y —con shellcheck en PATH— el shell
+  # de cada `run:` (p. ej. variables declaradas sin usar). Si faltara
+  # shellcheck esos checks se saltarían en silencio, por eso se comprueba
+  # explícitamente en lugar de fiarse de la imagen del runner.
+  actionlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instala actionlint 1.7.12 (con checksum)
+        run: |
+          curl -sSfL -o /tmp/actionlint.tgz \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  /tmp/actionlint.tgz" | sha256sum -c -
+          tar -xzf /tmp/actionlint.tgz -C /tmp actionlint
+          sudo install -m 755 /tmp/actionlint /usr/local/bin/actionlint
+          actionlint -version
+
+      - name: Valida los workflows (actionlint + shellcheck)
+        run: |
+          if ! command -v shellcheck > /dev/null; then
+            echo "::error::shellcheck no está en PATH: los checks de shell se saltarían en silencio"
+            exit 1
+          fi
+          actionlint -no-color

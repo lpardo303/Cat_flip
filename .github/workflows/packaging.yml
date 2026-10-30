@@ -89,7 +89,7 @@ jobs:
           # El proceso se mata SIEMPRE al salir del paso, pase lo que pase
           # (mismo criterio que el trap del smoke del Flatpak).
           trap 'kill "$PID" 2>/dev/null || true' EXIT
-          for i in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             curl -sf -o /dev/null http://127.0.0.1:5050/ && break
             sleep 1
           done
@@ -211,7 +211,7 @@ jobs:
           cleanup() {
             kill "$PID" 2>/dev/null || true
             flatpak kill "$APP_ID" 2>/dev/null || true
-            for i in 1 2 3 4 5; do
+            for _ in 1 2 3 4 5; do
               flatpak ps 2>/dev/null | grep -q "$APP_ID" || break
               sleep 1
             done
@@ -224,7 +224,7 @@ jobs:
           flatpak install --user -y "$BUNDLE"
           flatpak run "$APP_ID" > /tmp/catflip-flatpak-smoke.log 2>&1 &
           PID=$!
-          for i in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             curl -sf -o /dev/null http://127.0.0.1:5050/ && break
             sleep 1
           done
@@ -319,7 +319,7 @@ jobs:
           # El proceso se mata SIEMPRE al salir del paso (antes el kill iba
           # tras el reintento y un fallo del check lo dejaba huérfano).
           trap 'kill "$PID" 2>/dev/null || true' EXIT
-          for i in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             curl -sf -o /dev/null http://127.0.0.1:5050/ && break
             sleep 1
           done

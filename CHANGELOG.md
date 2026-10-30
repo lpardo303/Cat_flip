@@ -25,6 +25,12 @@ siguiente corte.
   construía y firmaba sin instalarlo nunca. Usa el mismo backoff contra
   el rate limit que el `.exe` (305 s por la caché de 300 s, estirada al
   reset) y desinstala el bundle siempre al terminar, también si falla.
+- **Validación de workflows en la CI**: job nuevo de `actionlint` (con
+  shellcheck en PATH, que amplía la revisión de los `run:` a bash) en
+  `ci.yml`, que revisa los tres workflows en cada PR y empuje — hasta
+  ahora `actionlint`/`shellcheck` solo corrían a mano en local, así que
+  una regresión en el YAML pasaba inadvertida hasta el siguiente dispatch
+  de packaging.
 
 ### Cambiado
 
