@@ -190,7 +190,9 @@ jobs:
   # revisa sintaxis YAML, expressions y —con shellcheck en PATH— el shell
   # de cada `run:` (p. ej. variables declaradas sin usar). Si faltara
   # shellcheck esos checks se saltarían en silencio, por eso se comprueba
-  # explícitamente en lugar de fiarse de la imagen del runner.
+  # explícitamente en lugar de fiarse de la imagen del runner. El mismo
+  # shellcheck pasa además por los scripts del repo (`scripts/*.sh`), que
+  # solo se ejecutaban a mano en local.
   actionlint:
     runs-on: ubuntu-latest
     steps:
@@ -212,3 +214,12 @@ jobs:
             exit 1
           fi
           actionlint -no-color
+
+      - name: Shellcheck de los scripts del repo
+        # shellcheck ya se comprobó en el paso anterior (si faltara, el job
+        # se habría cortado ahí); severity por defecto = style, la máxima.
+        # La versión varía con la imagen del runner (SC2329 no existe en
+        # 0.10.0), así que se imprime para poder diagnosticar sin biszar.
+        run: |
+          shellcheck --version | sed -n '2p'
+          shellcheck scripts/*.sh

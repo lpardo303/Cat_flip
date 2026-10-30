@@ -31,6 +31,17 @@ siguiente corte.
   ahora `actionlint`/`shellcheck` solo corrían a mano en local, así que
   una regresión en el YAML pasaba inadvertida hasta el siguiente dispatch
   de packaging.
+- **Shellcheck de `scripts/` en la CI**: el job `actionlint` pasa ahora
+  `shellcheck` por los scripts del repo (`scripts/*.sh`: `smoke.sh` y
+  `smoke_version_check.sh`) además de por los `run:` de los workflows —
+  antes solo se ejecutaban a mano en local. El paso nuevo destapó 2 avisos
+  `SC2329` («función nunca invocada») que el shellcheck 0.11.0 del runner
+  lanza sobre `cleanup` y `s3_ready`: falsos positivos de invocación
+  indirecta (vía `trap` y como comando pasado a `wait_for`), ya cubiertos
+  por las directivas `disable=SC2317` existentes — se amplían a
+  `SC2317,SC2329`, válidas en 0.10.0 local y en 0.11.0. El paso imprime
+  además la versión de shellcheck para diagnosticar desajustes de versión
+  sin tener que reproducirlos a ciegas.
 
 ### Cambiado
 

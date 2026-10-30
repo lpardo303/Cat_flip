@@ -110,7 +110,7 @@ fi
 started_pg=0
 started_s3=0
 
-# shellcheck disable=SC2317  # se invoca vía trap, no desde aquí
+# shellcheck disable=SC2317,SC2329  # se invoca vía trap, no desde aquí
 cleanup() {
   local status=$?
   set +e
@@ -144,7 +144,7 @@ wait_for() {
 }
 
 # El endpoint de S3 responde con curl o, si no lo hay, con python
-# shellcheck disable=SC2317  # se pasa como comando a wait_for
+# shellcheck disable=SC2317,SC2329  # se pasa como comando a wait_for
 s3_ready() {
   if command -v curl >/dev/null 2>&1; then
     curl -sf "$CATFLIP_S3_ENDPOINT/_localstack/health" >/dev/null
