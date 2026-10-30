@@ -39,9 +39,10 @@ siguiente corte.
   lanza sobre `cleanup` y `s3_ready`: falsos positivos de invocación
   indirecta (vía `trap` y como comando pasado a `wait_for`), ya cubiertos
   por las directivas `disable=SC2317` existentes — se amplían a
-  `SC2317,SC2329`, válidas en 0.10.0 local y en 0.11.0. El paso imprime
-  además la versión de shellcheck para diagnosticar desajustes de versión
-  sin tener que reproducirlos a ciegas.
+  `SC2317,SC2329`, válidas en 0.10.0 local y en 0.11.0. Para que el
+  resultado no dependa de la versión que traiga la imagen del runner, el
+  job **fija shellcheck 0.11.0 con checksum** (`sha256sum -c`), igual que
+  ya hacía con actionlint, e imprime la versión en el log como constancia.
 
 ### Cambiado
 
