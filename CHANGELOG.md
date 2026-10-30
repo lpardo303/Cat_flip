@@ -50,6 +50,13 @@ siguiente corte.
   una nueva, abre un issue con la versión y el recordatorio de recalcular
   el `sha256sum`, sin duplicar si ya hay uno abierto. Si un pin
   desapareciera, el job falla con `::error::` en lugar de mirar al lado.
+- **Dependabot para actions y pip**: `.github/dependabot.yml` habilita
+  version updates semanales (lunes 06:00 UTC) para el ecosistema
+  `github-actions` (los `use:` de los tres workflows) y `pip`
+  (`requirements*.txt` de la raíz), **agrupados**: un PR por ecosistema
+  como máximo a la semana en vez de uno por dependencia. Los binarios
+  fijados con checksum (actionlint/shellcheck) no son actions y siguen
+  siendo cosa del workflow de avisos.
 
 ### Cambiado
 
