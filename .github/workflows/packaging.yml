@@ -68,7 +68,17 @@ jobs:
             echo "::error::tag $GITHUB_REF_NAME ≠ package.json $VERSION"
             exit 1
           fi
-          IMG="$(ls dist/appimage/CatFlip-*.AppImage | head -1)"
+          # El glob debe casar EXACTAMENTE con 1 bundle: 0 = build incompleto
+          # y >1 = residuo de otra versión (un `head -1` se comió el bundle
+          # 1.0.0 antiguo en local en vez del 1.5.0). Error claro, no elegir
+          # el primero a ciegas.
+          shopt -s nullglob
+          BUNDLES=(dist/appimage/CatFlip-*.AppImage)
+          if [ "${#BUNDLES[@]}" -ne 1 ]; then
+            echo "::error::Se esperaba exactamente 1 AppImage en dist/appimage; hay ${#BUNDLES[@]} (${BUNDLES[*]:-ninguno})"
+            exit 1
+          fi
+          IMG="${BUNDLES[0]}"
           echo "→ arrancando $IMG (package.json $VERSION, ref $GITHUB_REF_NAME)"
           # FUSE no siempre está en el runner: se extrae y se lanza AppRun,
           # que además es el squashfs real que se distribuye.
@@ -183,7 +193,17 @@ jobs:
             exit 1
           fi
           APP_ID=io.github.lpardo303.CatFlip
-          BUNDLE="$(ls "$PWD"/dist/flatpak/CatFlip-*.flatpak | head -1)"
+          # El glob debe casar EXACTAMENTE con 1 bundle: 0 = build incompleto
+          # y >1 = residuo de otra versión (un `head -1` se comió el bundle
+          # 1.0.0 antiguo en local en vez del 1.5.0). Error claro, no elegir
+          # el primero a ciegas.
+          shopt -s nullglob
+          BUNDLES=("$PWD"/dist/flatpak/CatFlip-*.flatpak)
+          if [ "${#BUNDLES[@]}" -ne 1 ]; then
+            echo "::error::Se esperaba exactamente 1 Flatpak en dist/flatpak; hay ${#BUNDLES[@]} (${BUNDLES[*]:-ninguno})"
+            exit 1
+          fi
+          BUNDLE="${BUNDLES[0]}"
           echo "→ instalando $BUNDLE (package.json $VERSION, ref $GITHUB_REF_NAME)"
           # Limpieza SIEMPRE: la app se mata por app-id (`flatpak run`
           # deja el bwrap colgando si solo se mata al cliente) y el bundle
@@ -282,7 +302,17 @@ jobs:
       - name: Smoke — el .exe arranca, sirve / y consulta GitHub
         run: |
           VERSION="$(python3 -c "import json; print(json.load(open('package.json'))['version'])")"
-          EXE="$(ls dist/windows/CatFlip-*.exe | head -1)"
+          # El glob debe casar EXACTAMENTE con 1 bundle: 0 = build incompleto
+          # y >1 = residuo de otra versión (un `head -1` se comió el bundle
+          # 1.0.0 antiguo en local en vez del 1.5.0). Error claro, no elegir
+          # el primero a ciegas.
+          shopt -s nullglob
+          BUNDLES=(dist/windows/CatFlip-*.exe)
+          if [ "${#BUNDLES[@]}" -ne 1 ]; then
+            echo "::error::Se esperaba exactamente 1 .exe en dist/windows; hay ${#BUNDLES[@]} (${BUNDLES[*]:-ninguno})"
+            exit 1
+          fi
+          EXE="${BUNDLES[0]}"
           echo "→ arrancando $EXE (package.json $VERSION, ref $GITHUB_REF_NAME)"
           "$EXE" > /tmp/catflip-smoke.log 2>&1 &
           PID=$!

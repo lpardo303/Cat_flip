@@ -39,6 +39,14 @@ siguiente corte.
   Windows gana de paso un `trap` que mata el `.exe` en todos los caminos de
   salida, también si el check falla.
 
+- **Los tres smokes exigen exactamente un bundle en `dist/`**: la
+  selección era `ls … | head -1`, que con un glob sin match se quedaba
+  vacío (fallas después con un error confuso) y con varios matches se
+  tragaba en silencio el primero — en local llegó a coger el AppImage
+  1.0.0 antiguo en vez del 1.5.0. Ahora cada paso lista el glob con
+  `nullglob` y falla de inmediato con `::error::` diciendo cuántos
+  bundles hay y cuáles, si no hay exactamente uno.
+
 ### Arreglados
 
 - **El smoke del `.exe` ya no lo tumba el rate limit de api.github.com**:
