@@ -29,13 +29,20 @@ siguiente corte.
 ### Arreglados
 
 - **El smoke del `.exe` ya no lo tumba el rate limit de api.github.com**:
-  el reintento de `/version/check` dormía 3 s, pero el servidor cachea el
-  fallo 300 s (`_RELEASE_TTL_ERR`), así que los tres intentos releían la
+  el reintento de `/version/check` dormía 3 s, pero el servidor cachea  el fallo 300 s (`_RELEASE_TTL_ERR`), así que los tres intentos releían la
   misma caché y jamás volvían a consultar a GitHub — tres `checked:false`
   falsos hundían el job. El backoff arranca ahora en 305 s y crece por
   intento, y si `/rate_limit` reporta la ventana agotada se estira hasta su
   reset (+15 s, máx. 10 min por intento) antes de fallar, distinguiendo
   en el mensaje un rate limit sostenido de un problema real de CAs.
+- **El smoke E2E del AppImage también tolera el rate limit**: el reintento
+  de `/version/check` dormía 3 s sin volver a consultar a GitHub (la
+  caché de 300 s devolvía el mismo fallo). Ahora usa el mismo backoff que
+  el `.exe` — espera base de 305 s, estirada al reset del rate limit con
+  tope de 10 min — y separa los fallos: `checked:true` con un `current`
+  distinto al del tag es error inmediato sin reintentar (el problema está
+  en el bundle, no en GitHub), mientras que `checked:false` sí se
+  reintenta. El proceso arrancado se mata siempre al salir del paso.
 
 ## [1.5.0] — 2026-10-29
 
