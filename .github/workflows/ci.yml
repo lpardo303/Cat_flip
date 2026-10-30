@@ -218,4 +218,8 @@ jobs:
       - name: Shellcheck de los scripts del repo
         # shellcheck ya se comprobó en el paso anterior (si faltara, el job
         # se habría cortado ahí); severity por defecto = style, la máxima.
-        run: shellcheck scripts/*.sh
+        # La versión varía con la imagen del runner (SC2329 no existe en
+        # 0.10.0), así que se imprime para poder diagnosticar sin biszar.
+        run: |
+          shellcheck --version | sed -n '2p'
+          shellcheck scripts/*.sh
