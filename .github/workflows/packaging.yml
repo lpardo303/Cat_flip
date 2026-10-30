@@ -175,6 +175,110 @@ jobs:
           gpg --verify SHA256SUMS.asc SHA256SUMS
           sha256sum -c SHA256SUMS
 
+      # El Flatpak se construía y firmaba sin instalarse nunca: un bundle
+      # roto (sin CAs, sin package.json, sandbox sin red) salía verde y
+      # llegaba al usuario. Mismo smoke que AppImage y .exe, pero pasando
+      # por el camino del usuario final: instalar el bundle, `flatpak run`
+      # y comprobar que el sandbox sirve HTTP y sale a la red. Va DESPUÉS
+      # de la verificación de firmas: solo se ejecuta un bundle cuya
+      # firma detach y su checksum ya cuadran.
+      - name: Smoke — el Flatpak arranca, sirve / y consulta GitHub
+        run: |
+          VERSION="$(python3 -c "import json; print(json.load(open('package.json'))['version'])")"
+          # En un tag, la release y el bundle deben llevar la MISMA versión
+          # que package.json (el bundle se nombra con ella).
+          if [[ "$GITHUB_REF" == refs/tags/* && "v$VERSION" != "$GITHUB_REF_NAME" ]]; then
+            echo "::error::tag $GITHUB_REF_NAME ≠ package.json $VERSION"
+            exit 1
+          fi
+          APP_ID=io.github.lpardo303.CatFlip
+          BUNDLE="$(ls "$PWD"/dist/flatpak/CatFlip-*.flatpak | head -1)"
+          echo "→ instalando $BUNDLE (package.json $VERSION, ref $GITHUB_REF_NAME)"
+          # Limpieza SIEMPRE: la app se mata por app-id (`flatpak run`
+          # deja el bwrap colgando si solo se mata al cliente) y el bundle
+          # se desinstala — también si el smoke falla o el paso se corta.
+          cleanup() {
+            kill "$PID" 2>/dev/null || true
+            flatpak kill "$APP_ID" 2>/dev/null || true
+            for i in 1 2 3 4 5; do
+              flatpak ps 2>/dev/null | grep -q "$APP_ID" || break
+              sleep 1
+            done
+            flatpak --user uninstall -y --delete-data "$APP_ID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          # --user: la MISMA instalación del resto del job, donde el paso
+          # «flatpak-builder + runtime 26.08» ya instaló el runtime (sin
+          # --user flatpak buscaría una instalación de sistema y sudo).
+          flatpak install --user -y "$BUNDLE"
+          flatpak run "$APP_ID" > /tmp/catflip-flatpak-smoke.log 2>&1 &
+          PID=$!
+          for i in $(seq 1 60); do
+            curl -sf -o /dev/null http://127.0.0.1:5050/ && break
+            sleep 1
+          done
+          if ! curl -sf -o /dev/null http://127.0.0.1:5050/; then
+            echo "::error::/ no responde en 60 s — ¿arranca el binario dentro del sandbox o comparte la red?"
+            cat /tmp/catflip-flatpak-smoke.log
+            exit 1
+          fi
+          # /version/check es el ÚNICO HTTPS del bundle: dentro del sandbox
+          # debe valer lo mismo que en AppImage y .exe — si PyInstaller
+          # vuelve a empaquetar ssl sin CAs, o el sandbox no puede salir a
+          # la red, checked:false y el aviso de versión muere en silencio
+          # (regresión 1.4.0 → 1.4.1). `current` sale del package.json
+          # EMPAQUETADO: comprueba que viaja en el bundle y que coincide con
+          # la del tag. Mismo backoff que el .exe contra el rate limit
+          # anónimo de api.github.com: el servidor cachea el fallo 300 s
+          # (_RELEASE_TTL_ERR de app.py), así que CADA espera tiene que
+          # superar ese TTL para que el reintento haga un fetch nuevo; si
+          # /rate_limit reporta la ventana agotada, se estira hasta su reset
+          # (+15 s) sin pasar de SMOKE_MAX_WAIT. /rate_limit NO consume
+          # cuota. SMOKE_BASE_DELAY / SMOKE_MAX_WAIT solo existen para
+          # probar este paso en local con esperas cortas.
+          BASE="${SMOKE_BASE_DELAY:-305}"
+          CAP="${SMOKE_MAX_WAIT:-600}"
+          OK=0
+          for i in 1 2 3 4; do
+            rm -f /tmp/version.json
+            curl -sf -o /tmp/version.json http://127.0.0.1:5050/version/check || true
+            cat /tmp/version.json 2>/dev/null || true
+            echo
+            if grep -Eq '"checked"[[:space:]]*:[[:space:]]*true' /tmp/version.json; then
+              # checked:true con OTRA versión: el bundle lleva un
+              # package.json distinto al de la release — fallo duro,
+              # reintentar (que solo reconsulta GitHub) no lo arregla.
+              if ! grep -Eq "\"current\"[[:space:]]*:[[:space:]]*\"$VERSION\"" /tmp/version.json; then
+                echo "::error::/version/check da current ≠ $VERSION — el package.json EMPAQUETADO no es el de la release"
+                cat /tmp/catflip-flatpak-smoke.log
+                exit 1
+              fi
+              OK=1
+              break
+            fi
+            if [ "$i" = 4 ]; then break; fi
+            WAIT=$(( BASE + (i - 1) * BASE / 10 ))
+            # pipefail: sin coincidencia grep sale 1, por eso cada
+            # extracción de las cabeceras va con || true dentro del $().
+            RL="$(curl -s --max-time 10 https://api.github.com/rate_limit || true)"
+            REMAIN="$(grep -oE '"remaining"[[:space:]]*:[[:space:]]*[0-9]+' <<< "$RL" | head -1 | grep -oE '[0-9]+$' || true)"
+            RESET="$(grep -oE '"reset"[[:space:]]*:[[:space:]]*[0-9]+' <<< "$RL" | head -1 | grep -oE '[0-9]+$' || true)"
+            if [ "$REMAIN" = 0 ] && [ -n "$RESET" ]; then
+              TILLRESET=$(( RESET - $(date +%s) + 15 ))
+              if [ "$TILLRESET" -gt "$WAIT" ] && [ "$TILLRESET" -le "$CAP" ]; then
+                WAIT=$TILLRESET
+              fi
+            fi
+            echo "→ reintento $i/3 tras ${WAIT}s (rate limit remaining=${REMAIN:-desconocido})"
+            sleep "$WAIT"
+          done
+          if [ "$OK" != 1 ]; then
+            echo "::error::/version/check sigue en checked:false tras 4 intentos con backoff — rate limit sostenido de api.github.com, sin CAs en el bundle o sin red en el sandbox"
+            cat /tmp/catflip-flatpak-smoke.log
+            exit 1
+          fi
+          echo "✓ Flatpak E2E: / y /version/check con current=$VERSION"
+
       - uses: actions/upload-artifact@v4
         with:
           name: flatpak

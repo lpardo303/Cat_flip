@@ -17,6 +17,14 @@ siguiente corte.
   `current` no coincide con `package.json` — antes se construía y
   firmaba sin ejecutarlo nunca. En un tag además se comprueba que el
   tag y `package.json` llevan la misma versión.
+- **Smoke E2E del Flatpak en la CI**: el job de Flatpak instala el bundle
+  recién construido (después de verificar su firma), lo arranca con
+  `flatpak run` y falla si `/` no responde, si `/version/check` no da
+  `checked:true` dentro del sandbox (CAs o red del sandbox) o si el
+  `current` empaquetado no coincide con la versión del tag — antes se
+  construía y firmaba sin instalarlo nunca. Usa el mismo backoff contra
+  el rate limit que el `.exe` (305 s por la caché de 300 s, estirada al
+  reset) y desinstala el bundle siempre al terminar, también si falla.
 
 ### Arreglados
 
