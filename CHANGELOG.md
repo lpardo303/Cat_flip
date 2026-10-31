@@ -9,6 +9,8 @@ siguiente corte.
 
 ## [Sin publicar]
 
+## [1.5.1] — 2026-10-31
+
 ### Añadido
 
 - **Smoke E2E del AppImage en la CI**: el job de AppImage ejecuta el
@@ -438,7 +440,8 @@ diagnóstico y CI de accesibilidad.
   escritorio — sustituido por el diálogo nativo de archivo.
 - Auto-mapeo de fechas: `dayfirst` mal inferido para días ISO > 12.
 
-[Sin publicar]: https://github.com/lpardo303/Cat_flip/compare/v1.5.0...HEAD
+[Sin publicar]: https://github.com/lpardo303/Cat_flip/compare/v1.5.1...HEAD
+[1.5.1]: https://github.com/lpardo303/Cat_flip/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/lpardo303/Cat_flip/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/lpardo303/Cat_flip/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/lpardo303/Cat_flip/compare/v1.3.0...v1.4.0
