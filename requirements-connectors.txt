@@ -4,7 +4,7 @@
 # instrucción. Instalación: pip install -r requirements-connectors.txt
 psycopg[binary]==3.3.6
 # S3: mismo contrato — sin este driver la ruta responde 400 accionable.
-boto3==1.35.0
+boto3==1.43.120
 # BigQuery: mismo contrato — sin estos drivers la ruta responde 400
 # accionable. `pyarrow` es el que convierte el DataFrame a Parquet para el
 # job de carga y `db-dtypes` acompaña al SDK en el intercambio con pandas.
