@@ -65,6 +65,14 @@ siguiente corte.
   ritual ya verificado de relajar → mergear → restaurar, con el payload
   canónico de restauración y su verificación campo a campo contra un
   snapshot previo.
+- **Ignoras en Dependabot para dependencias rotas** (`.github/dependabot.yml`):
+  bloquea `python-dateutil >=3.0.0` (google-cloud-bigquery 3.46.2 exige
+  dateutil <3 → ResolutionImpossible en los jobs de smokes) y
+  `charset-normalizer >=3.4.5` — desde la pin 3.4.4 verificada — porque
+  la regresión de detección no es solo de la 3.5.x: 3.5.2 **y 3.4.9** dan
+  «mac_latin2» para el CSV cp1252 de la suite y rompen los 3 tests de
+  `tests/test_encoding.py` (verificado en la CI del PR de Dependabot).
+  Sin estas reglas, la ronda semanal reabría cada lunes el mismo PR roto.
 
 ### Cambiado
 

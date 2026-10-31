@@ -46,11 +46,15 @@ updates:
       # s3-smoke no pueden siquiera instalar requirements-connectors.txt.
       - dependency-name: "python-dateutil"
         versions: [">=3.0.0"]
-      # 3.5.2 detecta el CSV de prueba cp1252 como «mac_latin2» en vez de
-      # la familia windows-125x (3.4.4 daba windows-1250 → cp1252), lo
-      # que decodifica mal el español y rompe tests/test_encoding.py.
-      # Se deja pasar 3.6+ por si ahí está la corrección.
+      # Regresión de detección verificada en CI: 3.5.2 Y TAMBIÉN 3.4.9
+      # detectan el CSV de prueba cp1252 como «mac_latin2» en vez de la
+      # familia windows-125x (3.4.4 daba windows-1250 → cp1252), lo que
+      # decodifica mal el español y rompe los 3 tests de
+      # tests/test_encoding.py. Se bloquea desde 3.4.5 — todo lo que hay
+      # por encima de la pin actual (3.4.4, la última verificada) — y sin
+      # límite superior: quitar el bloqueo solo cuando una versión nueva
+      # pase tests/test_encoding.py en la CI.
       - dependency-name: "charset-normalizer"
-        versions: [">=3.5.0,<3.6.0"]
+        versions: [">=3.4.5"]
     commit-message:
       prefix: "deps"
