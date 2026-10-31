@@ -36,5 +36,21 @@ updates:
     groups:
       python:
         patterns: ["*"]
+    # Bloqueos para que la ronda semanal no reabra cada lunes el mismo PR
+    # roto (verificado en local en e44aa03). Se quitan cuando la causa
+    # desaparezca: el cap de dateutil en google-cloud-bigquery o la
+    # detección de charset-normalizer.
+    ignore:
+      # 3.x (y superiores): google-cloud-bigquery 3.46.2 exige dateutil
+      # <3 y pip acaba en ResolutionImpossible — los jobs pg-smoke y
+      # s3-smoke no pueden siquiera instalar requirements-connectors.txt.
+      - dependency-name: "python-dateutil"
+        versions: [">=3.0.0"]
+      # 3.5.2 detecta el CSV de prueba cp1252 como «mac_latin2» en vez de
+      # la familia windows-125x (3.4.4 daba windows-1250 → cp1252), lo
+      # que decodifica mal el español y rompe tests/test_encoding.py.
+      # Se deja pasar 3.6+ por si ahí está la corrección.
+      - dependency-name: "charset-normalizer"
+        versions: [">=3.5.0,<3.6.0"]
     commit-message:
       prefix: "deps"
