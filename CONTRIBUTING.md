@@ -56,7 +56,117 @@ CATFLIP_PREMIUM_KEY=local python app.py   # http://127.0.0.1:5050
 
 4. Abre un PR contra `main`. Los jobs de CI (`test`, `pg-smoke`,
    `s3-smoke`, `axe` y `actionlint`) deben estar en verde; `main` está
-   protegida (1 review aprobatoria + checks de estado).
+   protegida (1 review aprobatoria + checks de estado). Ojo si el PR lo
+   escribes tú: **no puedes aprobar tu propio PR**, así que esa única
+   review no la reúne nadie — el ritual para mergearlo está en la
+   sección 🔒 justo debajo.
+
+## 🔒 Protección de `main`: el bloqueo de autoaprobación
+
+`main` está protegida con estas reglas — son las que aplica GitHub de
+verdad (leídas de la API):
+
+| Regla | Valor |
+| --- | --- |
+| Requiere PR para mergear | sí |
+| Reviews aprobatorias exigidas | **1** |
+| Descartar reviews obsoletas | sí (`dismiss_stale_reviews`) |
+| El último empujador no puede aprobar | no (`require_last_push_approval`) |
+| Code owners | no |
+| Checks de estado exigidos | sí, sin contexts concretos |
+| Aplica también a admins | sí (`enforce_admins`) |
+| Push directo, force push y borrado de `main` | bloqueados |
+| Borrado automático de la rama del PR al mergear | activo |
+
+El matiz que lastra a un mantenedor único: **GitHub prohíbe que el autor
+de un PR lo apruebe a sí mismo**, ni por API ni en la UI, y da igual que
+seas admin. Este repo tiene una sola persona con permiso de escritura,
+así que un PR escrito por esa persona no puede reunir jamás la única
+review que exige la regla → **es inmergeable**. Síntomas exactos:
+
+- **API**: `PUT /pulls/{n}/merge` → `405 At least 1 approving review is
+  required by reviewers with write access.`
+- **UI**: el botón «Merge pull request» aparece gris.
+- **Push directo**: `! [remote rejected] main -> main (protected branch
+  hook declined)`.
+
+Por eso la ronda semanal de Dependabot sí fluye: esos PR los escribe la
+app `dependabot`, otro autor distinto de ti, y tú puedes aprobarlos con
+normalidad. Lo mismo para PRs abiertos desde una fork por otra persona.
+
+### Ritual para mergear un PR de tu propia autoría
+
+Solo para cambios que no necesiten revisión externa real (docs, tus
+propios cambios cuando trabajas con tu agente). Mantén la ventana lo más
+corta posible: decenas de segundos entre relajar y restaurar.
+
+**0. Snapshot de la protección actual** — es tu copia para restaurar:
+
+```bash
+curl -sf -H "Authorization: Bearer $TOKEN" \
+  https://api.github.com/repos/lpardo303/Cat_flip/branches/main/protection \
+  > /tmp/main-protection.json
+```
+
+**1. Retira solo la regla de reviews** (lo demás queda intacto):
+
+```bash
+curl -sf -X DELETE -H "Authorization: Bearer $TOKEN" \
+  https://api.github.com/repos/lpardo303/Cat_flip/branches/main/protection/required_pull_request_reviews
+```
+
+**2. Merge con merge commit:**
+
+```bash
+curl -sf -X PUT -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"merge_method":"merge"}' \
+  https://api.github.com/repos/lpardo303/Cat_flip/pulls/N/merge
+```
+
+**3. Restaura la protección completa** con este payload canónico
+(`required_pull_request_reviews` incluido) en
+`PUT /repos/lpardo303/Cat_flip/branches/main/protection`:
+
+```json
+{
+  "required_status_checks": { "strict": false, "checks": [] },
+  "enforce_admins": true,
+  "required_pull_request_reviews": {
+    "dismiss_stale_reviews": true,
+    "require_code_owner_reviews": false,
+    "require_last_push_approval": false,
+    "required_approving_review_count": 1
+  },
+  "restrictions": null,
+  "required_linear_history": false,
+  "allow_force_pushes": false,
+  "allow_deletions": false,
+  "block_creations": false,
+  "required_conversation_resolution": false,
+  "lock_branch": false,
+  "allow_fork_syncing": false
+}
+```
+
+**4. Verificación**: vuelve a hacer el `GET` del paso 0 y compara campo
+a campo con el snapshot — ignorando las claves `url` (recursivas) y
+`required_signatures` (de solo lectura), debe coincidir al completo.
+Luego `git pull` para ver el merge commit en local y que la CI del push
+a `main` quede verde: el check `Dependabot` además vuelve a parsear
+`.github/dependabot.yml`.
+
+Notas:
+
+- El `TOKEN` necesita permiso de **administración** del repo; con un PAT
+  sin él, los pasos 1 y 3 devuelven `403` y tocará hacerlo a mano en
+  Settings → Branches → main (quitar «Require approving reviews»,
+  mergear, volver a poner 1).
+- GitHub borra la rama del PR al mergear (la opción está activada en el
+  repo), así que no hace falta borrarla a mano; si lo intentas después,
+  `git push origin --delete` dirá «ref remoto no existe».
+- **No** uses este ritual para cambios que sí necesiten revisión: la
+  relajación dura exactamente lo que tarde la merge, ni un segundo más.
 
 ## 🐘 Smoke real de conectores (Postgres y S3)
 

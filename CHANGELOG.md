@@ -57,6 +57,14 @@ siguiente corte.
   como máximo a la semana en vez de uno por dependencia. Los binarios
   fijados con checksum (actionlint/shellcheck) no son actions y siguen
   siendo cosa del workflow de avisos.
+- **Documentación del bloqueo de autoaprobación** (`CONTRIBUTING.md`):
+  sección 🔒 nueva con las reglas reales de protección de `main`, por qué
+  un PR escrito por el propio mantenedor no puede reunir la review que
+  la regla exige (GitHub prohíbe autoaprobar, y el repo tiene una sola
+  persona con escritura, mientras los PR de Dependabot sí fluyen) y el
+  ritual ya verificado de relajar → mergear → restaurar, con el payload
+  canónico de restauración y su verificación campo a campo contra un
+  snapshot previo.
 
 ### Cambiado
 
