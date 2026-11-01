@@ -389,6 +389,100 @@ def op_concatenar_columnas(df, params):
     return df, code
 
 
+def op_reorder_columns(df, params):
+    """Reordena las columnas del dataset (op #25).
+
+    Dos modos:
+
+    - ``block`` — fija las columnas de ``first`` al inicio del dataset
+      (conservando su orden ACTUAL relativo) y ordena el resto
+      alfabéticamente A→Z sin distinguir mayúsculas; los empates
+      conservan el orden original (``sorted`` es estable). ``first``
+      vacío = todo el dataset alfabético.
+    - ``move`` — mueve ``column`` a un destino exacto: ``position``
+      ("start"/"end") o relativo a otra columna (``before``/``after``),
+      exactamente uno de los tres.
+
+    El código generado lista el orden final explícito, así que la
+    paridad con ``exec`` es exacta en ambos modos.
+
+    Errores (ValueError → 500): modo desconocido, ``first`` no lista o
+    con columnas inexistentes/repetidas, dataset con etiquetas
+    duplicadas, ``move`` sin destino o con varios, destino fuera de
+    "start"/"end", referencia inexistente o igual a la columna a
+    mover.
+    """
+    cols = list(df.columns)
+    if len(set(cols)) != len(cols):
+        raise ValueError(
+            "El dataset tiene columnas duplicadas: renómbralas antes de reordenar."
+        )
+    mode = params.get("mode")
+
+    if mode == "block":
+        first = params.get("first")
+        if not isinstance(first, list):
+            raise ValueError("El bloque inicial debe ser una lista de columnas.")
+        first = [str(c) for c in first]
+        if len(set(first)) != len(first):
+            raise ValueError("No repitas columnas: cada columna entra una sola vez.")
+        missing = [c for c in first if c not in cols]
+        if missing:
+            raise ValueError(f"La columna {missing!r} no existe en el dataset.")
+        rest = [c for c in cols if c not in first]
+        rest.sort(key=str.casefold)
+        # Dentro del bloque se conserva el orden actual del dataset
+        new_order = [c for c in cols if c in first] + rest
+
+    elif mode == "move":
+        column = str(params.get("column") or "")
+        position = params.get("position")
+        before = params.get("before")
+        after = params.get("after")
+        if column not in cols:
+            raise ValueError(f"La columna {column!r} no existe en el dataset.")
+        targets = [t for t in (position, before, after) if t]
+        if len(targets) != 1:
+            raise ValueError(
+                "Elige exactamente un destino: al inicio, al final, "
+                "antes de… o después de…"
+            )
+        ref = None
+        if position:
+            if position not in ("start", "end"):
+                raise ValueError(
+                    f"Destino desconocido: {position!r} (usa 'start' o 'end')."
+                )
+        else:
+            ref = str(before or after)
+            if ref not in cols:
+                raise ValueError(
+                    f"La columna de referencia {ref!r} no existe en el dataset."
+                )
+            if ref == column:
+                raise ValueError(
+                    f"La columna '{column}' no puede servir de referencia de sí misma."
+                )
+        rest = [c for c in cols if c != column]
+        if position == "start":
+            new_order = [column] + rest
+        elif position == "end":
+            new_order = rest + [column]
+        else:
+            idx = rest.index(ref)
+            insert_at = idx if before else idx + 1
+            new_order = rest[:insert_at] + [column] + rest[insert_at:]
+
+    else:
+        raise ValueError(
+            f"Modo de reordenación desconocido: {mode!r} (usa 'block' o 'move')."
+        )
+
+    df = df.loc[:, new_order]
+    code = f"df = df[{new_order!r}]"
+    return df, code
+
+
 # ── Reglas & Operaciones ────────────────────────────────────────────────
 
 def op_filter(df, params):
@@ -1097,6 +1191,7 @@ OPS = {
     "change_type": op_change_type,
     "regex_mask": op_regex_mask,
     "concatenar_columnas": op_concatenar_columnas,
+    "reorder_columns": op_reorder_columns,
     # Reglas & Operaciones
     "filter": op_filter,
     "sort": op_sort,

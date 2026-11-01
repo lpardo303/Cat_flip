@@ -2,7 +2,7 @@
 
 Bienvenido a **Cat_flip - Studio ETL**, tu plataforma local y ligera para la limpieza, transformación y preparación de datos. Diseñada como una alternativa rápida a herramientas pesadas, Cat_flip te permite construir pipelines de datos visualmente mientras genera código Python por debajo.
 
-Este manual detalla las 24 operaciones de transformación disponibles en la "Caja de Transformaciones" (Panel Izquierdo) de la interfaz.
+Este manual detalla las 25 operaciones de transformación disponibles en la "Caja de Transformaciones" (Panel Izquierdo) de la interfaz.
 
 ---
 
@@ -79,6 +79,8 @@ Lógica condicional, ordenamiento, agregación y cruce de datasets.
     Analiza columnas numéricas (INT/FLOAT) y crea por cada una una columna de marca `columna_outlier` (TRUE/FALSE) con dos métodos: **Z-Score** marca si `|x − media| / desviación > umbral` (por defecto 2.5, desviación de población) e **IQR** marca si el valor cae fuera de `Q1 − k·IQR … Q3 + k·IQR` (k por defecto 1.5). Los valores nulos producen marca nula y las columnas constantes quedan todas en FALSE. La operación **solo marca, no elimina filas**: filtra después con *Filtrar filas* (por ejemplo `columna_outlier == TRUE`) o *Eliminar filas*. Nota: con pocos datos (menos de ~8 filas) el Z-Score es poco significativo; en columnas muy asimétricas prefiere IQR.
 24. **Muestreo (Sampling):** 
     Reduce el dataset a una muestra, con cuatro modos: **head** (primeras N filas), **tail** (últimas N filas), **random** (N filas aleatorias) y **stratified** (N filas *por cada valor* de una columna, por ejemplo 3 empleados de cada Departamento — los nulos cuentan como un estrato más y un estrato con menos de N filas se toma completo). Si N supera el número de filas disponible se recorta al máximo. El modo aleatorio usa una **semilla fija (42)**: la receta `.catflip.json` y el script exportado reproducen exactamente las mismas filas, así que tus resultados son auditables y repetibles. El botón **Muestreo** (icono de flechas cruzadas) está en el panel izquierdo, sección *Limpieza & Filtrado*, junto a *Eliminar filas*.
+25. **Reordenar Columnas:** 
+    Reorganiza el esquema del dataset —mueve columnas, no filas— con dos modos en el mismo modal. **Bloque inicial + resto alfabético** fija al principio las columnas que marques (conservando su orden actual relativo) y ordena el resto de A→Z ignorando mayúsculas, con empates en su orden original; sin ninguna columna marcada, todo el dataset queda alfabético. **Mover una columna a un sitio exacto** lleva una columna al inicio, al final, antes de otra columna o después de otra (la referencia no puede ser la propia columna). El código generado lista el orden final explícito, así que la receta y el script exportado reproducen exactamente el mismo orden. Puedes deshacer el paso como cualquier otro. El botón **Reordenar** (icono de lista numerada) está en el panel izquierdo, sección *Estructura*, junto a *Def. encabezado*; desde el menú contextual de cualquier columna abre el modal directamente en modo *Mover* con esa columna preseleccionada.
 
 ---
 

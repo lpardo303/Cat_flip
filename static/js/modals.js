@@ -30,6 +30,21 @@ function toggleRegexMaskMode() {
   if (newWrap) newWrap.style.display = isExtract ? 'block' : 'none';
 }
 
+// ── Reorder columns (op #25) — visibilidad condicional del modal ──────
+// 'move' oculta el bloque de checkboxes y viceversa; el destino relativo
+// (before/after) muestra la columna de referencia.
+function toggleReorderMode() {
+  const isMove = document.getElementById('rc-mode').value === 'move';
+  document.getElementById('rc-block-wrap').style.display = isMove ? 'none' : 'block';
+  document.getElementById('rc-move-wrap').style.display = isMove ? 'block' : 'none';
+}
+
+function toggleReorderDest() {
+  const dest = document.getElementById('rc-dest').value;
+  const wrap = document.getElementById('rc-ref-wrap');
+  if (wrap) wrap.style.display = (dest === 'before' || dest === 'after') ? 'block' : 'none';
+}
+
 const modalDefs = {
   unpivot: {
     title: icon('move-vertical') + ' Unpivot (Anular dinamización)',
@@ -194,6 +209,31 @@ const modalDefs = {
       return null;
     }
   },
+  reorder_columns: {
+    title: icon('list-ordered') + ' Reordenar columnas',
+    body: () => '<label>Modo:</label><select id="rc-mode" aria-label="Modo de reordenación" onchange="toggleReorderMode()"><option value="block">Bloque inicial + resto alfabético</option><option value="move">Mover una columna a un sitio exacto</option></select>'
+      + '<div id="rc-block-wrap"><label>Columnas del bloque inicial (se fijan al principio, en su orden actual):</label>'+selectAllHtml('rc-check')+'<div class="col-check" id="rc-check">'+colOptions(true)+'</div><p style="font-size:0.75rem;color:var(--text2);margin-top:0.5rem">El resto se ordena alfabéticamente A→Z (los empates conservan su orden actual). Sin ninguna marcada: todo el dataset alfabético.</p></div>'
+      + '<div id="rc-move-wrap" style="display:none"><label>Columna a mover:</label><select id="rc-col" aria-label="Columna a mover">'+colOptions()+'</select><label>Destino:</label><select id="rc-dest" aria-label="Destino de la columna" onchange="toggleReorderDest()"><option value="start">Al inicio del dataset</option><option value="end">Al final del dataset</option><option value="before">Antes de otra columna…</option><option value="after">Después de otra columna…</option></select><div id="rc-ref-wrap" style="display:none"><label>Columna de referencia:</label><select id="rc-ref" aria-label="Columna de referencia">'+colOptions()+'</select></div></div>'
+      + '<p class="modal-warn">'+icon('triangle-alert')+'<span>Puedes deshacer con '+icon('undo-2')+' Deshacer paso</span></p>',
+    params: () => {
+      if (document.getElementById('rc-mode').value === 'move') {
+        const dest = document.getElementById('rc-dest').value;
+        const params = { mode: 'move', column: document.getElementById('rc-col').value };
+        if (dest === 'before' || dest === 'after') params[dest] = document.getElementById('rc-ref').value;
+        else params.position = dest;
+        return params;
+      }
+      return { mode: 'block', first: [...document.querySelectorAll('#rc-check input:checked')].map(i=>i.value) };
+    },
+    validate: (p) => (p.mode === 'move' && p.column && (p.before || p.after) === p.column)
+      ? 'Elige una columna de referencia distinta a la que mueves.' : null,
+    init: () => {
+      // Arranca con el bloque vacío: marcar columnas es una decisión explícita
+      document.querySelectorAll('#rc-check input[type=checkbox]').forEach(cb => { cb.checked = false; });
+      const selAll = document.querySelector('#rc-block-wrap input[type=checkbox][onchange*="toggleAllChecks"]');
+      if (selAll) selAll.checked = false;
+    }
+  },
   detectar_outliers: {
     title: icon('activity') + ' Detectar Outliers',
     body: () => {
@@ -308,7 +348,8 @@ function openModalForCol(op, col) {
       replace: 'rep-col',
       split_column: 'split-col',
       split_to_rows: 'str-col',
-      regex_mask: 'rm-col'
+      regex_mask: 'rm-col',
+      reorder_columns: 'rc-col'
     };
 
     const selId = selectMap[op];
@@ -324,6 +365,12 @@ function openModalForCol(op, col) {
       if (dtypeSel && currentDtypes[col]) {
         dtypeSel.value = dtypeMap[currentDtypes[col]] || 'str';
       }
+    }
+
+    // Caso especial para reorder_columns: abrir directamente en modo "mover"
+    if (op === 'reorder_columns') {
+      const modeSel = document.getElementById('rc-mode');
+      if (modeSel) { modeSel.value = 'move'; toggleReorderMode(); }
     }
 
     // 2. Mapeo de contenedores con checkboxes múltiples
