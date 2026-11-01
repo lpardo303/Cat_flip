@@ -33,11 +33,13 @@ from connectors import (
 from operations import (
     OPS,
     NUL_REGEX,
+    consolidate_batch,
     detect_pii_columns,
     detect_type_suggestions,
     normalize_read_nulls,
     validate_rules,
     validate_schema,
+    validate_template_columns,
 )
 
 app = Flask(__name__)
@@ -299,6 +301,205 @@ def get_sheets():
         return jsonify({"sheets": xl.sheet_names})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ── Multi-File Batch Merge (consolidación de N archivos) ─────────────────
+# Es una carga, no una op del pipeline: el resultado reemplaza el dataset
+# activo y resetea el historial igual que /upload. `consolidate_batch`
+# (operations.py) hace la unión outer + alineación; aquí solo se leen los
+# archivos con read_table (mismos detectores de separador/encoding/Excel).
+_BATCH_EXTS = (".csv", ".tsv", ".xlsx", ".xls")
+
+
+def _read_batch(files):
+    """Lee N archivos con read_table → (dfs, exprs, names, encodings).
+
+    Las extensiones se validan ANTES de llamar (endpoint → 400); aquí
+    cualquier fallo de lectura propaga y el endpoint lo traduce a 500.
+    """
+    dfs, exprs, names, encodings = [], [], [], []
+    for f in files:
+        df, expr, enc = read_table(f)
+        dfs.append(df)
+        exprs.append(expr)
+        names.append(f.filename)
+        encodings.append(enc)
+    return dfs, exprs, names, encodings
+
+
+def _batch_template_file():
+    """Archivo de plantilla del form, o None si no llegó (o llegó vacío)."""
+    f = request.files.get("template")
+    return f if (f is not None and f.filename) else None
+
+
+@app.route("/batch_preview", methods=["POST"])
+def batch_preview():
+    """Previsualiza encabezados y diferencias de N archivos, sin tocar estado."""
+    files = request.files.getlist("files")
+    if len(files) < 2:
+        return jsonify({"error": "Selecciona al menos 2 archivos para consolidar."}), 400
+
+    template_file = _batch_template_file()
+    if template_file is not None and not template_file.filename.lower().endswith(_BATCH_EXTS):
+        return jsonify({"error": f"Formato de plantilla no soportado: {template_file.filename}. Usa CSV, TSV, XLSX o XLS."}), 400
+    for f in files:
+        if not (f.filename or "").lower().endswith(_BATCH_EXTS):
+            return jsonify({"error": f"Formato no soportado: {f.filename}. Usa CSV, TSV, XLSX o XLS."}), 400
+
+    try:
+        dfs, _, names, encodings = _read_batch(files)
+        template = None
+        if template_file is not None:
+            tdf, _, _ = read_table(template_file)
+            tcols = list(tdf.columns)
+            validate_template_columns(tcols)  # mismo contrato que el merge
+            union_tmp = []
+            for d in dfs:
+                for c in d.columns:
+                    if c not in union_tmp:
+                        union_tmp.append(c)
+            template = {
+                "name": template_file.filename,
+                "columns": tcols,
+                # diferencias contra la unión: qué se descarta y qué se rellena
+                "dropped": [c for c in union_tmp if c not in set(tcols)],
+                "missing": [c for c in tcols if c not in union_tmp],
+            }
+
+        union = []
+        for d in dfs:
+            for c in d.columns:
+                if c not in union:
+                    union.append(c)
+        common = [c for c in union if all(c in d.columns for d in dfs)]
+
+        return jsonify({
+            "files": [
+                {
+                    "name": n,
+                    "rows": int(d.shape[0]),
+                    "columns": list(d.columns),
+                    "dtypes": {c: str(d[c].dtype) for c in d.columns},
+                }
+                for n, d in zip(names, dfs)
+            ],
+            "union": union,
+            "common": common,
+            "columns": [
+                {
+                    "column": c,
+                    "present": [n for n, d in zip(names, dfs) if c in d.columns],
+                    "missing": [n for n, d in zip(names, dfs) if c not in d.columns],
+                }
+                for c in union
+            ],
+            "total_rows": int(sum(d.shape[0] for d in dfs)),
+            "template": template,
+            # codificaciones no-utf8 detectadas (ej. cp1252) por archivo
+            "encodings": [n for n, e in zip(names, encodings) if e],
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/batch_merge", methods=["POST"])
+def batch_merge():
+    """Consolida N archivos en el dataset activo (reset de estado = /upload)."""
+    global current_df, history, code_log, op_history, redo_history, schema_rules, step_ms
+    files = request.files.getlist("files")
+    if len(files) < 2:
+        return jsonify({"error": "Selecciona al menos 2 archivos para consolidar."}), 400
+
+    mode = request.form.get("mode", "dynamic")
+    if mode not in ("dynamic", "template"):
+        return jsonify({"error": f"Modo desconocido: {mode!r} (usa 'dynamic' o 'template')."}), 400
+    rest = request.form.get("rest", "append")
+    if rest not in ("append", "alpha"):
+        return jsonify({"error": f"Orden del resto desconocido: {rest!r} (usa 'append' o 'alpha')."}), 400
+    try:
+        first = json.loads(request.form.get("first", "[]") or "[]")
+    except (TypeError, ValueError):
+        first = None
+    if not isinstance(first, list):
+        return jsonify({"error": "`first` debe ser una lista JSON de columnas."}), 400
+
+    template_file = _batch_template_file()
+    if template_file is not None and not template_file.filename.lower().endswith(_BATCH_EXTS):
+        return jsonify({"error": f"Formato de plantilla no soportado: {template_file.filename}. Usa CSV, TSV, XLSX o XLS."}), 400
+    if mode == "template" and template_file is None:
+        return jsonify({"error": "Modo plantilla: sube el archivo de esquema maestro."}), 400
+    if mode == "dynamic" and template_file is not None:
+        return jsonify({"error": "Subiste una plantilla pero el modo es Dinámico: cambia de modo o quita la plantilla."}), 400
+    for f in files:
+        if not (f.filename or "").lower().endswith(_BATCH_EXTS):
+            return jsonify({"error": f"Formato no soportado: {f.filename}. Usa CSV, TSV, XLSX o XLS."}), 400
+
+    template_cols = None
+    if template_file is not None:
+        try:
+            tdf, _, _ = read_table(template_file)
+            template_cols = list(tdf.columns)
+            validate_template_columns(template_cols)
+        except ValueError as e:
+            return jsonify({"error": f"Plantilla inválida ({template_file.filename}): {e}"}), 400
+        except Exception as e:
+            return jsonify({"error": f"No se pudo leer la plantilla ({template_file.filename}): {e}"}), 500
+
+    try:
+        dfs, exprs, names, encodings = _read_batch(files)
+    except Exception as e:
+        return jsonify({"error": f"No se pudieron leer los archivos: {e}"}), 500
+
+    try:
+        df, order = consolidate_batch(
+            dfs, first=first, rest=rest, template_columns=template_cols
+        )
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    # El código generado reproduce la consolidación completa en un script
+    # portátil: N lecturas + concat outer + alineación (paridad con exec).
+    reads = "\n".join(f"df_{i} = {expr}" for i, expr in enumerate(exprs, start=1))
+    concat = (
+        "df = pd.concat(["
+        + ", ".join(f"df_{i}" for i in range(1, len(exprs) + 1))
+        + "], axis=0, join='outer', ignore_index=True)"
+    )
+    align = f"df = df.reindex(columns={order!r})"
+
+    current_df = df
+    history = [current_df.copy()]
+    code_log = [
+        "import pandas as pd\n\n"
+        "# Consolidar archivos (Multi-File Batch Merge)\n"
+        f"{reads}\n{concat}  # unión outer: las columnas extra no se pierden\n{align}"
+    ]
+    op_history = []
+    redo_history = []  # dataset nuevo → la pila de rehacer no aplica
+    schema_rules = []  # las reglas del dataset anterior no aplican
+    step_ms = []  # benchmark vacío con el dataset nuevo
+
+    union_all = []
+    for d in dfs:
+        for c in d.columns:
+            if c not in union_all:
+                union_all.append(c)
+    return jsonify({
+        "success": True,
+        "data": df_to_json(current_df),
+        "code": code_log[-1],
+        "type_suggestions": detect_type_suggestions(current_df),
+        "pii_suggestions": detect_pii_columns(current_df),
+        "merged": {
+            "files": names,
+            "rows": int(df.shape[0]),
+            "columns": int(df.shape[1]),
+            # en modo plantilla lo que sobre del esquema maestro se descarta
+            "dropped": [c for c in union_all if c not in set(order)],
+        },
+        "encodings": [n for n, e in zip(names, encodings) if e],
+    })
 
 @app.route("/operation", methods=["POST"])
 def operation():

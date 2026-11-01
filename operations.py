@@ -1258,6 +1258,85 @@ def validate_schema(df, rules, max_violations=_SCHEMA_MAX_VIOLATIONS):
     }
 
 
+# ── Consolidación Multi-Archivo (Multi-File Batch Merge) ───────────────
+# Orden del resto en modo dinámico: `append` preserva el orden de aparición
+# (el esquema del primer archivo y las columnas nuevas al final);
+# `alpha` ordena A→Z ignorando mayúsculas, igual que reorder_columns.
+_BATCH_REST_ORDERS = ("append", "alpha")
+
+
+def validate_template_columns(columns):
+    """Contrato de la plantilla maestra: lista no vacía, nombres únicos, sin blancos."""
+    if (
+        not isinstance(columns, list)
+        or not columns
+        or any(not isinstance(c, str) or not c.strip() for c in columns)
+    ):
+        raise ValueError("La plantilla debe aportar una lista de columnas no vacía.")
+    if len(set(columns)) != len(columns):
+        raise ValueError("La plantilla repite columnas; usa nombres únicos.")
+
+
+def consolidate_batch(dfs, first=None, rest="append", template_columns=None):
+    """Apila N DataFrames en uno solo alineando sus esquemas (unión outer).
+
+    Es una carga, no una op del pipeline: el resultado es el dataset
+    activo y el endpoint que llama resetea el historial como `/upload`.
+    * `pd.concat(join="outer")` conserva TODAS las columnas — las que
+      falten en un archivo quedan nulo en sus filas (nada se pierde).
+    * La alineación final es un único `df.reindex(columns=orden)` que a
+      la vez reordena, rellena con nulo las columnas de plantilla
+      ausentes en todos los archivos y descarta las que no estén.
+    * Modo dinámico: `first` fija un bloque estructural al inicio (en su
+      orden dado, como reorder_columns); el resto va por `rest`:
+      "append" (orden de aparición, default) o "alpha" (casefold).
+    * Modo plantilla: `template_columns` manda exacto (orden + conjunto).
+
+    Devuelve ``(df, orden_final)``. ValueError: menos de 2 frames, `rest`
+    desconocido, columna de `first` inexistente o plantilla vacía,
+    con blancos o con duplicados.
+    """
+    if not isinstance(dfs, list) or len(dfs) < 2:
+        raise ValueError("Se consolidan al menos 2 DataFrames.")
+
+    if template_columns is not None:
+        if first:
+            raise ValueError(
+                "En modo plantilla no uses el bloque fijo (`first`): el "
+                "esquema maestro ya define el orden completo."
+            )
+        validate_template_columns(template_columns)
+        order = list(template_columns)
+    else:
+        if rest not in _BATCH_REST_ORDERS:
+            raise ValueError(
+                f"Orden del resto desconocido: {rest!r} (usa 'append' o 'alpha')."
+            )
+        # Unión en orden de aparición; los nombres duplicados dentro de un
+        # archivo ya los ha manglado pandas al leerlo (a, a.1).
+        union = []
+        for df in dfs:
+            for c in df.columns:
+                if c not in union:
+                    union.append(c)
+        pinned = list(first) if first else []
+        if len(set(pinned)) != len(pinned):
+            raise ValueError("No repitas columnas en el bloque fijo.")
+        missing = [c for c in pinned if c not in union]
+        if missing:
+            raise ValueError(
+                f"Columna(s) del bloque fijo inexistente(s): {', '.join(missing)}"
+            )
+        rest_cols = [c for c in union if c not in pinned]
+        if rest == "alpha":
+            rest_cols = sorted(rest_cols, key=str.casefold)
+        order = pinned + rest_cols
+
+    df = pd.concat(dfs, axis=0, join="outer", ignore_index=True)
+    df = df.reindex(columns=order)
+    return df, order
+
+
 # ── Registro (consumido por app.operation()) ────────────────────────────
 
 OPS = {

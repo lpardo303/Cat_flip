@@ -1,12 +1,12 @@
 // Gate de accesibilidad (F3.4 + dark mode automático + Open Core + nuevo
 // front Tech Labs): abre Cat_flip con Playwright y ejecuta axe (WCAG 2.0
-// A/AA) en 15 corridas — la página base en modo Automático con el sistema
+// A/AA) en 17 corridas — la página base en modo Automático con el sistema
 // en oscuro (prefers-color-scheme, perfil sin localStorage); tema claro y
-// oscuro explícitos sobre 6 superficies (página base, modal «Receta desde
-// CSV», modal de conectores demo, modal de validación de esquema, la
-// pestaña Diagnóstico con el heatmap y el panel de selector de tema
-// abierto — con el catálogo de énfasis incluido); y las 2 paletas premium
-// (Aurora, Solar) con el servidor licenciado.
+// oscuro explícitos sobre 7 superficies (página base, modal «Receta desde
+// CSV», modal Multi-File Batch Merge, modal de conectores demo, modal de
+// validación de esquema, la pestaña Diagnóstico con el heatmap y el panel
+// de selector de tema abierto — con el catálogo de énfasis incluido); y
+// las 2 paletas premium (Aurora, Solar) con el servidor licenciado.
 // Además verifica que el cambio en vivo del sistema re-aplica el tema
 // (listener del matchMedia en modo 'auto') y escribe violations.json.
 // Sale con código 1 si hay fallos o violaciones, así la CI falla sin
@@ -152,6 +152,20 @@ try {
     await page.waitForSelector('#csvrecipe-overlay.open');
     await runAxe(page, `modal receta-desde-CSV (${theme})`);
     await page.evaluate(() => closeCsvRecipe());
+
+    // Modal Multi-File Batch Merge (nueva superficie): consolidación de 2
+    // archivos con esquemas distintos → chips, matriz de encabezados y
+    // bloque fijo pintados, para que axe mide el contenido real y no un
+    // modal vacío.
+    await page.evaluate(async () => {
+      const a = new File(['Fecha,Unidades\n2026-01-01,5\n'], 'enero.csv', { type: 'text/csv' });
+      const b = new File(['Fecha,Unidades,Region\n2026-02-01,7,Norte\n'], 'febrero.csv', { type: 'text/csv' });
+      openBatchMerge([a, b]);
+    });
+    await page.waitForSelector('#batchmerge-overlay.open');
+    await page.waitForSelector('#bm-preview .bm-matrix', { timeout: 10000 });
+    await runAxe(page, `modal fusionar-archivos (${theme})`);
+    await page.evaluate(() => closeBatchMerge());
 
     // Modal de conectores demo (conectores mock: BigQuery/Snowflake/Webhook)
     await page.evaluate(() => openConnector('webhook'));
