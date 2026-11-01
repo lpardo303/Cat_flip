@@ -560,7 +560,7 @@ def test_calculated_column_sandbox_blocks_and_reports(client, name, expression, 
 
 # ── Registro de operaciones (refactor P2) ───────────────────────────
 
-def test_registry_expone_las_24_operaciones():
+def test_registry_expone_las_25_operaciones():
     """El registro define exactamente las ops del contrato UI/API.
 
     Protege contra borrados accidentales al mover handlers en operations.py.
@@ -571,7 +571,7 @@ def test_registry_expone_las_24_operaciones():
         "unpivot", "pivot", "split_column", "split_to_rows", "set_header",
         "drop_nulls", "drop_duplicates", "drop_rows", "trim", "clean_newlines",
         "change_case", "replace", "rename_column", "drop_column", "change_type",
-        "regex_mask", "concatenar_columnas",
+        "regex_mask", "concatenar_columnas", "reorder_columns",
         "filter", "sort", "group_by", "merge", "calculated_column", "detectar_outliers",
         "sampling",
     }

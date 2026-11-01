@@ -9,6 +9,19 @@ siguiente corte.
 
 ## [Sin publicar]
 
+### Añadido
+
+- **Operación Reordenar Columnas (`reorder_columns`, op #25)**: nuevo modal
+  con dos modos — *Bloque inicial + resto alfabético* (fija las columnas
+  marcadas al principio conservando su orden actual y ordena el resto A→Z
+  ignorando mayúsculas, empates estables; sin marcadas = todo el dataset
+  alfabético) y *Mover una columna* (al inicio, al final, antes o después
+  de otra columna, con exactamente un destino). Botón «Reordenar» en la
+  sección *Estructura* del panel e ítem en el menú contextual de columna
+  (abre el modo *Mover* con esa columna preseleccionada). El código
+  generado lista el orden final explícito, así que receta y script
+  exportado reproducen el mismo orden. Registro `OPS` a 25 operaciones.
+
 ## [1.5.1] — 2026-10-31
 
 ### Añadido

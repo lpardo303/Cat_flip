@@ -9,7 +9,7 @@
 
 ## ✨ Características Principales
 
-* 🚀 **24 Operaciones ETL:** Herramientas de limpieza, filtrado, transformación estructural (Pivot/Unpivot), manejo de texto, enmascaramiento de PII (Regex Mask), concatenación de columnas, detección de outliers (Z-Score / IQR) y muestreo reproducible (head/tail/random/stratified con semilla fija).
+* 🚀 **25 Operaciones ETL:** Herramientas de limpieza, filtrado, transformación estructural (Pivot/Unpivot), reordenación de columnas (bloque fijo + resto alfabético, o mover a una posición exacta), manejo de texto, enmascaramiento de PII (Regex Mask), concatenación de columnas, detección de outliers (Z-Score / IQR) y muestreo reproducible (head/tail/random/stratified con semilla fija).
 * 🐍 **Generador de Código en Vivo:** Aprende y audita con el visor que muestra el código de Pandas autogenerado en tiempo real.
 * 💾 **Recetas Reproducibles:** Guarda tu pipeline como `.catrecipe` y revívelo con un clic sobre cualquier dataset — el ExecutePipelineModal muestra consola y barra de progreso paso a paso, y la receta se aplica sola al llegar al 100% (reproducción atómica: un paso fallido o un Cancelar a mitad no toca tus datos), con deshacer/rehacer paso a paso (`Ctrl+Z` / `Ctrl+Shift+Z`). Un `.catrecipe` arrastrado al grid abre el mismo modal.
 * 📥 **Receta desde CSV:** Elige un CSV sucio y Cat_flip **propone** una receta de limpieza (quitar espacios, filas con nulos, cambio de tipo donde todas las celdas casan, duplicados al final — máx. 4 pasos); el modal de preview lista pasos y avisos, y solo «Aplicar» la ejecuta vía el ExecutePipelineModal con dry-run previo.

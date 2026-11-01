@@ -534,6 +534,7 @@ _OP_LABELS = {
     "change_type": "Cambio de tipo",
     "regex_mask": "Enmascarar / extraer PII",
     "concatenar_columnas": "Concatenar columnas",
+    "reorder_columns": "Reordenar columnas",
     "filter": "Filtrar filas",
     "sort": "Ordenar",
     "group_by": "Agrupar",

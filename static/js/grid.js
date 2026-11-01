@@ -131,6 +131,9 @@ function buildColMenuHtml(col, dtype) {
     <div class="col-menu-item" onclick="handleColMenuAction('rename_column')">
       ${icon('pencil')}<span>Renombrar columna</span>
     </div>
+    <div class="col-menu-item" onclick="handleColMenuAction('reorder_columns')">
+      ${icon('list-ordered')}<span>Reordenar columnas</span>
+    </div>
     <div class="col-menu-item" onclick="handleColMenuAction('hide_column')">
       ${icon('x')}<span>Ocultar columna</span>
     </div>

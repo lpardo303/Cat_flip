@@ -831,6 +831,7 @@ function icon(name) {
     text: '<path d="M17 6.1H3"/><path d="M21 12.1H3"/><path d="M15.1 18H3"/>',
     activity: '<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>',
     shuffle: '<polygon points="16 3 21 3 21 8"/><line x1="4" x2="21" y1="20" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" x2="21" y1="15" y2="21"/><line x1="4" x2="9" y1="4" y2="9"/>',
+    'list-ordered': '<path d="M11 6h9"/><path d="M11 12h9"/><path d="M11 18h9"/><path d="M4 4.5 3 5.5V9"/><path d="M2.5 9h3"/><path d="M3.5 13.75a1.5 1.5 0 1 1 2.5 1.25L3.5 18h3"/>',
   };
   return '<svg class="icon-svg" viewBox="0 0 24 24">' + (paths[name] || '') + '</svg>';
 }
