@@ -108,8 +108,9 @@ const modalDefs = {
   },
   change_type: {
     title: icon('tag') + ' Cambiar tipo de dato',
-    body: () => '<label>Columna:</label><select id="type-col" aria-label="Columna para cambiar tipo de dato">'+colOptions()+'</select><label>Nuevo tipo:</label><select id="type-dtype" aria-label="Nuevo tipo de dato"><option value="str">Texto (str)</option><option value="int">Número entero (int)</option><option value="float">Número decimal (float)</option><option value="datetime">Fecha/hora (datetime)</option></select>',
-    params: () => ({ column: document.getElementById('type-col').value, dtype: document.getElementById('type-dtype').value })
+    body: () => '<label>Columnas:</label>'+selectAllHtml('tc-check')+'<div class="col-check" id="tc-check">'+colOptions(true)+'</div><label>Nuevo tipo:</label><select id="type-dtype" aria-label="Nuevo tipo de dato"><option value="str">Texto (str / string)</option><option value="int">Número entero (Int64 — admite nulos)</option><option value="float">Número decimal (float)</option><option value="datetime">Fecha y hora (datetime64)</option><option value="bool">Booleano (bool / boolean)</option><option value="category">Categoría (category — optimiza memoria)</option></select><p class="modal-warn">'+icon('triangle-alert')+'<span>Se aplica el mismo tipo a todas las columnas marcadas, en un solo paso; en números, fechas y booleanos lo no convertible queda nulo. Puedes deshacer con '+icon('undo-2')+' Deshacer paso</span></p>',
+    validate: (p) => (!p.columns || p.columns.length === 0) ? 'Marca al menos una columna.' : null,
+    params: () => ({ columns: [...document.querySelectorAll('#tc-check input:checked')].map(i => i.value), dtype: document.getElementById('type-dtype').value })
   },
   sort: {
     title: icon('arrow-down-wide-narrow') + ' Ordenar',
@@ -341,7 +342,6 @@ function openModalForCol(op, col) {
     const selectMap = {
       sort: 'sort-col',
       filter: 'filter-col',
-      change_type: 'type-col',
       rename_column: 'rename-old',
       drop_column: 'drop-col',
       change_case: 'case-col',
@@ -359,8 +359,9 @@ function openModalForCol(op, col) {
     }
 
     // Caso especial para change_type: pre-seleccionar el tipo actual
+    // (BOOL → bool: desde este PR existe el target booleano en el catálogo)
     if (op === 'change_type') {
-      const dtypeMap = { INT: 'int', FLOAT: 'float', STR: 'str', DATE: 'datetime', BOOL: 'str' };
+      const dtypeMap = { INT: 'int', FLOAT: 'float', STR: 'str', DATE: 'datetime', BOOL: 'bool' };
       const dtypeSel = document.getElementById('type-dtype');
       if (dtypeSel && currentDtypes[col]) {
         dtypeSel.value = dtypeMap[currentDtypes[col]] || 'str';
@@ -380,7 +381,8 @@ function openModalForCol(op, col) {
       drop_nulls: 'nulls-check',
       drop_duplicates: 'dup-check',
       concatenar_columnas: 'cc-check',
-      detectar_outliers: 'do-check'
+      detectar_outliers: 'do-check',
+      change_type: 'tc-check'
     };
 
     const containerId = checkMap[op];
