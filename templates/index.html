@@ -510,14 +510,68 @@
     <div class="ds-grid" id="ds-grid"></div>
     <div class="ds-dropzone" id="ds-dropzone" role="button" tabindex="0" onclick="document.getElementById('file-input').click()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('file-input').click()}">
       <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
-      <span><strong>Arrastra</strong> un archivo aquí o clic para examinar</span>        <span class="ds-dropzone-hint">.CSV · .TSV · .XLSX · .XLS</span>
+      <span><strong>Arrastra</strong> un archivo aquí —o varios a la vez— o clic para examinar</span>        <span class="ds-dropzone-hint">.CSV · .TSV · .XLSX · .XLS · arrastra varios para fusionarlos</span>
     </div>
+    <button type="button" class="btn btn-secondary bm-open-btn" onclick="openBatchMerge([])">
+      <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="m8 6 4-4 4 4"/><path d="M20 10v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-9"/><path d="M2 10h20"/></svg>
+      <span>Fusionar varios archivos…</span>
+    </button>
+    <input type="file" id="batch-file-input" accept=".csv,.tsv,.xlsx,.xls" multiple hidden>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeDatasetPicker()">Cancelar</button>
       <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">
         <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
         <span>Examinar archivos</span>
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL MULTI-FILE BATCH MERGE (consolidación de N archivos) ═══════ -->
+<div class="modal-overlay" id="batchmerge-overlay" onclick="if(event.target===this)closeBatchMerge()">
+  <div class="modal" style="width: 640px; max-height: 88vh;" role="dialog" aria-modal="true" aria-labelledby="bm-title">
+    <h2 id="bm-title">
+      <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 2v6"/><path d="m8 6 4-4 4 4"/><path d="M20 10v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-9"/><path d="M2 10h20"/></svg>
+      <span>Fusionar varios archivos</span>
+    </h2>
+    <p class="ds-picker-sub">Consolida varios CSV/TSV/XLSX en un solo dataset. Las columnas que falten en un archivo quedan vacías en sus filas; ninguna se pierde.</p>
+
+    <div class="bm-files" id="bm-files" aria-label="Archivos seleccionados"></div>
+    <button type="button" class="btn btn-secondary bm-add" onclick="document.getElementById('batch-file-input').click()">+ Añadir archivos</button>
+
+    <div id="bm-preview" class="bm-preview" aria-live="polite"></div>
+
+    <label for="bm-mode">Modo de consolidación:</label>
+    <select id="bm-mode" aria-label="Modo de consolidación">
+      <option value="dynamic">Dinámico — unión de todos los encabezados</option>
+      <option value="template">Plantilla — esquema maestro de referencia</option>
+    </select>
+
+    <div id="bm-dynamic-fields">
+      <label>Columnas fijas al inicio (bloque estructural):</label>
+      <div class="col-check bm-block" id="bm-check"></div>
+      <label for="bm-rest">Resto de columnas:</label>
+      <select id="bm-rest" aria-label="Orden del resto de columnas">
+        <option value="append">Aparición — el orden de los archivos, nuevas al final</option>
+        <option value="alpha">Alfabético — A→Z ignorando mayúsculas</option>
+      </select>
+      <p class="bm-hint">Sin ninguna columna fija, el orden sale del primer archivo y lo nuevo se añade al final.</p>
+    </div>
+
+    <div id="bm-template-fields" style="display:none">
+      <label>Archivo de esquema maestro (plantilla):</label>
+      <div class="bm-template-row">
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('bm-template-file').click()">Subir plantilla…</button>
+        <input type="file" id="bm-template-file" accept=".csv,.tsv,.xlsx,.xls" hidden>
+        <span id="bm-template-info" class="bm-template-info">Sin plantilla</span>
+      </div>
+      <div id="bm-template-summary" class="bm-template-summary"></div>
+      <p class="bm-hint">La plantilla define el orden y el conjunto exacto de columnas: lo que sobre se descarta y lo que falte queda vacío.</p>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeBatchMerge()">Cancelar</button>
+      <button class="btn btn-primary" id="bm-confirm" onclick="confirmBatchMerge()" disabled>Consolidar</button>
     </div>
   </div>
 </div>

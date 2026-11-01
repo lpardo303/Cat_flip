@@ -5,7 +5,9 @@ uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.cl
 uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
 uploadArea.addEventListener('drop', e => {
   e.preventDefault(); uploadArea.classList.remove('drag-over');
-  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  // Varios archivos a la vez → consolidación batch (Multi-File Batch Merge)
+  if (e.dataTransfer.files.length > 1) openBatchMerge(e.dataTransfer.files);
+  else if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
 });
 document.getElementById('file-input').addEventListener('change', e => {
   if (e.target.files[0]) handleFile(e.target.files[0]);
@@ -42,17 +44,13 @@ async function loadSheet() {
   uploadFile(currentSheetFile, document.getElementById('sheet-select').value);
 }
 
-async function uploadFile(file, sheet) {
-  showLoading();
-  const fd = new FormData(); fd.append('file', file); fd.append('sheet', sheet);
-  try {
-    const res = await fetch('/upload', {method:'POST', body:fd});
-    const data = await res.json();
-    hideLoading();
-    if (data.error) { toast(data.error, 'error'); return; }
-
+// ── Éxito compartido de una carga de dataset ───────────────────────────
+// Lo usan /upload (archivo único) y /batch_merge (consolidación
+// multi-archivo): mismos refrescos de UI, suggestions y reset de pipeline.
+// Los toasts son responsabilidad de cada caller.
+function handleUploadSuccess(data, name) {
     // Dataset nuevo → las reglas de validación del anterior no aplican
-    // (el backend ya las limpió en /upload).
+    // (el backend ya las limpió).
     currentViolations = new Map();
     const svBadge0 = document.getElementById('valid-badge');
     if (svBadge0) { svBadge0.hidden = true; svBadge0.textContent = ''; }
@@ -76,7 +74,7 @@ async function uploadFile(file, sheet) {
     // Top ribbon breadcrumb & Active Buffer badge (F2.1)
     const breadcrumb = document.getElementById('ribbon-breadcrumb');
     if (breadcrumb) {
-      document.getElementById('ribbon-filename').textContent = file.name;
+      document.getElementById('ribbon-filename').textContent = name;
       breadcrumb.classList.add('visible');
     }
     const badgeActive = document.getElementById('badge-active');
@@ -84,7 +82,7 @@ async function uploadFile(file, sheet) {
 
     const badge = document.getElementById('filename-badge');
     if (badge) {
-      document.getElementById('filename-text').textContent = file.name;
+      document.getElementById('filename-text').textContent = name;
       badge.style.display = 'none';
     }
     document.getElementById('header-metrics').style.display = 'flex';
@@ -93,12 +91,49 @@ async function uploadFile(file, sheet) {
     loadStats(); // refrescar diagnóstico en segundo plano
     loadCorrelations(); // heatmap de correlaciones al día
     loadBenchmark(); // barra de benchmark al día
+}
+
+async function uploadFile(file, sheet) {
+  showLoading();
+  const fd = new FormData(); fd.append('file', file); fd.append('sheet', sheet);
+  try {
+    const res = await fetch('/upload', {method:'POST', body:fd});
+    const data = await res.json();
+    hideLoading();
+    if (data.error) { toast(data.error, 'error'); return; }
+    handleUploadSuccess(data, file.name);
     toast('Archivo cargado: ' + data.data.shape[0] + ' filas × ' + data.data.shape[1] + ' columnas');
     // Codificación no-utf8 detectada (latin-1/cp1252): solo entonces hay campo
     if (data.detected_encoding) {
       toast('Codificación detectada: ' + data.detected_encoding, 'info');
     }
   } catch(e) { hideLoading(); toast('Error al cargar el archivo', 'error'); }
+}
+
+// ── MULTI-FILE BATCH MERGE — consolidación de N archivos ────────────────
+// El FormData ya viene montado por openBatchMerge/confirmBatchMerge con
+// los N archivos, el modo (dynamic/template), el orden del resto, el
+// bloque fijo y la plantilla opcional. Devuelve true si consolidó.
+async function uploadBatchMerge(fd, displayName) {
+  showLoading();
+  try {
+    const res = await fetch('/batch_merge', {method:'POST', body:fd});
+    const data = await res.json();
+    hideLoading();
+    if (data.error) { toast(data.error, 'error'); return false; }
+    handleUploadSuccess(data, displayName);
+    if (data.merged) {
+      toast('Consolidados ' + data.merged.files.length + ' archivos → '
+        + data.merged.rows + ' filas × ' + data.merged.columns + ' columnas');
+      if (data.merged.dropped && data.merged.dropped.length) {
+        toast('Columnas fuera de la plantilla descartadas: ' + data.merged.dropped.join(', '), 'info');
+      }
+    }
+    if (data.encodings && data.encodings.length) {
+      toast('Codificación detectada: ' + data.encodings.join(', '), 'info');
+    }
+    return true;
+  } catch(e) { hideLoading(); toast('Error al consolidar los archivos', 'error'); return false; }
 }
 
 // ── AUTO-MAPEO DE TIPOS AL CARGAR (heurística de esquema completo) ─────

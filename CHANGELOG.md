@@ -11,6 +11,20 @@ siguiente corte.
 
 ### Añadido
 
+- **Multi-File Batch Merge — consolidación de N archivos**: el selector de
+  *Fuente de datos* acepta arrastrar **varios** archivos a la vez y añade
+  el botón «Fusionar varios archivos…», que abre un modal con la **matriz
+  de encabezados por archivo** (coincidencias, faltantes y totales) antes
+  de consolidar. Modo *Dinámico*: unión outer de todos los encabezados —
+  lo que falte en un archivo queda vacío y **nada se pierde** — con bloque
+  estructural fijo opcional y resto por aparición (default) o alfabético;
+  modo *Plantilla*: esquema maestro exacto (orden + conjunto), descartando
+  lo que sobre y rellenando vacío lo que falte, con el resumen de
+  diferencias en el propio modal. Nuevos endpoints `/batch_preview` (solo
+  lectura, la matriz) y `/batch_merge` (reset de estado idéntico a
+  `/upload`); el código generado (N lecturas + `concat` outer + `reindex`)
+  reproduce la consolidación completa en el script exportado. Modal
+  añadido a las superficies del gate de axe (17 corridas, 0 violaciones).
 - **`change_type` masivo con catálogo extendido (op 15)**: el modal de
   *Tipo dato* acepta selección múltiple de columnas (checkboxes con
   *Seleccionar todas*) y amplía los tipos de destino a las grafías

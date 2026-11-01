@@ -1429,6 +1429,50 @@
     .ds-grid { grid-template-columns: 1fr; }
   }
 
+  /* ── MULTI-FILE BATCH MERGE (consolidación de N archivos) ── */
+  .bm-open-btn { width: 100%; margin-top: 0.6rem; justify-content: center; }
+  .bm-files { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.5rem; }
+  .bm-chip {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    padding: 0.25rem 0.5rem; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 999px;
+    font-size: 0.72rem; color: var(--text);
+  }
+  .bm-chip-meta { color: var(--text2); font-size: 0.66rem; }
+  .bm-chip-x {
+    border: none; background: none; cursor: pointer;
+    color: var(--text2); font-size: 0.85rem; line-height: 1; padding: 0 0.15rem;
+  }
+  .bm-chip-x:hover { color: var(--red); }
+  .bm-add { margin-bottom: 0.6rem; }
+  .bm-preview { margin-bottom: 0.6rem; }
+  .bm-stats { font-size: 0.75rem; color: var(--text2); margin: 0.2rem 0 0.4rem; }
+  .bm-stats strong { color: var(--text); }
+  .bm-matrix-wrap {
+    max-height: 190px; overflow: auto;
+    border: 1px solid var(--border); border-radius: var(--radius2);
+  }
+  .bm-matrix { width: 100%; border-collapse: collapse; font-size: 0.7rem; }
+  .bm-matrix th, .bm-matrix td {
+    padding: 0.22rem 0.5rem; border-bottom: 1px solid var(--border); text-align: left;
+  }
+  .bm-matrix thead th {
+    position: sticky; top: 0; background: var(--surface2); z-index: 1;
+  }
+  .bm-matrix tbody th {
+    font-weight: 600; color: var(--text); max-width: 160px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .bm-yes { color: var(--green); font-weight: 700; }
+  .bm-no { color: var(--text2); }
+  .bm-enc { font-size: 0.7rem; color: var(--yellow); margin-top: 0.35rem; }
+  .bm-warn { font-size: 0.72rem; color: var(--orange); margin: 0.25rem 0 0; }
+  .bm-ok { font-size: 0.72rem; color: var(--green); margin: 0.25rem 0 0; }
+  .bm-hint { font-size: 0.72rem; color: var(--text2); margin-top: 0.35rem; }
+  .bm-template-row { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.4rem; }
+  .bm-template-info { font-size: 0.75rem; color: var(--text2); }
+  .bm-block { max-height: 120px; overflow: auto; }
+
   /* ── BARRA DE SUGERENCIA DE TIPOS (auto-mapeo de esquema al cargar) ── */
   .type-suggest-bar {
     display: flex;

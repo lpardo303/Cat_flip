@@ -885,6 +885,7 @@ document.addEventListener('keydown', e => {
     closeColVisModal();
     closeColMenu();
     closeDatasetPicker();
+    closeBatchMerge();
     closeExecPipe();
     closeStepDiff();
     closeCsvRecipe();

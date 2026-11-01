@@ -691,7 +691,7 @@ function loadDemoDataset(i) {
   uploadFile(new File([d.csv], d.file, { type: 'text/csv' }), 0);
 }
 
-// Dropzone del picker: mismo flujo handleFile que el upload-area original
+// Dropzone del picker: 1 archivo → flujo normal; VARIOS → consolidación batch
 const dsDropzone = document.getElementById('ds-dropzone');
 if (dsDropzone) {
   dsDropzone.addEventListener('dragover', e => { e.preventDefault(); dsDropzone.classList.add('drag-over'); });
@@ -699,9 +699,193 @@ if (dsDropzone) {
   dsDropzone.addEventListener('drop', e => {
     e.preventDefault();
     dsDropzone.classList.remove('drag-over');
-    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files.length > 1) openBatchMerge(e.dataTransfer.files);
+    else if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
   });
 }
+
+// ── MULTI-FILE BATCH MERGE (consolidación de N archivos) ────────────────
+// Es una CARGA, no una op: el resultado reemplaza el dataset activo vía
+// POST /batch_merge (mismo reset de estado que /upload, refresco de UI
+// compartido en handleUploadSuccess). /batch_preview no toca estado y
+// devuelve las diferencias de encabezados que pinta la matriz.
+let batchFiles = [];           // File[] seleccionados (en orden)
+let batchPreview = null;       // última respuesta de /batch_preview
+let batchTemplateFile = null;  // plantilla (File) o null
+
+function openBatchMerge(files) {
+  batchFiles = Array.from(files || []);
+  batchTemplateFile = null;
+  if (batchFiles.length < 2) {
+    // Botón "Fusionar varios…": el picker se queda abierto para elegir
+    if (files && files.length) toast('Selecciona al menos 2 archivos para consolidar', 'error');
+    if (!files || !files.length) document.getElementById('batch-file-input').click();
+    return;
+  }
+  closeDatasetPicker();
+  const tmpl = document.getElementById('bm-template-file');
+  if (tmpl) tmpl.value = '';
+  document.getElementById('bm-template-info').textContent = 'Sin plantilla';
+  document.getElementById('bm-template-summary').innerHTML = '';
+  document.getElementById('bm-mode').value = 'dynamic';
+  document.getElementById('bm-rest').value = 'append';
+  toggleBatchMode();
+  document.getElementById('bm-confirm').disabled = true;
+  document.getElementById('batchmerge-overlay').classList.add('open');
+  refreshBatchPreview();
+}
+
+function closeBatchMerge() {
+  const overlay = document.getElementById('batchmerge-overlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function addBatchFiles(fileList) {
+  for (const f of fileList || []) {
+    const low = f.name.toLowerCase();
+    if (!low.endsWith('.csv') && !low.endsWith('.tsv') && !low.endsWith('.xlsx') && !low.endsWith('.xls')) {
+      toast('Formato no soportado: ' + f.name + '. Usa CSV, TSV, XLSX o XLS.', 'error');
+      continue;
+    }
+    if (!batchFiles.some(x => x.name === f.name && x.size === f.size)) batchFiles.push(f);
+  }
+  if (batchFiles.length < 2) { toast('Añade al menos 2 archivos para consolidar', 'error'); return; }
+  if (!document.getElementById('batchmerge-overlay').classList.contains('open')) {
+    closeDatasetPicker();
+    document.getElementById('batchmerge-overlay').classList.add('open');
+  }
+  refreshBatchPreview();
+}
+
+function removeBatchFile(idx) {
+  batchFiles.splice(idx, 1);
+  if (batchFiles.length < 2) {
+    closeBatchMerge();
+    toast('Consolidación cancelada: quedaban menos de 2 archivos', 'info');
+    return;
+  }
+  refreshBatchPreview();
+}
+
+function batchFormData(withTemplate) {
+  const fd = new FormData();
+  batchFiles.forEach(f => fd.append('files', f));
+  if (withTemplate && batchTemplateFile) fd.append('template', batchTemplateFile);
+  return fd;
+}
+
+async function refreshBatchPreview() {
+  showLoading();
+  try {
+    const res = await fetch('/batch_preview', { method: 'POST', body: batchFormData(true) });
+    const data = await res.json();
+    hideLoading();
+    if (data.error) { toast(data.error, 'error'); return; }
+    batchPreview = data;
+    renderBatchChips();
+    renderBatchMatrix();
+    renderBatchBlockChecks();
+    renderBatchTemplateSummary();
+    document.getElementById('bm-confirm').disabled = false;
+  } catch(e) { hideLoading(); toast('Error al previsualizar la consolidación', 'error'); }
+}
+
+function renderBatchChips() {
+  const wrap = document.getElementById('bm-files');
+  wrap.innerHTML = batchFiles.map((f, i) => {
+    const info = batchPreview.files[i];
+    const meta = info ? info.rows + ' filas × ' + info.columns.length + ' cols' : '';
+    return '<span class="bm-chip">' + escapeHtml(f.name)
+      + (meta ? ' <span class="bm-chip-meta">' + meta + '</span>' : '')
+      + '<button type="button" class="bm-chip-x" onclick="removeBatchFile(' + i + ')" aria-label="Quitar ' + escapeHtml(f.name) + '" title="Quitar">×</button></span>';
+  }).join('');
+}
+
+function renderBatchMatrix() {
+  const el = document.getElementById('bm-preview');
+  if (!batchPreview) { el.innerHTML = ''; return; }
+  const p = batchPreview;
+  const shortName = n => n.length > 14 ? n.slice(0, 12) + '…' : n;
+  let html = '<p class="bm-stats"><strong>' + p.files.length + ' archivos</strong> · '
+    + p.total_rows + ' filas · ' + p.common.length + ' columna' + (p.common.length === 1 ? '' : 's')
+    + ' común' + (p.common.length === 1 ? '' : 'es') + ' de ' + p.union.length + ' en total</p>';
+  html += '<div class="bm-matrix-wrap"><table class="bm-matrix"><caption class="lin-sr-only">Matriz de encabezados por archivo</caption><thead><tr><th scope="col">Columna</th>'
+    + p.files.map(f => '<th scope="col" title="' + escapeHtml(f.name) + '">' + escapeHtml(shortName(f.name)) + '</th>').join('')
+    + '</tr></thead><tbody>'
+    + p.columns.map(c => '<tr><th scope="row">' + escapeHtml(c.column) + '</th>'
+        + p.files.map(f => '<td>' + (c.present.includes(f.name) ? '<span class="bm-yes" aria-label="presente">✓</span>' : '<span class="bm-no" aria-label="falta">—</span>') + '</td>').join('')
+        + '</tr>').join('')
+    + '</tbody></table></div>';
+  if (p.encodings.length) {
+    html += '<p class="bm-enc">Codificación no-utf8 detectada en: ' + p.encodings.map(escapeHtml).join(', ') + '</p>';
+  }
+  el.innerHTML = html;
+}
+
+function renderBatchBlockChecks() {
+  const box = document.getElementById('bm-check');
+  if (!batchPreview) { box.innerHTML = ''; return; }
+  box.innerHTML = batchPreview.union.map(c =>
+    '<label><input type="checkbox" value="' + escapeHtml(c) + '"> ' + escapeHtml(c) + '</label>'
+  ).join('');
+}
+
+function renderBatchTemplateSummary() {
+  const el = document.getElementById('bm-template-summary');
+  const t = batchPreview && batchPreview.template;
+  if (!t) { el.innerHTML = ''; return; }
+  let html = '<p class="bm-stats"><strong>' + escapeHtml(t.name) + '</strong> · ' + t.columns.length + ' columnas en el maestro</p>';
+  if (t.dropped.length) {
+    html += '<p class="bm-warn">Se descartan (fuera de la plantilla): ' + t.dropped.map(escapeHtml).join(', ') + '</p>';
+  }
+  if (t.missing.length) {
+    html += '<p class="bm-warn">Se rellenan vacías (no están en los archivos): ' + t.missing.map(escapeHtml).join(', ') + '</p>';
+  }
+  if (!t.dropped.length && !t.missing.length) {
+    html += '<p class="bm-ok">Los encabezados coinciden exacto con la plantilla.</p>';
+  }
+  el.innerHTML = html;
+}
+
+function toggleBatchMode() {
+  const isTemplate = document.getElementById('bm-mode').value === 'template';
+  document.getElementById('bm-dynamic-fields').style.display = isTemplate ? 'none' : 'block';
+  document.getElementById('bm-template-fields').style.display = isTemplate ? 'block' : 'none';
+}
+
+async function confirmBatchMerge() {
+  if (batchFiles.length < 2) { toast('Selecciona al menos 2 archivos para consolidar', 'error'); return; }
+  const mode = document.getElementById('bm-mode').value;
+  if (mode === 'template' && !batchTemplateFile) {
+    toast('Sube el archivo de esquema maestro (plantilla)', 'error');
+    return;
+  }
+  const fd = batchFormData(mode === 'template');
+  fd.append('mode', mode);
+  fd.append('rest', document.getElementById('bm-rest').value);
+  const first = [...document.querySelectorAll('#bm-check input:checked')].map(i => i.value);
+  fd.append('first', JSON.stringify(first));
+  const name = batchFiles[0].name + (batchFiles.length > 2 ? ' + ' + (batchFiles.length - 1) + ' archivos' : ' + ' + batchFiles[1].name);
+  const done = await uploadBatchMerge(fd, name);
+  if (done) closeBatchMerge();
+}
+
+// Listeners del modal (se registran una vez al cargar el script)
+const bmModeSel = document.getElementById('bm-mode');
+if (bmModeSel) bmModeSel.addEventListener('change', toggleBatchMode);
+const bmAddInput = document.getElementById('batch-file-input');
+if (bmAddInput) bmAddInput.addEventListener('change', e => {
+  addBatchFiles(e.target.files);
+  e.target.value = '';
+});
+const bmTemplateInput = document.getElementById('bm-template-file');
+if (bmTemplateInput) bmTemplateInput.addEventListener('change', async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  batchTemplateFile = f;
+  document.getElementById('bm-template-info').textContent = f.name;
+  await refreshBatchPreview();  // la plantilla viaja en el preview → resumen de diferencias
+});
 
 // ── ExecutePipelineModal (F3.5) ─────────────────────────────────────────
 // "Cargar receta" ya no aplica en silencio: el modal primero hace un
