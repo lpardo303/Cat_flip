@@ -11,6 +11,21 @@ siguiente corte.
 
 ### Añadido
 
+- **`change_type` masivo con catálogo extendido (op 15)**: el modal de
+  *Tipo dato* acepta selección múltiple de columnas (checkboxes con
+  *Seleccionar todas*) y amplía los tipos de destino a las grafías
+  pandas — Texto (`str`/`string`), Entero nullable (`int`/`Int64`),
+  Decimal (`float`, ahora siempre `float64`), Fecha y hora
+  (`datetime`/`datetime64`), Booleano nullable (`bool`/`boolean`) y
+  Categoría (`category`) — aplicando el mismo tipo a todas las columnas
+  marcadas en **un solo paso** de receta. Los booleanos aceptan
+  `true`/`t`/`yes`/`y`/`1` y `false`/`f`/`no`/`n`/`0` sin distinción de
+  mayúsculas y lo no reconocido queda nulo (`<NA>`); `category` no
+  convierte en categoría los marcadores de nulo previos de las columnas
+  de texto (regla Bug 4). El backend valida el catálogo (dtype
+  desconocido → 500 con las 10 grafías en el mensaje; antes caía al
+  fallback `str` sin avisar) y acepta `column` (forma legada, intacta)
+  o `columns` (lista), exactamente uno.
 - **Operación Reordenar Columnas (`reorder_columns`, op #25)**: nuevo modal
   con dos modos — *Bloque inicial + resto alfabético* (fija las columnas
   marcadas al principio conservando su orden actual y ordena el resto A→Z

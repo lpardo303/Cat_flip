@@ -227,22 +227,112 @@ def op_drop_column(df, params):
     return df, code
 
 
+# ── Texto & Tipos — Cambiar tipo (multi-columna + catálogo extendido) ───
+# 10 grafías de destino → 7 conversiones canónicas. Los alias recogen las
+# grafías pandas del roadmap: string ≡ str, Int64 ≡ int (nullable, admite
+# nulos), datetime64 ≡ datetime y boolean ≡ bool. Antes cualquier dtype
+# desconocido caía al fallback `str` sin avisar; ahora es un error.
+_CHANGE_TYPE_ALIASES = {
+    "str": "str", "string": "str",
+    "int": "int", "Int64": "int",
+    "float": "float",
+    "datetime": "datetime", "datetime64": "datetime",
+    "bool": "bool", "boolean": "bool",
+    "category": "category",
+}
+
+# Mapeo hacia boolean nullable. Las claves son el valor YA normalizado
+# (strip + minúsculas), por eso '1'/'1.0' y '0'/'0.0' cubren tanto los
+# enteros como los floats stringificados. Lo no reconocido (y los nulos)
+# queda en <NA>, igual de leniente que int/float/datetime (coerce).
+_BOOL_MAP = {
+    "true": True, "t": True, "yes": True, "y": True, "1": True, "1.0": True,
+    "false": False, "f": False, "no": False, "n": False, "0": False, "0.0": False,
+}
+
+
 def op_change_type(df, params):
+    """Convierte una o varias columnas al tipo del catálogo extendido.
+
+    `params` acepta `column` (str, la forma legada de recetas/badges) O
+    `columns` (lista, selección múltiple del modal) — exactamente uno —
+    y `dtype` con las 10 grafías de `_CHANGE_TYPE_ALIASES`. El mismo tipo
+    se aplica a todas las columnas marcadas en un solo paso de receta
+    (una entrada de history, deshacible con undo).
+    """
     col = params.get("column")
+    cols = params.get("columns")
     dtype = params.get("dtype", "str")
-    if dtype == "datetime":
-        df[col] = pd.to_datetime(df[col], errors="coerce")
-        code = f"df['{col}'] = pd.to_datetime(df['{col}'], errors='coerce')"
-    elif dtype == "int":
-        df[col] = pd.to_numeric(df[col], errors="coerce").astype("Int64")
-        code = f"df['{col}'] = pd.to_numeric(df['{col}'], errors='coerce').astype('Int64')"
-    elif dtype == "float":
-        df[col] = pd.to_numeric(df[col], errors="coerce")
-        code = f"df['{col}'] = pd.to_numeric(df['{col}'], errors='coerce')"
+
+    if (col is None) == (cols is None):
+        raise ValueError(
+            "Indica exactamente una columna (`column`) o una lista (`columns`)."
+        )
+    target = _CHANGE_TYPE_ALIASES.get(dtype)
+    if target is None:
+        raise ValueError(
+            f"Tipo de destino desconocido: {dtype!r} (usa uno de: "
+            f"{', '.join(sorted(_CHANGE_TYPE_ALIASES))})."
+        )
+
+    if cols is None:
+        columns = [col]
     else:
-        df[col] = _normalize_nulls(df[col].astype(str))
-        code = f"df['{col}'] = df['{col}'].astype(str)\n{_null_code(col)}"
-    return df, code
+        if not isinstance(cols, list) or not cols:
+            raise ValueError("`columns` debe ser una lista con al menos una columna.")
+        if any(not isinstance(c, str) for c in cols):
+            raise ValueError("`columns` solo puede contener nombres de columna (texto).")
+        if len(set(cols)) != len(cols):
+            raise ValueError("No repitas columnas en `columns`.")
+        columns = cols
+
+    missing = [c for c in columns if c not in df.columns]
+    if missing:
+        raise ValueError(f"Columna(s) inexistente(s): {', '.join(missing)}")
+
+    lines = []
+    for c in columns:
+        s = df[c]
+        if target == "str":
+            df[c] = _normalize_nulls(s.astype(str))
+            lines.append(f"df['{c}'] = df['{c}'].astype(str)")
+            lines.append(_null_code(c))
+        elif target == "int":
+            df[c] = pd.to_numeric(s, errors="coerce").astype("Int64")
+            lines.append(
+                f"df['{c}'] = pd.to_numeric(df['{c}'], errors='coerce').astype('Int64')"
+            )
+        elif target == "float":
+            # astype('float64') explícito: to_numeric deja intacto un int64
+            # y el catálogo promete Decimal (FLOAT), no un paseo de IDs.
+            df[c] = pd.to_numeric(s, errors="coerce").astype("float64")
+            lines.append(
+                f"df['{c}'] = pd.to_numeric(df['{c}'], errors='coerce').astype('float64')"
+            )
+        elif target == "datetime":
+            df[c] = pd.to_datetime(s, errors="coerce")
+            lines.append(f"df['{c}'] = pd.to_datetime(df['{c}'], errors='coerce')")
+        elif target == "bool":
+            # Coerce a boolean nullable: los valores reconocidos → True/False
+            # y el resto (incluidos los nulos) → <NA>. Nunca el `True`
+            # implícito de astype(bool) sobre strings no vacíos.
+            df[c] = s.astype(str).str.strip().str.lower().map(_BOOL_MAP).astype("boolean")
+            lines.append(
+                f"df['{c}'] = df['{c}'].astype(str).str.strip().str.lower()"
+                f".map({repr(_BOOL_MAP)}).astype('boolean')"
+            )
+        else:  # category — en columnas de texto los marcadores de nulo
+            # previos se normalizan antes de categorizar (regla Bug 4); en el
+            # resto de tipos `_normalize_nulls` pasa intacto.
+            df[c] = _normalize_nulls(s).astype("category")
+            if (
+                pd.api.types.is_object_dtype(s.dtype)
+                or pd.api.types.is_string_dtype(s.dtype)
+            ):
+                lines.append(_null_code(c))
+            lines.append(f"df['{c}'] = df['{c}'].astype('category')")
+
+    return df, "\n".join(lines)
 
 
 # ── Texto & Tipos — Regex Mask (PII) ─────────────────────────────────────
