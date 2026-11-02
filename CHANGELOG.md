@@ -82,6 +82,18 @@ siguiente corte.
   **31 → 19.8 ms** y p95 **51.9 → 35 ms** (medido en navegador con el
   fichero real).
 
+### Arreglado
+
+- **Las celdas «null» ya no asoman por encima de la cabecera sticky del
+  grid**: `thead th` era `position: sticky` con `z-index: auto` y un
+  `backdrop-filter` que no se veía (el `--base2` es opaco en los 4
+  temas); en Chromium el contenido de las filas (el «null» de
+  `.cell-null`, con `opacity` que crea capa de composición) pasaba por
+  encima de la cabecera al hacer scroll. La cabecera lleva ahora
+  `z-index: 10` y se retira el `backdrop-filter` inservicial; reproducido
+  y verificado con `elementFromPoint` sobre la franja de la cabecera con
+  el fichero real (antes devolvía `SPAN.cell-null`, después el `th`).
+
 ## [1.5.1] — 2026-10-31
 
 ### Añadido
