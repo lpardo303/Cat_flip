@@ -629,10 +629,13 @@ document.addEventListener('click', e => {
 
 window.addEventListener('resize', () => { if (themeMenuOpen) positionThemeMenu(); });
 
-// ── CANVAS MATEMÁTICO DE FONDO (grid isométrico ondulante, Tech Labs) ───
+// ── CANVAS MATEMÁTICO (grid isométrico ondulante, Tech Labs) ─────────────
 // Firma visual del prototipo: malla 28×20 en proyección isométrica con onda
-// armónica, repulsión al ratón y tinte del color de énfasis activo. Con
-// prefers-reduced-motion se pinta UNA vez estático (sin rAF, sin ratón).
+// armónica, repulsión al ratón y tinte del color de énfasis activo. Vive
+// DENTRO de <header> (z-index -1, bajo el contenido del ribbon): se
+// redimensiona a la franja del header y el ratón se mapea a su rect. Con
+// prefers-reduced-motion se pinta UNA vez estático (sin rAF, sin ratón);
+// el cambio de tema/énfasis repinta el trazo estático (ver applyAccent).
 const mathCanvas = document.getElementById('math-grid-bg');
 const mathCtx = mathCanvas ? mathCanvas.getContext('2d') : null;
 const MCOLS = 28;
@@ -643,13 +646,18 @@ let mathW = 0;
 let mathH = 0;
 let mathPhase = 0;
 let mathRaf = null;
+let mathHeaderRect = { left: 0, top: 0 }; // rect del header (para el ratón)
 
 function mathReduced() { return !!(motionMQ && motionMQ.matches); }
 
 function resizeMathGrid() {
   if (!mathCtx) return;
-  mathW = window.innerWidth;
-  mathH = window.innerHeight;
+  // El canvas vive en <header>: se redimensiona a su franja, no al viewport
+  const header = mathCanvas.closest ? mathCanvas.closest('header') : document.querySelector('header');
+  const rect = header ? header.getBoundingClientRect() : null;
+  mathW = Math.max(1, Math.round(rect ? rect.width : window.innerWidth));
+  mathH = Math.max(1, Math.round(rect ? rect.height : window.innerHeight));
+  mathHeaderRect = rect ? { left: rect.left, top: rect.top } : { left: 0, top: 0 };
   // setTransform (no scale) — reiniciar el bitmap ya limpia la transformación
   mathCanvas.width = mathW * window.devicePixelRatio;
   mathCanvas.height = mathH * window.devicePixelRatio;
@@ -669,7 +677,7 @@ function drawMathGrid() {
   mathPhase += 0.022;
 
   const originX = mathW * 0.5;
-  const originY = mathH * 0.48;
+  const originY = mathH * 0.5;
   const cellW = Math.max(34, mathW / (MCOLS * 0.9));
   const cellH = cellW * 0.52;
 
@@ -697,7 +705,9 @@ function drawMathGrid() {
     }
   }
 
-  const baseAlpha = isDark ? 0.22 : 0.16;
+  // Alfa más alta que con el canvas a viewport: en la franja del ribbon
+  // (52px + fila 2) las líneas son más estrechas y el glass las atenúa.
+  const baseAlpha = isDark ? 0.34 : 0.26;
   mathCtx.lineWidth = 1;
   for (let r = 0; r < MROWS; r++) {
     for (let c = 0; c < MCOLS; c++) {
@@ -721,7 +731,7 @@ function drawMathGrid() {
         mathCtx.stroke();
       }
       if (r % 2 === 0 && c % 2 === 0 && p.intensity > 0.1) {
-        const a = (p.intensity * (isDark ? 0.6 : 0.4)).toFixed(3);
+        const a = (p.intensity * (isDark ? 0.75 : 0.55)).toFixed(3);
         mathCtx.fillStyle = 'rgba(' + rgb.r + ', ' + rgb.g + ', ' + rgb.b + ', ' + a + ')';
         mathCtx.beginPath();
         mathCtx.arc(p.x, p.y, 1.6, 0, Math.PI * 2);
@@ -737,7 +747,7 @@ function drawStaticMathGrid() {
   mathCtx.clearRect(0, 0, mathW, mathH);
   const rgb = hexToRgb(activeAccent);
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-  const alpha = isDark ? 0.15 : 0.12;
+  const alpha = isDark ? 0.24 : 0.19;
   const originX = mathW * 0.5;
   const originY = mathH * 0.5;
   const cellW = Math.max(34, mathW / (MCOLS * 0.9));
@@ -779,8 +789,9 @@ window.addEventListener('resize', () => {
   if (mathReduced()) drawStaticMathGrid();
 });
 window.addEventListener('mousemove', e => {
-  mathMouse.tx = e.clientX;
-  mathMouse.ty = e.clientY;
+  // Coordenadas locales al rect del header (el canvas ya no es viewport)
+  mathMouse.tx = e.clientX - mathHeaderRect.left;
+  mathMouse.ty = e.clientY - mathHeaderRect.top;
 });
 if (motionMQ) {
   const onMotionChange = () => {

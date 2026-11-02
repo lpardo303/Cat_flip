@@ -81,6 +81,16 @@ siguiente corte.
   en cada una: **39 → 7 reconstrucciones / 3 s**, frame medio
   **31 → 19.8 ms** y p95 **51.9 → 35 ms** (medido en navegador con el
   fichero real).
+- **La malla matemática animada se muda a la franja de la cabecera**: el
+  `#math-grid-bg` vive ahora dentro de `<header>` (`position: absolute;
+  z-index: -1`), se redimensiona al rect del ribbon, el ratón se mapea a
+  sus coordenadas y la malla queda recortada a la franja (52 px de fila 1
+  transparente sobre el glass; la fila 2 sigue opaca); las alfas suben
+  (0.22 → 0.34 en oscuro, 0.16 → 0.26 en claro) para que la franja se
+  lea como el antiguo fondo a viewport. Se conservan el tinte `--accent`,
+  `aria-hidden`, el pintado estático con `prefers-reduced-motion` y el
+  repintado por tema/énfasis — verificado en los 4 temas y en
+  reduced-motion.
 
 ### Arreglado
 
