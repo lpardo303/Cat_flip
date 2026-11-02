@@ -33,15 +33,19 @@
   body::before { top: 10px; left: 14px; }
   body::after { bottom: 10px; right: 14px; }
 
-  /* ── CANVAS MATEMÁTICO DE FONDO (grid isométrico ondulante) ── */
+  /* ── CANVAS MATEMÁTICO (grid isométrico ondulante) ──────────── */
+  /* Vive dentro de <header> (sticky = positioned): con z-index -1 queda
+     sobre el fondo del ribbon y por debajo de sus filas; el canvas se
+     recorta solo a la caja del header (el JS lo redimensiona a su rect y
+     mapea el ratón a esas mismas coordenadas). La alfa final la gobierna
+     el JS (baseAlpha), ya sin opacity CSS que la multiplicara. */
   #math-grid-bg {
-    position: fixed;
+    position: absolute;
     inset: 0;
-    width: 100vw;
-    height: 100vh;
+    width: 100%;
+    height: 100%;
     pointer-events: none;
-    z-index: 0;
-    opacity: 0.85;
+    z-index: -1;
   }
 
   /* ── REDUCED MOTION ────────────────────────────────────── */

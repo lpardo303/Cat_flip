@@ -17,8 +17,13 @@
     text-align: left;
     border-bottom: 2px solid var(--border-strong);
     position: sticky; top: 0;
+    /* z-index explícito: sin él, Chromium puede pintar el contenido de las
+       filas (p. ej. el «null» de .cell-null, con opacity que crea capa de
+       composición) POR ENCIMA de la cabecera sticky al hacer scroll. La capa
+       de backdrop-filter agrava el orden de composición y no se veía de
+       todos modos (--base2 es opaco en los 4 temas), así que se retira. */
+    z-index: 10;
     white-space: nowrap;
-    backdrop-filter: blur(8px);
     overflow: visible; /* permite que la barra absoluta sea visible */
   }
   tbody tr { transition: background 0.1s; }
