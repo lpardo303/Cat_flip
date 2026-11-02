@@ -51,6 +51,23 @@ siguiente corte.
   generado lista el orden final explícito, así que receta y script
   exportado reproducen el mismo orden. Registro `OPS` a 25 operaciones.
 
+### Cambiado
+
+- **Data Grid optimizado para datasets anchos**: el grid ventanea también
+  en **anchura** — solo pinta las columnas visibles + 3 de búfer por lado
+  (colgroup con todos los anchos y `table-layout: fixed`), de modo que un
+  archivo de **78 columnas × 515 filas** navega sin tirones: el scroll
+  baja de ~185 ms por frame (≈5 fps) a **~33 ms vertical / ~51 ms
+  horizontal**, el render en caliente de 283 ms a **33 ms** y el DOM de
+  ~40 000 celdas a **~300**. La cabecera y el colgroup solo se repintan
+  cuando cambia la ventana (firmas de render), el buscador aplica
+  **debounce de 120 ms** y un **`ResizeObserver`** sobre el viewport
+  recalcula la ventana al colapsar/expandir paneles o cambiar de pestaña
+  (antes `window.resize`, que no se disparaba en esos casos). El coste
+  único de calibrar los anchos (~2 s) solo se paga en la primera carga
+  de cada esquema; medido en navegador con el fichero real
+  («Query Mayo 2026 - I.xlsx», hoja MAYO 2026-I).
+
 ## [1.5.1] — 2026-10-31
 
 ### Añadido
