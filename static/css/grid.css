@@ -2,6 +2,11 @@
   /* ── DATA GRID ─────────────────────────────────────────── */
   .table-wrap { flex: 1; overflow: auto; contain: layout paint style; }
   table { border-collapse: collapse; width: 100%; font-family: var(--font-mono); font-size: 0.75rem; }
+  /* Ventana de columnas (F3.6): layout fijo con los anchos calibrados en
+     el <colgroup>. Sin esto, el layout automático re-mide las celdas en
+     cada scroll (medido: 185ms/frame con 78 columnas) y los anchos
+     "jitter" al cambiar de slice de filas. Solo lo usa el data grid. */
+  table.grid-fixed { table-layout: fixed; }
   thead th {
     background: var(--base2);
     color: var(--text);
@@ -27,6 +32,11 @@
   tbody tr.vs-spacer { background: transparent; pointer-events: none; }
   tbody tr.vs-spacer:hover { background: transparent; }
   tbody tr.vs-spacer td { padding: 0; border: none; }
+  /* Spacers horizontales de la ventana de columnas: celdas vacías con
+     colspan que ocupan las columnas fuera de la ventana. Sin padding ni
+     borde propio; la línea de fila la mantienen las celdas vecinas. */
+  thead th.col-spacer { padding: 0; }
+  tbody td.col-spacer { padding: 0; max-width: none; border-right: none; }
   tbody td {
     padding: 0.38rem 0.85rem;
     border-bottom: 1px solid var(--border2);
@@ -117,6 +127,9 @@
     gap: 0.35rem;
     width: 100%;
   }
+  /* El badge de tipo y el menú no se encogen: el nombre absorbe el
+     recorte (ellipsis) cuando el ancho calibrado es menor que el texto */
+  .th-content .type-badge { flex-shrink: 0; }
   .th-name {
     cursor: default;
     user-select: text;

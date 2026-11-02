@@ -24,13 +24,28 @@ function highlightEscaped(escapedText, query) {
   return escapedText.replace(regex, '<mark class="search-hl">$1</mark>');
 }
 
+let searchDebounceTimer = null;
+
 function onSearchInput(val) {
   currentSearchQuery = (val || '').trim();
   const clearBtn = document.getElementById('search-clear');
   if (clearBtn) clearBtn.classList.toggle('visible', currentSearchQuery.length > 0);
-  if (currentRawData) {
-    renderTable(currentRawData);
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = null;
   }
+  if (!currentSearchQuery) {
+    // Borrar la búsqueda es instantáneo: el usuario ya no espera nada.
+    if (currentRawData) renderTable(currentRawData);
+    return;
+  }
+  // Escribir: debounce de 120ms. El filtro en sí cuesta <1ms, pero el
+  // re-render del grid no (medido: 176ms/tecla con 78 columnas); sin
+  // esto cada pulsación bloquea el hilo principal.
+  searchDebounceTimer = setTimeout(() => {
+    searchDebounceTimer = null;
+    if (currentRawData) renderTable(currentRawData);
+  }, 120);
 }
 
 function clearSearch() {
@@ -201,17 +216,192 @@ function handleColMenuAction(action) {
   openModalForCol(action, targetCol);
 }
 
-// ── F3.6: VIRTUALIZACIÓN DEL DATA GRID ─────────────────────────────────
+// ── F3.6: VIRTUALIZACIÓN DEL DATA GRID (filas Y columnas) ──────────────
 // Con el preview ampliado a 5000 filas, el tbody solo materializa el
-// viewport + buffer de 10 filas por lado. Dos filas spacer (`.vs-spacer`)
-// simulan la altura total: la barra de scroll y el thead sticky quedan
-// correctos. El thead NO se toca entre renders → sin parpadeo y el scroll
-// se conserva al aplicar una operación.
-const GRID_VIRT_MIN = 150;       // por debajo: render directo, sin spacers
+// viewport + buffer de 10 filas por lado; con datasets anchos (78+ col)
+// las celdas también se ventanean en horizontal: thead y tbody solo
+// pintan las columnas visibles + 3 de buffer, con celdas colspan como
+// spacer a cada lado. Dos filas spacer (`.vs-spacer`) simulan la altura
+// total: la barra de scroll y el thead sticky quedan correctos.
+//
+// Medido con 515×78 antes de ventanear columnas: frame de scroll 185ms
+// (5 fps), renderTable 283ms — el coste es lineal en celdas en el DOM
+// (parse + style + layout + paint). Por eso el layout se estabiliza con
+// `table-layout: fixed` + <colgroup> de anchos CALIBRADOS (un render
+// completo en auto layout solo cuando aparece una columna nueva): además
+// evita el «jitter» de anchos al cambiar de slice de filas.
 const GRID_ROW_H_FALLBACK = 28;
-const GRID_BUFFER = 10;
+const GRID_BUFFER = 10;          // filas de buffer vertical por lado
+const COL_BUFFER = 3;            // columnas de buffer horizontal por lado
+const COL_W_MIN = 80;            // clamp del ancho calibrado (px)
+const COL_W_MAX = 260;
+const COL_W_FALLBACK = 160;      // ancho de respaldo si la medición falla
 let gridView = null;             // estado del render virtualizado activo
 let gridRafPending = false;
+let gridColWidths = new Map();   // nombre de columna → ancho calibrado (px)
+let gridIdxW = 41;               // ancho calibrado de la columna #
+let gridColSig = null;           // firma del colgroup ya pintado
+let gridTheadSig = null;         // firma del thead ya pintado
+let gridFontsArmed = false;      // recalibración única pendiente de web fonts
+
+function gridClampW(w) { return Math.max(COL_W_MIN, Math.min(COL_W_MAX, Math.round(w))); }
+
+// Si la calibración corre con las web fonts aún cargando (display=swap),
+// los anchos medidos con la fuente fallback no sirven: cuando terminen de
+// cargar, se limpian y se recalibra (una sola vez; después status === 'loaded').
+function armGridFontRecalib() {
+  if (gridFontsArmed || !document.fonts || document.fonts.status === 'loaded') return;
+  gridFontsArmed = true;
+  document.fonts.ready.then(() => {
+    if (!currentRawData) return;
+    gridColWidths.clear();
+    gridIdxW = 41;
+    gridColSig = null;
+    gridTheadSig = null;
+    renderTable(currentRawData);
+  });
+}
+
+// Celda de cabecera de una columna: nombre + badge de tipo + menú +
+// quality bar (idéntico al markup histórico; solo se añade title al
+// nombre para cuando el ancho calibrado lo recorte con ellipsis).
+function gridThCellHtml(col, g) {
+  const dtype = currentDtypes[col] || 'STR';
+  const nullCount = g.nulls[col] || 0;
+  const quality = g.totalRows > 0 ? ((g.totalRows - nullCount) / g.totalRows) : 1;
+  const pct = (quality * 100).toFixed(1);
+  const isPerfect = nullCount === 0;
+  const barColor = quality >= 0.9 ? 'var(--green)' : quality >= 0.6 ? 'var(--yellow)' : 'var(--red)';
+  const tooltip = isPerfect
+    ? `${col} — Sin nulos (100% válido)`
+    : `${col} — ${nullCount} nulo${nullCount>1?'s':''} (${pct}% válido)`;
+  return `<th title="${tooltip}">
+      <div class="th-content">
+        <span class="th-name" title="${escapeHtml(col)}">${escapeHtml(col)}</span>
+        <span class="type-badge ${dtype}" data-col="${escapeHtml(col)}" onclick="event.stopPropagation();openModalForCol('change_type',this.dataset.col)" title="Tipo: ${dtype} — clic para cambiar">${dtype}</span>
+        <button type="button" class="th-menu-btn" data-col="${escapeHtml(col)}" onclick="openColMenu(event,this.dataset.col)" title="Transformaciones para ${escapeHtml(col)}">
+          ${icon('more-vertical')}
+        </button>
+      </div>
+      <div class="quality-bar-wrap${isPerfect?' perfect':''}">
+        <div class="quality-bar-fill" style="width:${pct}%;background:${barColor}"></div>
+      </div>
+    </th>`;
+}
+
+// Builder de fila: la ventana de columnas (colStart/colEnd) se lee en
+// tiempo de ejecución desde `g`, así que al hacer scroll horizontal solo
+// hay que repintar el thead y forzar el repintado de filas — el builder
+// no se recrea.
+function makeRowBuilder(g) {
+  return (item) => {
+    const L = g.colStart;
+    const R = g.totalSlots - g.colEnd;
+    let h = '<tr class="' + (item.i % 2 === 1 ? 'row-alt' : '') + '">';
+    if (L > 0) h += '<td class="col-spacer" colspan="' + L + '"></td>';
+    if (L === 0) h += '<td>' + (item.i + 1) + '</td>';
+    for (let s = Math.max(1, L); s < g.colEnd; s++) {
+      const idx = g.visibleIndices[s - 1];
+      const cellVal = item.row[idx];
+      // Validación de esquema: ¿incumple alguna regla? (clave = posición
+      // de fila + nombre de columna; las etiquetas del índice no pintan)
+      const violRule = currentViolations.get(item.i + '\u0000' + currentColumns[idx]);
+      const violTitle = violRule ? ' — incumple: ' + SV_RULE_LABELS[violRule] : '';
+      // Bug 4: el backend envía JSON null para nulos reales de pandas (NaN)
+      if (cellVal === null || cellVal === undefined) {
+        const nullCls = violRule ? 'cell-null-td cell-viol' : 'cell-null-td';
+        h += '<td class="' + nullCls + '"><span class="cell-null" title="Nulo real de pandas (NaN)' + violTitle + '">null</span></td>';
+        continue;
+      }
+      const escaped = escapeHtml(String(cellVal));
+      const highlighted = g.query ? highlightEscaped(escaped, g.query) : escaped;
+      const violCls = violRule ? ' class="cell-viol"' : '';
+      h += '<td' + violCls + ' title="' + escaped + violTitle + '">' + highlighted + '</td>';
+    }
+    if (R > 0) h += '<td class="col-spacer" colspan="' + R + '"></td>';
+    return h + '</tr>';
+  };
+}
+
+// Ventana de columnas visible a partir del scrollLeft (con buffer)
+function computeColWindow(scrollLeft, g) {
+  const total = g.totalSlots;
+  const w = g.widths;
+  const wrap = document.getElementById('table-wrap');
+  const viewW = wrap.clientWidth || 800;
+  let start = 0;
+  let acc = 0;
+  while (start < total && acc + w[start] <= scrollLeft) { acc += w[start]; start++; }
+  let end = start;
+  const rightEdge = scrollLeft + viewW;
+  while (end < total && acc < rightEdge) { acc += w[end]; end++; }
+  start = Math.max(0, start - COL_BUFFER);
+  end = Math.min(total, end + COL_BUFFER);
+  if (end <= start) end = Math.min(total, start + 1);
+  return { start, end };
+}
+
+// Estructura del grid: <table><colgroup><thead><tbody> — se crea una vez
+// y se actualiza por partes. Reemplazar wrap.innerHTML entero en cada
+// render re-parseaba las 79 cabeceras y forzaba el layout de la tabla
+// completo (medido: 283ms por render con 78 columnas).
+function ensureGridTable(wrap) {
+  let table = wrap.querySelector('table');
+  if (!table || !table.querySelector('#grid-tbody') || !table.querySelector('#grid-colgroup')) {
+    wrap.innerHTML = '<table><colgroup id="grid-colgroup"></colgroup><thead id="grid-thead"></thead><tbody id="grid-tbody"></tbody></table>';
+    gridColSig = null;
+    gridTheadSig = null;
+    table = wrap.querySelector('table');
+  }
+  return table;
+}
+
+// Colgroup con TODAS las columnas (aunque solo se pinten las de la
+// ventana): el ancho total del tabla y el scrollbar horizontal quedan
+// iguales al de la tabla completa, y las celdas colspan se alinean con
+// las columnas declaradas. Solo se repinta si cambian los anchos.
+function paintColgroup(table, g) {
+  const sig = g.widths.join(',');
+  if (sig === gridColSig) return;
+  const cg = table.querySelector('#grid-colgroup');
+  cg.innerHTML = g.widths.map(w => '<col style="width:' + Math.round(w) + 'px">').join('');
+  const total = g.widths.reduce((a, b) => a + b, 0);
+  table.style.width = 'max(' + Math.round(total) + 'px, 100%)';
+  gridColSig = sig;
+}
+
+// thead de la ventana actual, con firma: si no cambió nada (columnas,
+// tipos, nulos, ventana), no se toca el DOM de la cabecera — una
+// búsqueda o una operación de valores no re-parsea cabeceras pesadas.
+function paintThead(table, g) {
+  const sig = g.colStart + '|' + g.colEnd + '|' + g.totalRows + '|'
+    + g.visibleCols.map(c => c + ':' + (currentDtypes[c] || 'STR') + ':' + (g.nulls[c] || 0)).join('|');
+  if (sig === gridTheadSig) return;
+  const L = g.colStart;
+  const R = g.totalSlots - g.colEnd;
+  let h = '<tr>';
+  if (L > 0) h += '<th class="col-spacer" colspan="' + L + '"></th>';
+  if (L === 0) h += '<th>#</th>';
+  for (let s = Math.max(1, L); s < g.colEnd; s++) h += gridThCellHtml(g.visibleCols[s - 1], g);
+  if (R > 0) h += '<th class="col-spacer" colspan="' + R + '"></th>';
+  table.querySelector('#grid-thead').innerHTML = h + '</tr>';
+  gridTheadSig = sig;
+}
+
+// Re-ventanear columnas tras scroll horizontal o resize. Devuelve true
+// si la ventana cambió (el caller debe forzar el repintado de filas).
+function updateVirtualCols() {
+  const g = gridView;
+  if (!g) return false;
+  const wrap = document.getElementById('table-wrap');
+  const win = computeColWindow(wrap.scrollLeft, g);
+  if (win.start === g.colStart && win.end === g.colEnd) return false;
+  g.colStart = win.start;
+  g.colEnd = win.end;
+  const table = wrap.querySelector('table');
+  if (table) paintThead(table, g);
+  return true;
+}
 
 function updateVirtualRows() {
   const g = gridView;
@@ -231,7 +421,7 @@ function updateVirtualRows() {
   g.end = end;
   const topH = start * rowH;
   const bottomH = (g.rows.length - end) * rowH;
-  const span = g.visibleCols.length + 1;
+  const span = g.totalSlots;
   let html = '';
   if (topH > 0) html += '<tr class="vs-spacer" style="height:' + topH + 'px"><td colspan="' + span + '"></td></tr>';
   for (let k = start; k < end; k++) html += g.buildRowHtml(g.rows[k]);
@@ -244,7 +434,60 @@ function updateVirtualRows() {
 function gridOnScroll() {
   if (!gridView || gridRafPending) return;
   gridRafPending = true;
-  requestAnimationFrame(() => { gridRafPending = false; updateVirtualRows(); });
+  requestAnimationFrame(() => {
+    gridRafPending = false;
+    if (!gridView) return;
+    // El scroll horizontal cambia la ventana de columnas → repintar la
+    // cabecera y forzar el repintado de filas aunque el rango no cambie
+    if (updateVirtualCols()) gridView.end = -1;
+    updateVirtualRows();
+  });
+}
+
+// Un cambio de ancho del wrap deja la ventana de columnas corta (zonas
+// sin pintar a la derecha) → re-ventanear y re-slicear. ResizeObserver
+// sobre #table-wrap en vez de window.resize: el ancho del wrap también
+// cambia al colapsar/expandir un panel lateral (F2.3) y al volver de
+// otra pestaña, y esos cambios no disparan el evento resize de window.
+function gridOnResize() {
+  if (!gridView) return;
+  requestAnimationFrame(() => {
+    if (!gridView) return;
+    updateVirtualCols();
+    gridView.end = -1;
+    updateVirtualRows();
+  });
+}
+const gridWrapObserved = document.getElementById('table-wrap');
+if (gridWrapObserved && typeof ResizeObserver !== 'undefined') {
+  new ResizeObserver(gridOnResize).observe(gridWrapObserved);
+} else {
+  window.addEventListener('resize', gridOnResize);
+}
+
+// ── Calibración de anchos de columna ─────────────────────────────────────
+// Render completo en auto layout (todas las columnas, el coste del render
+// histórico) para medir el ancho real de cada cabecera; después todo el
+// grid usa table-layout: fixed con esos anchos. Solo ocurre cuando aparece
+// una columna sin ancho conocido (upload, split, rename, unhide…).
+function calibrateGridWidths(g) {
+  const wrap = document.getElementById('table-wrap');
+  // Sin la clase grid-fixed: el HTML nuevo ya nace en auto layout
+  wrap.innerHTML = '<table><thead><tr><th>#</th>'
+    + g.visibleCols.map(c => gridThCellHtml(c, g)).join('')
+    + '</tr></thead><tbody>' + g.rows.map(makeRowBuilder(g)).join('') + '</tbody></table>';
+  const ths = wrap.querySelectorAll('thead th');
+  if (ths.length === g.visibleCols.length + 1) {
+    const idxW = ths[0].getBoundingClientRect().width;
+    if (idxW > 0) gridIdxW = Math.max(24, Math.min(96, Math.round(idxW)));
+    g.visibleCols.forEach((c, i) => {
+      const w = ths[i + 1].getBoundingClientRect().width;
+      gridColWidths.set(c, w > 0 ? gridClampW(w) : COL_W_FALLBACK);
+    });
+  }
+  // Nunca re-calibrar en bucle: lo que no se midió, ancho de respaldo
+  g.visibleCols.forEach(c => { if (!gridColWidths.has(c)) gridColWidths.set(c, COL_W_FALLBACK); });
+  armGridFontRecalib();
 }
 
 function renderTable(data) {
@@ -287,36 +530,14 @@ function renderTable(data) {
     html += '</tbody></table>';
     document.getElementById('table-wrap').innerHTML = html;
     document.getElementById('truncated-msg').style.display = 'none';
+    gridColSig = null;
+    gridTheadSig = null;
+    gridView = null;
     return;
   }
 
-  let html = '<table><thead><tr><th>#</th>';
-  visibleCols.forEach(c => {
-    const dtype    = currentDtypes[c] || 'STR';
-    const nullCount = nulls[c] || 0;
-    const quality  = totalRows > 0 ? ((totalRows - nullCount) / totalRows) : 1;
-    const pct      = (quality * 100).toFixed(1);
-    const isPerfect = nullCount === 0;
-    const barColor  = quality >= 0.9 ? 'var(--green)' : quality >= 0.6 ? 'var(--yellow)' : 'var(--red)';
-    const tooltip   = isPerfect
-      ? `${c} — Sin nulos (100% válido)`
-      : `${c} — ${nullCount} nulo${nullCount>1?'s':''} (${pct}% válido)`;
-
-    html += `<th title="${tooltip}">
-      <div class="th-content">
-        <span class="th-name">${escapeHtml(c)}</span>
-        <span class="type-badge ${dtype}" data-col="${escapeHtml(c)}" onclick="event.stopPropagation();openModalForCol('change_type',this.dataset.col)" title="Tipo: ${dtype} — clic para cambiar">${dtype}</span>
-        <button type="button" class="th-menu-btn" data-col="${escapeHtml(c)}" onclick="openColMenu(event,this.dataset.col)" title="Transformaciones para ${escapeHtml(c)}">
-          ${icon('more-vertical')}
-        </button>
-      </div>
-      <div class="quality-bar-wrap${isPerfect?' perfect':''}">
-        <div class="quality-bar-fill" style="width:${pct}%;background:${barColor}"></div>
-      </div>
-    </th>`;
-  });
-  html += '</tr></thead>';
-  const theadHtml = html;
+  // El thead ya no se construye aquí: lo pinta paintThead (ventana de
+  // columnas + cache de firma) sobre la estructura de ensureGridTable.
 
   // ── F3.6: lista de filas a mostrar (filtro de búsqueda, F2.5) ────────
   // El índice original se preserva para la columna # y para el rayado
@@ -340,67 +561,72 @@ function renderTable(data) {
   });
 
   const wrap = document.getElementById('table-wrap');
-  // Conservar el scroll entre renders (F3.6): reemplazar el innerHTML
-  // resetea el scroll a 0; aplicar una operación ya no salta al inicio.
+  // Conservar el scroll entre renders (F3.6): una calibración reemplaza el
+  // innerHTML y resetea el scroll; aplicar una operación no debe saltar al
+  // inicio. El resto de renders solo tocan colgroup/thead/tbody y el
+  // scroll queda intacto de por sí.
   const prevScrollTop = wrap.scrollTop;
+  const prevScrollLeft = wrap.scrollLeft;
+
+  // Estado del grid para esta pasada: filas filtradas + ventana de columnas
+  const g = {
+    rows, visibleCols, visibleIndices, nulls, totalRows, query,
+    totalSlots: visibleCols.length + 1,
+    colStart: 0, colEnd: visibleCols.length + 1,
+    widths: [gridIdxW].concat(visibleCols.map(c => gridColWidths.get(c) || COL_W_FALLBACK)),
+    rowH: GRID_ROW_H_FALLBACK, start: 0, end: -1,
+  };
+  g.buildRowHtml = makeRowBuilder(g);
+
+  // ¿Falta algún ancho calibrado? (columna nueva desde el último render:
+  // upload, split, rename, unhide…) → un render completo en auto layout
+  // para medirla; a partir de ahí, table-layout: fixed.
+  if (visibleCols.some(c => !gridColWidths.has(c))) calibrateGridWidths(g);
+  g.widths = [gridIdxW].concat(visibleCols.map(c => gridColWidths.get(c) || COL_W_FALLBACK));
+
+  const table = ensureGridTable(wrap);
+  table.classList.add('grid-fixed');
+  paintColgroup(table, g);
 
   if (rows.length === 0 && query) {
-    wrap.innerHTML = theadHtml
-      + '<tbody><tr><td colspan="' + (visibleCols.length + 1) + '" style="padding:2.5rem;text-align:center;color:var(--text2);font-size:0.8rem">No se encontraron filas que coincidan con "<strong>' + escapeHtml(currentSearchQuery) + '</strong>".<br><button class="btn btn-secondary" style="margin-top:0.75rem" onclick="clearSearch()">Limpiar búsqueda</button></td></tr></tbody></table>';
+    // Sin resultados: cabecera COMPLETA (todas las columnas, sin ventanear
+    // — no hay filas que optimizar y el scroll horizontal debe recorrerla)
+    // + una fila de mensaje a todo lo ancho.
+    paintThead(table, { ...g, colStart: 0, colEnd: g.totalSlots });
+    table.querySelector('#grid-tbody').innerHTML =
+      '<tr><td colspan="' + g.totalSlots + '" style="padding:2.5rem;text-align:center;color:var(--text2);font-size:0.8rem">No se encontraron filas que coincidan con "<strong>' + escapeHtml(currentSearchQuery) + '</strong>".<br><button class="btn btn-secondary" style="margin-top:0.75rem" onclick="clearSearch()">Limpiar búsqueda</button></td></tr>';
     gridView = null;
+    if (wrap.scrollTop !== prevScrollTop) wrap.scrollTop = prevScrollTop;
+    if (wrap.scrollLeft !== prevScrollLeft) wrap.scrollLeft = prevScrollLeft;
     document.getElementById('truncated-msg').style.display = 'none';
     return;
   }
 
-  const buildRowHtml = (item) => {
-    let h = '<tr class="' + (item.i % 2 === 1 ? 'row-alt' : '') + '"><td>' + (item.i + 1) + '</td>';
-    visibleIndices.forEach(idx => {
-      const cellVal = item.row[idx];
-      // Validación de esquema: ¿incumple alguna regla? (clave = posición
-      // de fila + nombre de columna; las etiquetas del índice no pintan)
-      const violRule = currentViolations.get(item.i + '\u0000' + currentColumns[idx]);
-      const violTitle = violRule ? ' — incumple: ' + SV_RULE_LABELS[violRule] : '';
-      // Bug 4: el backend envía JSON null para nulos reales de pandas (NaN)
-      if (cellVal === null || cellVal === undefined) {
-        const nullCls = violRule ? 'cell-null-td cell-viol' : 'cell-null-td';
-        h += '<td class="' + nullCls + '"><span class="cell-null" title="Nulo real de pandas (NaN)' + violTitle + '">null</span></td>';
-        return;
-      }
-      const escaped = escapeHtml(String(cellVal));
-      const highlighted = query ? highlightEscaped(escaped, query) : escaped;
-      const violCls = violRule ? ' class="cell-viol"' : '';
-      h += '<td' + violCls + ' title="' + escaped + violTitle + '">' + highlighted + '</td>';
-    });
-    return h + '</tr>';
-  };
+  // (el builder de filas vive en makeRowBuilder: lee la ventana de
+  // columnas desde g en tiempo de ejecución)
+  // Ventana de columnas visible (con buffer) + thead cacheado por firma:
+  // una búsqueda o una operación de valores no toca la cabecera.
+  const win = computeColWindow(prevScrollLeft, g);
+  g.colStart = win.start;
+  g.colEnd = win.end;
+  paintThead(table, g);
 
-  if (rows.length <= GRID_VIRT_MIN) {
-    // Caso normal: render directo, DOM idéntico al previo a F3.6
-    gridView = null;
-    wrap.innerHTML = theadHtml + '<tbody>' + rows.map(buildRowHtml).join('') + '</tbody></table>';
-    wrap.scrollTop = prevScrollTop;
-  } else {
-    // Virtualizado: tbody con solo el viewport + buffers, spacers arriba/abajo
-    gridView = { rows, visibleCols, visibleIndices, query, buildRowHtml,
-                 rowH: GRID_ROW_H_FALLBACK, start: 0, end: -1 };
-    wrap.innerHTML = theadHtml + '<tbody id="grid-tbody"></tbody></table>';
-    updateVirtualRows();
-    // Medir la altura real de fila (fraccional: getBoundingClientRect
-    // evita el redondeo de offsetHeight, que acumulaba ~1px de drift por
-    // rango renderizado y temblaba el scroll al cambiar de slice) y
-    // corregir el slice inicial.
-    const first = wrap.querySelector('#grid-tbody tr:not(.vs-spacer)');
-    if (first && first.getBoundingClientRect().height > 0
-        && Math.abs(first.getBoundingClientRect().height - gridView.rowH) > 0.01) {
-      gridView.rowH = first.getBoundingClientRect().height;
-      gridView.end = -1;
-      updateVirtualRows();
-    }
-    if (prevScrollTop > 0) {
-      wrap.scrollTop = prevScrollTop;
-      updateVirtualRows(); // re-slicear el viewport para la nueva posición
-    }
+  gridView = g;
+  updateVirtualRows();
+  // Medir la altura real de fila (fraccional: getBoundingClientRect
+  // evita el redondeo de offsetHeight, que acumulaba ~1px de drift por
+  // rango renderizado y temblaba el scroll al cambiar de slice) y
+  // corregir el slice inicial.
+  const first = wrap.querySelector('#grid-tbody tr:not(.vs-spacer)');
+  if (first && first.getBoundingClientRect().height > 0
+      && Math.abs(first.getBoundingClientRect().height - g.rowH) > 0.01) {
+    g.rowH = first.getBoundingClientRect().height;
+    g.end = -1;
   }
+  // Restaurar scroll (vertical y horizontal) y re-slicear en su posición
+  if (wrap.scrollTop !== prevScrollTop) wrap.scrollTop = prevScrollTop;
+  if (wrap.scrollLeft !== prevScrollLeft) wrap.scrollLeft = prevScrollLeft;
+  updateVirtualRows();
   wrap.onscroll = gridOnScroll;
   document.getElementById('truncated-msg').style.display = (data.truncated && !query) ? 'block' : 'none';
 }
