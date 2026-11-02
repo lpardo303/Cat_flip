@@ -236,6 +236,7 @@ const COL_BUFFER = 3;            // columnas de buffer horizontal por lado
 const COL_W_MIN = 80;            // clamp del ancho calibrado (px)
 const COL_W_MAX = 260;
 const COL_W_FALLBACK = 160;      // ancho de respaldo si la medición falla
+const CALIB_SAMPLE_N = 128;      // filas objetivo del muestreo de calibración
 let gridView = null;             // estado del render virtualizado activo
 let gridRafPending = false;
 let gridColWidths = new Map();   // nombre de columna → ancho calibrado (px)
@@ -323,8 +324,9 @@ function makeRowBuilder(g) {
   };
 }
 
-// Ventana de columnas visible a partir del scrollLeft (con buffer)
-function computeColWindow(scrollLeft, g) {
+// Rango de slots visibles (sin buffer) para un scrollLeft dado.
+// El extremo final es excluido, como en computeColWindow.
+function computeVisibleRange(scrollLeft, g) {
   const total = g.totalSlots;
   const w = g.widths;
   const wrap = document.getElementById('table-wrap');
@@ -335,8 +337,15 @@ function computeColWindow(scrollLeft, g) {
   let end = start;
   const rightEdge = scrollLeft + viewW;
   while (end < total && acc < rightEdge) { acc += w[end]; end++; }
-  start = Math.max(0, start - COL_BUFFER);
-  end = Math.min(total, end + COL_BUFFER);
+  return { start, end };
+}
+
+// Ventana de columnas visible a partir del scrollLeft (con buffer)
+function computeColWindow(scrollLeft, g) {
+  const total = g.totalSlots;
+  const vis = computeVisibleRange(scrollLeft, g);
+  let start = Math.max(0, vis.start - COL_BUFFER);
+  let end = Math.min(total, vis.end + COL_BUFFER);
   if (end <= start) end = Math.min(total, start + 1);
   return { start, end };
 }
@@ -394,6 +403,13 @@ function updateVirtualCols() {
   const g = gridView;
   if (!g) return false;
   const wrap = document.getElementById('table-wrap');
+  // Histeresis: mientras la franja visible siga DENTRO de la ventana ya
+  // pintada no se re-ventanea. Cada re-ventaneo obliga a reconstruir el
+  // tbody entero (medido: ~10 ms de JS + layout; en scroll horizontal se
+  // cruzaba una columna cada ~77 ms → 39 reconstrucciones en 3 s). Con
+  // buffer 3 la ventana solo se mueve cada 3-4 cruces → ÷3-4 reconstrucciones.
+  const vis = computeVisibleRange(wrap.scrollLeft, g);
+  if (vis.start >= g.colStart && vis.end <= g.colEnd) return false;
   const win = computeColWindow(wrap.scrollLeft, g);
   if (win.start === g.colStart && win.end === g.colEnd) return false;
   g.colStart = win.start;
@@ -466,16 +482,27 @@ if (gridWrapObserved && typeof ResizeObserver !== 'undefined') {
 }
 
 // ── Calibración de anchos de columna ─────────────────────────────────────
-// Render completo en auto layout (todas las columnas, el coste del render
-// histórico) para medir el ancho real de cada cabecera; después todo el
-// grid usa table-layout: fixed con esos anchos. Solo ocurre cuando aparece
-// una columna sin ancho conocido (upload, split, rename, unhide…).
+// Render en auto layout para medir el ancho real de cada cabecera; después
+// todo el grid usa table-layout: fixed con esos anchos. Solo ocurre cuando
+// aparece una columna sin ancho conocido (upload, split, rename, unhide…).
+// Muestreo: renderizar TODAS las filas (515×78 en el caso real) cuesta
+// ~1.6 s de bloqueo (medido); una estrada que cubre todo el dataset
+// (~CALIB_SAMPLE_N filas) lo baja a ~0.3 s, con desviación de anchos de
+// ≤19 px en una sola columna de 78 (el valor extremo aislado se recorta
+// con ellipsis + tooltip, el mismo mecanismo del clamp).
+function calibSampleRows(g) {
+  const n = g.rows.length;
+  if (n <= CALIB_SAMPLE_N) return g.rows;
+  const stride = Math.ceil(n / CALIB_SAMPLE_N);
+  return g.rows.filter((_, i) => i % stride === 0);
+}
+
 function calibrateGridWidths(g) {
   const wrap = document.getElementById('table-wrap');
   // Sin la clase grid-fixed: el HTML nuevo ya nace en auto layout
   wrap.innerHTML = '<table><thead><tr><th>#</th>'
     + g.visibleCols.map(c => gridThCellHtml(c, g)).join('')
-    + '</tr></thead><tbody>' + g.rows.map(makeRowBuilder(g)).join('') + '</tbody></table>';
+    + '</tr></thead><tbody>' + calibSampleRows(g).map(makeRowBuilder(g)).join('') + '</tbody></table>';
   const ths = wrap.querySelectorAll('thead th');
   if (ths.length === g.visibleCols.length + 1) {
     const idxW = ths[0].getBoundingClientRect().width;

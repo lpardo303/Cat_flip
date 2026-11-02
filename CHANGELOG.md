@@ -64,9 +64,23 @@ siguiente corte.
   **debounce de 120 ms** y un **`ResizeObserver`** sobre el viewport
   recalcula la ventana al colapsar/expandir paneles o cambiar de pestaña
   (antes `window.resize`, que no se disparaba en esos casos). El coste
-  único de calibrar los anchos (~2 s) solo se paga en la primera carga
-  de cada esquema; medido en navegador con el fichero real
+  único de calibrar los anchos solo se paga en la primera carga de cada
+  esquema; medido en navegador con el fichero real
   («Query Mayo 2026 - I.xlsx», hoja MAYO 2026-I).
+- **Carga y scroll sin tirones: calibración muestreada + histeresis de
+  columnas**: la calibración ya no renderiza el dataset completo en auto
+  layout — muestrea ~128 filas con stride repartidas por todo el dataset
+  — lo que baja el primer pintado de **~2089 ms a ~476 ms** y la
+  recalibración de web fonts de **~1925 ms a ~530 ms** (cero bloqueos de
+  >0.5 s; subida → grid listo: **2695 → 832 ms**). Los anchos difieren
+  como máximo en **1 columna / ≤19 px** de los 78 del fichero real (el
+  recorte con ellipsis + tooltip ya documentado cubre ese caso).
+  Además `updateVirtualCols` aplica **histeresis**: mientras la franja
+  visible siga DENTRO de la ventana ya pintada no re-ventanea, así que el
+  scroll horizontal reconstruye el tbody **~1 de cada 3 cruces** en vez de
+  en cada una: **39 → 7 reconstrucciones / 3 s**, frame medio
+  **31 → 19.8 ms** y p95 **51.9 → 35 ms** (medido en navegador con el
+  fichero real).
 
 ## [1.5.1] — 2026-10-31
 
