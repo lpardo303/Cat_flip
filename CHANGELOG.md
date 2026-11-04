@@ -9,6 +9,8 @@ siguiente corte.
 
 ## [Sin publicar]
 
+## [1.6.0] — 2026-11-04
+
 ### Añadido
 
 - **Multi-File Batch Merge — consolidación de N archivos**: el selector de
@@ -535,7 +537,8 @@ diagnóstico y CI de accesibilidad.
   escritorio — sustituido por el diálogo nativo de archivo.
 - Auto-mapeo de fechas: `dayfirst` mal inferido para días ISO > 12.
 
-[Sin publicar]: https://github.com/lpardo303/Cat_flip/compare/v1.5.1...HEAD
+[Sin publicar]: https://github.com/lpardo303/Cat_flip/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/lpardo303/Cat_flip/compare/v1.5.1...v1.6.0
 [1.5.1]: https://github.com/lpardo303/Cat_flip/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/lpardo303/Cat_flip/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/lpardo303/Cat_flip/compare/v1.4.0...v1.4.1
