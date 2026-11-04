@@ -7,6 +7,20 @@
 
 **Cat_flip** es una alternativa ligera, diáfana y rápida a herramientas ETL pesadas (como Power Query), diseñada para ingenieros de datos y analistas que quieren procesar datos sin escribir código. Permite construir pipelines empresariales mediante una interfaz visual intuitiva, generando código Python/Pandas en tiempo real a medida que se aplican las transformaciones.
 
+## 🖼️ Vista previa
+
+<p align="center">
+  <img src="docs/img/Tema_claro_oscuro.png" alt="Cat_flip Studio ETL con una base DEMO cargada: mitad izquierda de la interfaz en tema oscuro y mitad derecha en tema claro" width="100%">
+</p>
+
+Data Grid con una base **DEMO** cargada: a la izquierda el catálogo de transformaciones, en el centro la tabla con el tipo detectado en cada columna y a la derecha el control de flujo (exportaciones, recetas, destinos y validación de esquema). El **tema es ortogonal al contenido**: la misma vista, sin tocar los datos, en **oscuro** (mitad izquierda) y en **claro** (mitad derecha).
+
+<p align="center">
+  <img src="docs/img/Vista_previa_Modulo_Python.png" alt="Módulo Python de Cat_flip con el código pandas generado por las transformaciones aplicadas a la base DEMO" width="100%">
+</p>
+
+Pestaña **Python**: el código pandas que Cat_flip escribe en vivo mientras aplicas las transformaciones a la base DEMO (carga con limpieza de marcadores de nulo, `change_case`, `change_type`, `drop_nulls`, `regex_mask` de PII, `concatenar_columnas` y `reorder_columns`), listo para **copiar**, exportar como pipeline `.py` o guardar como receta `.catrecipe`.
+
 ## ✨ Características Principales
 
 * 🚀 **25 Operaciones ETL:** Herramientas de limpieza, filtrado, transformación estructural (Pivot/Unpivot), reordenación de columnas (bloque fijo + resto alfabético, o mover a una posición exacta), manejo de texto y cambio de tipo en masa (selección múltiple con catálogo str/int/float/datetime/bool/category), enmascaramiento de PII (Regex Mask), concatenación de columnas, detección de outliers (Z-Score / IQR) y muestreo reproducible (head/tail/random/stratified con semilla fija).
