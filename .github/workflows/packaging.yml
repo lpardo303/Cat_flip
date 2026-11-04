@@ -83,8 +83,13 @@ jobs:
           # FUSE no siempre está en el runner: se extrae y se lanza AppRun,
           # que además es el squashfs real que se distribuye.
           chmod +x "$IMG"
-          (cd dist/appimage && "./$(basename "$IMG")" --appimage-extract > /dev/null)
-          (cd dist/appimage/squashfs-root && exec ./AppRun > /tmp/catflip-appimage-smoke.log 2>&1) &
+          # La extracción va a un directorio temporal FUERA de dist/: hecha
+          # dentro, el squashfs-root (~180 MB) viajaba en el artefacto del job
+          # y el job de release intentaba subirlo como asset muriendo con
+          # «read artifacts/appimage/squashfs-root: is a directory» (1.5.1).
+          SCRATCH="$(mktemp -d)"
+          (cd "$SCRATCH" && "$GITHUB_WORKSPACE/dist/appimage/$(basename "$IMG")" --appimage-extract > /dev/null)
+          (cd "$SCRATCH/squashfs-root" && exec ./AppRun > /tmp/catflip-appimage-smoke.log 2>&1) &
           PID=$!
           # El proceso se mata SIEMPRE al salir del paso, pase lo que pase
           # (mismo criterio que el trap del smoke del Flatpak).
@@ -393,9 +398,15 @@ jobs:
           # cubre SHA256SUMS.flatpak.asc: añadirlos aparte duplicaría. En
           # windows NO hay esa casualidad (SHA256SUMS.windows no acaba en
           # .exe), así que sus checksums se suben aparte: sin estas dos
-          # líneas la release sale sin SHA256SUMS.windows(.asc).
+          # líneas la release sale sin SHA256SUMS.windows(.asc). En appimage
+          # los ficheros se listan uno a uno a propósito: con `*` también
+          # entraba cualquier carpeta que dejara el smoke y gh moría al
+          # intentar subirla (el squashfs-root de 1.5.1).
           gh release upload "$GITHUB_REF_NAME" --clobber \
-            artifacts/appimage/* \
+            artifacts/appimage/*.AppImage \
+            artifacts/appimage/*.AppImage.asc \
+            artifacts/appimage/SHA256SUMS.appimage \
+            artifacts/appimage/SHA256SUMS.appimage.asc \
             artifacts/flatpak/*.flatpak \
             artifacts/flatpak/*.flatpak.asc \
             artifacts/windows/*.exe \
