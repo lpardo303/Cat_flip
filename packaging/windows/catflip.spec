@@ -31,12 +31,15 @@ datas = [
 
 a = Analysis(
     [os.path.join(ROOT, "packaging", "appimage", "entry.py")],
-    pathex=[ROOT],
+    # `openbrowser.py` vive junto a `entry.py`, fuera de ROOT: sin este
+    # pathex el import del punto de entrada no se resuelve al congelar.
+    pathex=[ROOT, os.path.join(ROOT, "packaging", "appimage")],
     binaries=[],
     datas=datas,
     # app.py entra como dato (runpy lo ejecuta) y como hidden import para que
     # el grafo de dependencias (pandas, pyarrow, flask, premium) se analice.
-    hiddenimports=["app", "operations", "premium"],
+    # `openbrowser` es el ayudante de `entry.py` que abre el navegador.
+    hiddenimports=["app", "operations", "premium", "openbrowser"],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

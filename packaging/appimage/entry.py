@@ -12,10 +12,16 @@ Flask resuelve sus rutas relativas igual que en desarrollo:
 
 `runpy.run_path` con `run_name="__main__"` hace que app.py vea su guard
 `if __name__ == "__main__"` como verdadero y arranque el servidor.
+
+Antes de eso se lanza `openbrowser.lanzar()`: abrir Cat_flip desde el menú
+no deja consola donde leer la URL, así que el navegador por defecto tiene
+que abrirse solo (hilo aparte, porque `app.run()` es bloqueante).
 """
 import os
 import runpy
 import sys
+
+import openbrowser
 
 if getattr(sys, "frozen", False):
     base = sys._MEIPASS
@@ -32,4 +38,7 @@ else:
 sys.path.insert(0, base)
 # Rutas relativas (premium.key, exports) resuelven igual en cualquier sitio.
 os.chdir(base)
+# Se abre cuando el puerto ya responde; en CI o sin sesión gráfica no hace
+# nada, y si no hay navegador el servidor sigue arrancando igual.
+openbrowser.lanzar()
 runpy.run_path(os.path.join(base, "app.py"), run_name="__main__")

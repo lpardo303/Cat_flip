@@ -126,7 +126,7 @@ packaging/appimage/build.sh   # dist/appimage/CatFlip-<ver>-x86_64.AppImage (+ .
 packaging/flatpak/build.sh    # dist/flatpak/repo (ostree firmado) + CatFlip-<ver>.flatpak (+ .asc)
 ```
 
-Ambos formatos envuelven el mismo binario congelado de PyInstaller. Requisitos, verificación de firmas, instalación y las decisiones técnicas (runtime 26.08, SDK a nivel de sistema) están en **[packaging/README.md](packaging/README.md)**.
+Ambos formatos envuelven el mismo binario congelado de PyInstaller y, al arrancar, **abren tu navegador por defecto** en `http://127.0.0.1:5050` (con `CATFLIP_NO_BROWSER=1` no lo hacen). Requisitos, verificación de firmas, instalación y las decisiones técnicas (runtime 26.08, SDK a nivel de sistema) están en **[packaging/README.md](packaging/README.md)**.
 
 ## 🧪 Tests
 
