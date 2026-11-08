@@ -32,7 +32,10 @@ a = Analysis(
     # app.py entra como dato (runpy lo ejecuta) y como hidden import para que
     # el grafo de dependencias (pandas, pyarrow, flask, premium) se analice.
     # `openbrowser` es el ayudante de `entry.py` que abre el navegador.
-    hiddenimports=["app", "operations", "premium", "openbrowser"],
+    # python_calamine: pandas lo importa en diferido (import_optional_dependency)
+    # como motor de lectura de .xls, así que el análisis estático de PyInstaller
+    # no lo ve y el bundle fallaba con "Import python-calamine failed".
+    hiddenimports=["app", "operations", "premium", "openbrowser", "python_calamine"],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

@@ -11,6 +11,25 @@ siguiente corte.
 
 ### Solucionado
 
+- **`.xls` (Excel 97-2003) no se podía leer**: la extensión se anunciaba
+  en el selector, el dropzone, el CLI y los mensajes de error, pero
+  pandas 3 ya no incluye motor para BIFF y, sin él, subir un `.xls` real
+  devolvía 500 con `Import python-calamine failed` — también en
+  `/get_sheets`. Ahora `python-calamine` viaja en `requirements.txt` y
+  como `hiddenimport` en los dos specs de PyInstaller (pandas lo importa
+  en diferido, así que el análisis estático no lo ve y el Flatpak, el
+  AppImage y el `.exe` habrían seguido fallando). Además el motor se fija
+  explícitamente —`openpyxl` para `.xlsx`, `calamine` para `.xls`— en
+  `read_table` y `/get_sheets`, para no depender del motor por defecto de
+  pandas, que ya avisa de que va a cambiar. Tests nuevos con un `.xls`
+  BIFF real (fixture generado con LibreOffice): `/upload`, `/get_sheets`
+  y CLI.
+- **Faltaba TSV en el estado vacío**: la bienvenida decía «Carga un
+  archivo CSV, XLSX o XLS» mientras el resto de la interfaz, el CLI y los
+  mensajes 400 sí admiten `.tsv` (detectando tabulador). Corregido, y con
+  tests anti-deriva que leen `templates/index.html` y exigen que el estado
+  vacío, el hint del dropzone y el `accept=` nombren exactamente las
+  extensiones que acepta el backend.
 - **El paquete abre el navegador al arrancar (Flatpak, AppImage y
   `.exe`)**: el binario congelado solo levantaba Flask, así que abrir
   Cat_flip desde el menú daba la sensación de que «no pasaba nada» — la
