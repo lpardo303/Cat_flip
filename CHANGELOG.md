@@ -9,6 +9,24 @@ siguiente corte.
 
 ## [Sin publicar]
 
+### Solucionado
+
+- **El paquete abre el navegador al arrancar (Flatpak, AppImage y
+  `.exe`)**: el binario congelado solo levantaba Flask, así que abrir
+  Cat_flip desde el menú daba la sensación de que «no pasaba nada» — la
+  URL `127.0.0.1:5050` había que escribirla a mano, porque los
+  `launch.sh`/`launch.fish`/`launch.bat` del repo son lanzadores de
+  desarrollo y no viajan dentro del paquete. Ahora un hilo espera a que
+  el puerto responda (hasta 30 s: Flask importa pandas antes de escuchar)
+  y abre la URL con el navegador por defecto: `xdg-open` en Linux —dentro
+  del sandbox del Flatpak resuelve por el portal OpenURI, sin permisos
+  extra—, `gio open` como alternativa y `flatpak-spawn --host` como
+  último recurso. Es un hilo *daemon* que nunca levanta excepciones: si
+  no hay navegador, o falla, el servidor arranca igual. Se desactiva con
+  `CATFLIP_NO_BROWSER=1` y no se intenta en CI ni sin sesión gráfica, así
+  que los smokes del packaging siguen ejecutando el binario a ciegas sin
+  cambios en el workflow.
+
 ## [1.6.0] — 2026-11-04
 
 ### Añadido

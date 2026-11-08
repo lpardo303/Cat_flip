@@ -89,6 +89,17 @@ gpg --verify dist/flatpak/CatFlip-1.0.0.flatpak.asc dist/flatpak/CatFlip-1.0.0.f
 flatpak install --user --bundle dist/flatpak/CatFlip-1.0.0.flatpak
 ```
 
+Al arrancar cualquiera de los tres formatos, el binario levanta el
+servidor y **abre la URL en tu navegador por defecto** en cuanto el
+puerto responde (hasta 30 s de espera). Lo hace `openbrowser.py`, junto
+a `entry.py`, y vale igual dentro del sandbox del Flatpak: el `xdg-open`
+del runtime `26.08` resuelve por el portal OpenURI, así que **no hace
+falta ningún `finish-arg` extra** — solo el `--share=network` que ya
+tiene el manifiesto, para que el navegador del host llegue a
+`127.0.0.1:5050`. `CATFLIP_NO_BROWSER=1` lo desactiva (servidores,
+sesiones remotas, lanzadores propios); en CI y sin sesión gráfica no se
+intenta y el servidor arranca igual.
+
 Comprobado en este repo: el repo con `gpg-verify=1` **rechaza** un
 `summary.idx` alterado (`BAD signature ... key ID DE7CB5CA87D2DD91`) e
 instala el original; nota que `summary.idx.sig` es un contenedor ostree
