@@ -38,6 +38,11 @@ Desktop.ini
 *.csv
 *.xlsx
 *.xls
+# ...pero el fixture binario de los tests SÍ se versiona: el .xls BIFF de
+# tests/fixtures es un archivo real generado con LibreOffice (no se puede
+# recrear en CI sin la suite de oficina) y es lo único que prueba la lectura
+# de Excel 97-2003.
+!tests/fixtures/*.xls
 
 # Windows
 *.lnk

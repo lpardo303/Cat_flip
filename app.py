@@ -161,6 +161,18 @@ _NULLS_TAIL = (
 )
 
 
+def excel_engine(filename):
+    """Motor explícito de pandas para un Excel, por extensión.
+
+    Sin esto, al tener `python-calamine` instalado pandas avisa de que el
+    motor por defecto de `.xlsx` cambiará de `openpyxl` a `calamine` y de que
+    `xlrd` desaparece: ruido en cada carga. Fijarlo conserva exactamente el
+    comportamiento de siempre (`.xlsx` → openpyxl) y hace que `.xls` (BIFF)
+    funcione con el motor que pandas 3 mantiene.
+    """
+    return "calamine" if filename.lower().endswith(".xls") else "openpyxl"
+
+
 def read_table(file, sheet=None):
     """Lee un CSV/XLSX/XLS subido y devuelve (df, expresión pandas, encoding).
 
@@ -219,7 +231,11 @@ def read_table(file, sheet=None):
     if sheet is None:
         sheet = request.form.get("sheet", 0) if has_request_context() else 0
     df = normalize_read_nulls(
-        pd.read_excel(file, sheet_name=int(sheet) if str(sheet).isdigit() else sheet)
+        pd.read_excel(
+            file,
+            sheet_name=int(sheet) if str(sheet).isdigit() else sheet,
+            engine=excel_engine(file.filename),
+        )
     )
     return df, f"pd.read_excel('{file.filename}', sheet_name={repr(sheet)})" + _NULLS_TAIL, None
 
@@ -297,7 +313,7 @@ def right_info():
 def get_sheets():
     file = request.files["file"]
     try:
-        xl = pd.ExcelFile(file)
+        xl = pd.ExcelFile(file, engine=excel_engine(file.filename))
         return jsonify({"sheets": xl.sheet_names})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -779,7 +795,7 @@ def receta_a_codigo(steps, load_code="df = pd.read_csv(entrada)"):
         "# ============================================================\n"
         "# Pipeline generado por Cat_flip — Studio ETL\n"
         "# Reproduce la receta exacta que ejecutaste en la app.\n"
-        "# Requiere: pandas (+ openpyxl para leer .xlsx)\n"
+        "# Requiere: pandas (+ openpyxl para .xlsx, python-calamine para .xls)\n"
         "# Uso: python pipeline_catflip.py datos_entrada.xlsx salida_resultante.xlsx\n"
         "# ============================================================\n\n"
         "import sys\n\n"
