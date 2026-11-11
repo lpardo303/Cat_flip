@@ -253,17 +253,25 @@ _NULLS_TAIL = (
 
 
 def excel_engine(filename):
-    """Motor explícito de pandas para un Excel/ODS, por extensión.
+    """Motor explícito de pandas para hojas de cálculo: `calamine`, siempre.
 
-    `.xlsx` → openpyxl: sin fijarlo, al tener `python-calamine` instalado
-    pandas avisa de que el motor por defecto de `.xlsx` va a cambiar, y este
-    conserva el comportamiento de siempre.
+    Un solo motor para `.xlsx`, `.xls`, `.xlsb` y `.ods`, fijado a propósito
+    en vez de dejar que lo elija pandas: el default de `.xlsx` es hoy
+    `openpyxl` y va a cambiar, y `.ods`/`.xlsb` pedirían `odf`/`pyxlsb`. Sin
+    fijarlo, el mismo archivo se leería con un motor distinto según la versión
+    de pandas (y el script exportado dejaría de reproducir la carga).
 
-    `.xls` (BIFF), `.xlsb` y `.ods` → calamine, el motor que pandas 3 mantiene.
-    Para `.ods` el default sería `odf` (odfpy) y para `.xlsb` `pyxlsb`: dos
-    dependencias que no empaquetamos.
+    Se eligió calamine midiendo: sobre 50.000×8 idéntico en columnas, dtypes
+    y valores que openpyxl (fechas, horas, booleanos, enteros >2^53, errores
+    de fórmula, combinadas, encabezados raros), 7× más rápido (0,8 s frente a
+    6,0 s) y además lee cuadernos con hoja de gráfico, que hacen fallar a
+    openpyxl 3.1.5. Coste: ~25 % más de pico de memoria al leer.
+
+    `openpyxl` sigue siendo dependencia porque es quien **escribe** `.xlsx`
+    (`to_excel`); aquí solo cambia la lectura. Este es el único interruptor:
+    devolver `"openpyxl"` para `.xlsx` revierte al comportamiento anterior.
     """
-    return "openpyxl" if filename.lower().endswith(".xlsx") else "calamine"
+    return "calamine"
 
 
 def read_table(file, sheet=None):
@@ -361,11 +369,11 @@ def read_table(file, sheet=None):
         )
     )
     expr = f"pd.read_excel('{file.filename}', sheet_name={repr(sheet)}"
-    if low.endswith((".ods", ".xlsb")):
-        # pandas 3 leería .ods con `odf` (odfpy) y .xlsb con `pyxlsb` por
-        # defecto: el script exportado lleva el motor explícito para
-        # reproducir la carga sin pedirle al usuario una dependencia más.
-        expr += ", engine='calamine'"
+    # El motor usado va explícito en el código exportado: el default de
+    # pandas no es el nuestro (`.xlsx` → openpyxl hoy, y cambiará; `.ods` →
+    # odfpy; `.xlsb` → pyxlsb), así que sin esto el script leería con otro
+    # motor y dejaría de reproducir la carga.
+    expr += f", engine={engine!r}"
     return df, expr + ")" + _NULLS_TAIL, None
 
 
@@ -928,7 +936,8 @@ def receta_a_codigo(steps, load_code="df = pd.read_csv(entrada)"):
         "# ============================================================\n"
         "# Pipeline generado por Cat_flip — Studio ETL\n"
         "# Reproduce la receta exacta que ejecutaste en la app.\n"
-        "# Requiere: pandas (+ openpyxl para .xlsx, python-calamine para .xls)\n"
+        "# Requiere: pandas (+ python-calamine para leer hojas de cálculo\n"
+        "#            y openpyxl para escribir el .xlsx de salida)\n"
         "# Uso: python pipeline_catflip.py datos_entrada.xlsx salida_resultante.xlsx\n"
         "# ============================================================\n\n"
         "import sys\n\n"
