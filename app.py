@@ -74,6 +74,24 @@ right_df = None
 right_name = ""
 right_code = ""
 
+def _celda_json(value):
+    """Valor de una celda listo para el front.
+
+    Nulos reales como JSON null (Bug 4): el front los pinta con la etiqueta
+    "null" tenue. Antes fillna("") los ocultaba como celda vacía
+    indistinguible de un string vacío legítimo.
+
+    Un JSON anidado deja listas/objetos dentro de la celda; `pd.isna` sobre
+    una lista devuelve un array y el `if` reventaba con «truth value of an
+    array is ambiguous». Se serializan como texto JSON, que es lo que el grid
+    y las operaciones de texto pueden manejar; el DataFrame conserva la
+    estructura para las exportaciones.
+    """
+    if pd.api.types.is_list_like(value):
+        return json.dumps(value, ensure_ascii=False, default=str)
+    return None if pd.isna(value) else str(value)
+
+
 def df_to_json(df, max_rows=5000):
     """Convierte DataFrame a JSON seguro para el frontend.
 
@@ -96,10 +114,7 @@ def df_to_json(df, max_rows=5000):
             return "FLOAT"
         return "STR"
 
-    # Filas con nulos reales como JSON null (Bug 4): el front los pinta con
-    # la etiqueta "null" tenue. Antes fillna("") los ocultaba como celda
-    # vacía indistinguible de un string vacío legítimo.
-    rows = [[None if pd.isna(v) else str(v) for v in row]
+    rows = [[_celda_json(v) for v in row]
             for row in preview.itertuples(index=False, name=None)]
 
     return {
@@ -156,6 +171,76 @@ def _detect_delimiter(text):
     totals = {c: sum(ln.count(c) for ln in lines) for c in _DELIM_CANDIDATES}
     best_c, best_n = max(totals.items(), key=lambda kv: kv[1])
     return best_c if best_n else ","
+
+
+# ── JSON de entrada ──────────────────────────────────────────────────────
+# Un `.json` puede venir en cinco formas y pandas adivina mal algunas (un
+# objeto indexado se convertía en columnas si se le pasaba `orient='records'`),
+# así que la estructura se decide aquí y el `orient` va explícito tanto en la
+# lectura como en el código exportado.
+
+def _detect_json_orient(obj):
+    """Orientación pandas de un JSON ya parseado (records/columns/index/values)."""
+    if isinstance(obj, list):
+        if not obj:
+            raise ValueError("El JSON no contiene registros.")
+        if all(isinstance(x, dict) for x in obj):
+            return "records"
+        if all(isinstance(x, list) for x in obj):
+            return "values"
+        raise ValueError(
+            "JSON no soportado: el array mezcla objetos y valores. "
+            "Usa un array de objetos o un array de filas."
+        )
+    if isinstance(obj, dict):
+        if not obj:
+            raise ValueError("El JSON no contiene registros.")
+        if all(isinstance(v, list) for v in obj.values()):
+            return "columns"  # {"col": [valores]}
+        if all(isinstance(v, dict) for v in obj.values()):
+            return "index"  # {"fila": {"col": valor}}
+        raise ValueError(
+            "JSON no soportado: el objeto mezcla listas y objetos. "
+            'Usa {"columna": [valores]} o envuelve el registro en un array: '
+            '[{...}].'
+        )
+    raise ValueError(
+        "JSON no soportado: la raíz debe ser un array de objetos, un objeto "
+        'de columnas ({"col": [...]}) o un objeto de filas ({"fila": {...}}).'
+    )
+
+
+def _read_json(text):
+    """Lee un JSON de texto y devuelve (df, orient, lines).
+
+    Soporta las cuatro orientaciones de pandas más NDJSON (un objeto por
+    línea, que es lo que exportan muchas APIs y herramientas de logs): si el
+    documento entero no parsea, se reintenta línea a línea.
+    """
+    try:
+        obj = json.loads(text)
+    except json.JSONDecodeError as error:
+        registros = _json_lines(text)
+        if registros is None:
+            raise ValueError(
+                f"JSON inválido: {error.msg} (línea {error.lineno}, "
+                f"columna {error.colno})."
+            ) from None
+        return pd.read_json(io.StringIO(text), lines=True), "records", True
+    orient = _detect_json_orient(obj)
+    return pd.read_json(io.StringIO(text), orient=orient), orient, False
+
+
+def _json_lines(text):
+    """Filas de un NDJSON (una por línea), o None si no lo es."""
+    lineas = [ln for ln in text.splitlines() if ln.strip()]
+    if len(lineas) < 2:
+        return None
+    try:
+        registros = [json.loads(ln) for ln in lineas]
+    except json.JSONDecodeError:
+        return None
+    return registros if all(isinstance(r, dict) for r in registros) else None
 
 
 # Cola que encadena la expresión de carga con la normalización de nulos
@@ -243,6 +328,28 @@ def read_table(file, sheet=None):
         # para que una celda de solo espacios no burle el resto del pipeline.
         df = normalize_read_nulls(pd.read_parquet(file))
         return df, f"pd.read_parquet('{file.filename}')" + _NULLS_TAIL, None
+    if low.endswith(".json"):
+        content = file.read()
+        file.seek(0)
+        try:
+            # utf-8-sig: un BOM al inicio (export de Excel/Windows) rompe el
+            # parseo si se decodifica como utf-8 puro.
+            text = content.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            raise ValueError(
+                "JSON no legible: el archivo debe estar en UTF-8 "
+                "(un .json de otra codificación no es JSON válido)."
+            ) from None
+        df, orient, lines = _read_json(text)
+        # Objetos anidados → columnas con punto (Direccion.Ciudad). Las listas
+        # se quedan como celda: no se explotan filas por debajo del usuario.
+        df = pd.json_normalize(df.to_dict(orient="records"))
+        args = f"orient={orient!r}" + (", lines=True" if lines else "")
+        expr = (
+            f"pd.json_normalize(pd.read_json('{file.filename}', {args})"
+            ".to_dict(orient='records'))"
+        )
+        return normalize_read_nulls(df), expr + _NULLS_TAIL, None
     if sheet is None:
         sheet = request.form.get("sheet", 0) if has_request_context() else 0
     engine = excel_engine(file.filename)

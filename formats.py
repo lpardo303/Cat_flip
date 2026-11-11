@@ -20,6 +20,7 @@ LABELS = {
     ".xlsb": "XLSB",
     ".ods": "ODS",
     ".parquet": "Parquet",
+    ".json": "JSON",
 }
 
 READ_EXTS = tuple(LABELS)

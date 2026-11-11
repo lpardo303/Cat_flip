@@ -14,6 +14,9 @@ Fixtures reales, no bytes falsos:
   tipos numéricos sobrevivan a la conversión (un CSV de entrada los dejaría
   como texto y el test no probaría nada).
 - `tests/fixtures/ventas.parquet` → pyarrow desde el mismo DataFrame.
+- `tests/fixtures/ventas.json` → esquema plano (array de registros) con los
+  mismos datos que los demás. `tests/fixtures/anidado.json` → objetos y
+  listas dentro de cada registro, para el aplanado.
 - `tests/fixtures/hojas.xlsb` → **del corpus de tests de calamine**
   (proyecto MIT, `tests/any_sheets.xlsb`). Ningún conversor local escribe
   XLSB —LibreOffice no exporta el formato y `pyxlsb` solo lee—, así que el
@@ -57,6 +60,7 @@ EXPR_ESPERADA = {
     ".ods": "pd.read_excel('ventas.ods', sheet_name=0, engine='calamine'",
     ".xlsb": "pd.read_excel('hojas.xlsb', sheet_name=0, engine='calamine'",
     ".parquet": "pd.read_parquet('ventas.parquet'",
+    ".json": "pd.json_normalize(pd.read_json('ventas.json', orient='records')",
 }
 
 
@@ -134,8 +138,9 @@ def test_los_textos_derivados_nombran_todos_los_formatos():
     for texto in (formats.read_plain(), formats.read_html(), formats.read_dots()):
         for etiqueta in formats.LABELS.values():
             assert etiqueta.lower() in texto.lower(), f"{etiqueta} falta en {texto!r}"
-    # La conjunción final va con «o»: «… ODS o Parquet»
-    assert formats.read_plain().endswith(" o Parquet")
+    # La conjunción final va con «o»: «… Parquet o JSON»
+    ultimo = formats.LABELS[formats.READ_EXTS[-1]]
+    assert formats.read_plain().endswith(f" o {ultimo}")
     assert "<strong>CSV</strong>" in formats.read_html()
 
 
@@ -195,7 +200,7 @@ def test_get_sheets_devuelve_las_hojas_de_los_formatos_con_hojas(ext, client):
         assert hojas == ["Visible", "Hidden", "VeryHidden"]
 
 
-@pytest.mark.parametrize("ext", (".parquet", ".csv", ".tsv"))
+@pytest.mark.parametrize("ext", (".parquet", ".csv", ".tsv", ".json"))
 def test_get_sheets_no_falla_en_formatos_sin_hojas(ext, client):
     nombre, contenido = _contenido(ext)
     resp = client.post(
@@ -207,7 +212,7 @@ def test_get_sheets_no_falla_en_formatos_sin_hojas(ext, client):
     assert resp.get_json()["sheets"] == []
 
 
-@pytest.mark.parametrize("ext", (".ods", ".xlsb", ".parquet"))
+@pytest.mark.parametrize("ext", (".ods", ".xlsb", ".parquet", ".json"))
 def test_cli_carga_los_formatos_con_motor_explicito(ext):
     """El CLI comparte read_table, así que cubre los tres motores nuevos."""
     nombre = "hojas.xlsb" if ext == ".xlsb" else f"ventas{ext}"
@@ -271,6 +276,123 @@ def test_el_batch_rechaza_un_formato_no_soportado(client):
     assert "Parquet" in resp.get_json()["error"]
 
 
+# ── JSON: orientaciones, esquemas anidados y errores ──────────────────
+def _subir(client, nombre, contenido):
+    if isinstance(contenido, str):
+        contenido = contenido.encode("utf-8")
+    return client.post(
+        "/upload",
+        data={"file": (io.BytesIO(contenido), nombre)},
+        content_type="multipart/form-data",
+    )
+
+
+@pytest.mark.parametrize(
+    "nombre,texto,columnas,orient",
+    [
+        # Array de objetos: la forma habitual
+        ("registros.json", '[{"a":1,"b":"x"},{"a":2,"b":"y"}]', ["a", "b"], "records"),
+        # {"columna": [valores]}
+        ("columnas.json", '{"a":[1,2],"b":["x","y"]}', ["a", "b"], "columns"),
+        # {"fila": {...}}: con orient="records" pandas lo leía transpuesto
+        ("indice.json", '{"f1":{"a":1,"b":"x"},"f2":{"a":2,"b":"y"}}', ["a", "b"], "index"),
+        # Array de filas, sin nombres de columna
+        ("valores.json", '[[1,"x"],[2,"y"]]', [0, 1], "values"),
+        # NDJSON: un objeto por línea (lo que exportan logs y muchas APIs)
+        ("lineas.json", '{"a":1,"b":"x"}\n{"a":2,"b":"y"}', ["a", "b"], "records"),
+    ],
+)
+def test_json_detecta_la_orientacion(nombre, texto, columnas, orient, client):
+    resp = _subir(client, nombre, texto)
+    assert resp.status_code == 200, resp.get_json()
+    cuerpo = resp.get_json()
+    assert cuerpo["data"]["columns"] == columnas
+    assert cuerpo["data"]["total_rows"] == 2
+    # La orientación va explícita también en el código generado
+    assert f"orient={orient!r}" in cuerpo["code"], cuerpo["code"]
+    assert ("lines=True" in cuerpo["code"]) is (nombre == "lineas.json")
+
+
+def test_json_anidado_se_aplana_sin_duplicar_filas():
+    """Objetos → columnas con punto; las listas quedan como celda, intactas."""
+    contenido = (FIXTURES / "anidado.json").read_bytes()
+    df, _, _ = read_table(_ArchivoConNombre(contenido, "anidado.json"))
+    assert list(df.columns) == [
+        "Nombre",
+        "Etiquetas",
+        "Pedidos",
+        "Contacto.Ciudad",
+        "Contacto.CodigoPostal",
+    ]
+    # Aplanar no puede multiplicar filas: 2 registros de entrada → 2 filas
+    assert len(df) == 2
+    assert df.loc[0, "Contacto.Ciudad"] == "Madrid"
+    assert list(df.loc[0, "Etiquetas"]) == ["cliente", "vip"]
+    assert [p["total"] for p in df.loc[0, "Pedidos"]] == [120.5, 80.0]
+
+
+def test_upload_de_json_anidado_no_revienta_con_celdas_de_lista(client):
+    """Regresión: `pd.isna` sobre una lista devolvía un array y rompía el grid."""
+    contenido = (FIXTURES / "anidado.json").read_bytes()
+    resp = client.post(
+        "/upload",
+        data={"file": (io.BytesIO(contenido), "anidado.json")},
+        content_type="multipart/form-data",
+    )
+    assert resp.status_code == 200, resp.get_json()
+    datos = resp.get_json()["data"]
+    assert datos["total_rows"] == 2
+    assert "Contacto.Ciudad" in datos["columns"]
+    fila = dict(zip(datos["columns"], datos["data"][0]))
+    # La lista viaja como texto JSON (lo que el grid y las ops de texto esperan)
+    assert json.loads(fila["Etiquetas"]) == ["cliente", "vip"]
+    assert json.loads(fila["Pedidos"])[0]["total"] == 120.5
+
+
+def test_codigo_exportado_reproduce_json_anidado(tmp_path, monkeypatch):
+    contenido = (FIXTURES / "anidado.json").read_bytes()
+    df, expr, _ = read_table(_ArchivoConNombre(contenido, "anidado.json"))
+    (tmp_path / "anidado.json").write_bytes(contenido)
+    monkeypatch.chdir(tmp_path)
+    reconstruido = eval(expr, {"pd": pd})  # noqa: S307 — expresión propia
+    assert list(reconstruido.columns) == list(df.columns)
+    assert len(reconstruido) == len(df)
+    assert reconstruido["Contacto.Ciudad"].tolist() == df["Contacto.Ciudad"].tolist()
+
+
+@pytest.mark.parametrize(
+    "nombre,texto,mensaje",
+    [
+        ("roto.json", '{"a": 1,', "JSON inválido"),
+        ("escalar.json", "42", "la raíz debe ser"),
+        # Un único registro sin array: se explica cómo arreglarlo
+        ("registro.json", '{"Nombre": "Ana"}', "envuelve el registro en un array"),
+        ("vacio.json", "[]", "no contiene registros"),
+        ("mixto.json", '[{"a": 1}, 2]', "mezcla objetos y valores"),
+    ],
+)
+def test_json_invalido_explica_el_problema(nombre, texto, mensaje, client):
+    resp = _subir(client, nombre, texto)
+    assert resp.status_code == 500
+    assert mensaje in resp.get_json()["error"], resp.get_json()["error"]
+
+
+def test_el_batch_acepta_json(client):
+    contenido = (FIXTURES / "ventas.json").read_bytes()
+    resp = client.post(
+        "/batch_preview",
+        data={
+            "files": [
+                (io.BytesIO(contenido), "a.json"),
+                (io.BytesIO(contenido), "b.json"),
+            ]
+        },
+        content_type="multipart/form-data",
+    )
+    assert resp.status_code == 200, resp.get_json()
+    assert len(resp.get_json()["files"]) == 2
+
+
 # ── Anti-deriva: el front dice lo mismo que el backend ────────────────
 def _html_renderizado(client):
     """La plantilla tal cual la ve el navegador (con el contexto Jinja)."""
@@ -295,8 +417,9 @@ def test_el_estado_vacio_nombra_todos_los_formatos_y_solo_esos(client):
     assert vacio, "no se encontró el texto del estado vacío"
     texto = re.sub(r"<[^>]+>", "", vacio.group(1))
     assert formats.read_plain() in texto, texto
-    # Y no anuncia formatos que no se leen (JSON de entrada sigue fuera)
-    assert "JSON" not in texto
+    # Y no anuncia formatos que no se leen
+    for fuera in ("XLSM", "XML"):
+        assert fuera not in texto
 
 
 def test_los_hints_de_los_dropzones_salen_de_formats(client):

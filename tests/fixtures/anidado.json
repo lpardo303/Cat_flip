@@ -1,0 +1,14 @@
+[
+  {
+    "Nombre": "Ana López",
+    "Contacto": {"Ciudad": "Madrid", "CodigoPostal": "28001"},
+    "Etiquetas": ["cliente", "vip"],
+    "Pedidos": [{"id": 1, "total": 120.5}, {"id": 2, "total": 80.0}]
+  },
+  {
+    "Nombre": "Luis Pérez",
+    "Contacto": {"Ciudad": "Bogotá", "CodigoPostal": "110111"},
+    "Etiquetas": ["cliente"],
+    "Pedidos": []
+  }
+]

@@ -294,8 +294,10 @@ def test_run_input_missing_exit_1(tmp_path, capsys):
 
 def test_run_input_unsupported_format_exit_1(tmp_path, capsys):
     recipe = write_recipe(tmp_path)
-    bad = tmp_path / "datos.json"
-    bad.write_text("[]", encoding="utf-8")
+    # `.json` ya es formato de entrada, así que el ejemplo de «no soportado»
+    # es una extensión que sigue fuera del alcance.
+    bad = tmp_path / "datos.txt"
+    bad.write_text("a,b\n1,2\n", encoding="utf-8")
     code = run(recipe, "--input", bad)
     assert code == 1
     assert "entrada no soportado" in capsys.readouterr().err
