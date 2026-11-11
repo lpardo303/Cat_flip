@@ -11,6 +11,10 @@ import urllib.error
 import urllib.request
 from functools import wraps
 
+# Formatos de entrada: única fuente de verdad (la usan también cli.py y la
+# plantilla, que recibe este módulo como contexto Jinja).
+import formats
+
 # Open Core: gating de features premium (la licencia decide qué sirve
 # /premium/status y /premium/themes/<id>.css — sin ella, 404/lista vacía)
 import premium as premium_pkg
@@ -110,7 +114,9 @@ def df_to_json(df, max_rows=5000):
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    # `fmt` → la plantilla deriva de ahí los `accept=` y los textos de formato:
+    # ninguna extensión se escribe a mano en HTML ni en JS.
+    return render_template("index.html", fmt=formats)
 
 # Separadores candidatos de CSV. El orden es el desempate de la regla de
 # consistencia ("," gana a ";" — conserva el comportamiento histórico).
@@ -162,19 +168,20 @@ _NULLS_TAIL = (
 
 
 def excel_engine(filename):
-    """Motor explícito de pandas para un Excel, por extensión.
+    """Motor explícito de pandas para un Excel/ODS, por extensión.
 
-    Sin esto, al tener `python-calamine` instalado pandas avisa de que el
-    motor por defecto de `.xlsx` cambiará de `openpyxl` a `calamine` y de que
-    `xlrd` desaparece: ruido en cada carga. Fijarlo conserva exactamente el
-    comportamiento de siempre (`.xlsx` → openpyxl) y hace que `.xls` (BIFF)
-    funcione con el motor que pandas 3 mantiene.
+    `.xlsx` → openpyxl: sin fijarlo, al tener `python-calamine` instalado
+    pandas avisa de que el motor por defecto de `.xlsx` va a cambiar, y este
+    conserva el comportamiento de siempre.
+
+    `.xls` (BIFF) y `.ods` → calamine, el motor que pandas 3 mantiene. Para
+    `.ods` el default sería `odf` (odfpy), una dependencia que no empaquetamos.
     """
-    return "calamine" if filename.lower().endswith(".xls") else "openpyxl"
+    return "openpyxl" if filename.lower().endswith(".xlsx") else "calamine"
 
 
 def read_table(file, sheet=None):
-    """Lee un CSV/XLSX/XLS subido y devuelve (df, expresión pandas, encoding).
+    """Lee un archivo de entrada y devuelve (df, expresión pandas, encoding).
 
     La expresión es el RHS listo para el código generado: en /upload se usa
     como `df = <expr>` y en el cruce como `df_right = <expr>`. El formato lo
@@ -190,7 +197,8 @@ def read_table(file, sheet=None):
     se lee `request.form['sheet']` si hay contexto Flask; sin contexto
     (modo CLI, cli.py) → hoja 0. El CLI puede pasarla explícita (--sheet).
     """
-    if file.filename.lower().endswith((".csv", ".tsv")):
+    low = file.filename.lower()
+    if low.endswith(formats.TEXT_EXTS):
         content = file.read()
         file.seek(0)
         encoding = None
@@ -228,16 +236,29 @@ def read_table(file, sheet=None):
             )
         df = normalize_read_nulls(pd.read_csv(io.StringIO(text), sep=sep))
         return df, f"pd.read_csv('{file.filename}', sep={sep!r})" + _NULLS_TAIL, None
+    if low.endswith(".parquet"):
+        # Parquet trae los tipos puestos y no tiene hojas ni codificación: se
+        # lee tal cual, con la misma normalización de vacíos que CSV/Excel
+        # para que una celda de solo espacios no burle el resto del pipeline.
+        df = normalize_read_nulls(pd.read_parquet(file))
+        return df, f"pd.read_parquet('{file.filename}')" + _NULLS_TAIL, None
     if sheet is None:
         sheet = request.form.get("sheet", 0) if has_request_context() else 0
+    engine = excel_engine(file.filename)
     df = normalize_read_nulls(
         pd.read_excel(
             file,
             sheet_name=int(sheet) if str(sheet).isdigit() else sheet,
-            engine=excel_engine(file.filename),
+            engine=engine,
         )
     )
-    return df, f"pd.read_excel('{file.filename}', sheet_name={repr(sheet)})" + _NULLS_TAIL, None
+    expr = f"pd.read_excel('{file.filename}', sheet_name={repr(sheet)}"
+    if low.endswith(".ods"):
+        # pandas 3 leería .ods con `odf` (odfpy) por defecto: el script
+        # exportado lleva el motor explícito para reproducir la carga sin
+        # pedirle al usuario una dependencia más.
+        expr += ", engine='calamine'"
+    return df, expr + ")" + _NULLS_TAIL, None
 
 
 @app.route("/upload", methods=["POST"])
@@ -247,8 +268,8 @@ def upload():
     filename = file.filename.lower()
     
     try:
-        if not filename.endswith((".csv", ".tsv", ".xlsx", ".xls")):
-            return jsonify({"error": "Formato no soportado. Usa CSV, TSV, XLSX o XLS."}), 400
+        if not formats.is_readable(filename):
+            return jsonify({"error": f"Formato no soportado. Usa {formats.read_plain()}."}), 400
 
         current_df, expr, encoding = read_table(file)
         code = f"df = {expr}"
@@ -281,8 +302,8 @@ def upload_right():
     file = request.files["file"]
     filename = file.filename.lower()
 
-    if not filename.endswith((".csv", ".tsv", ".xlsx", ".xls")):
-        return jsonify({"error": "Formato no soportado. Usa CSV, TSV, XLSX o XLS."}), 400
+    if not formats.is_readable(filename):
+        return jsonify({"error": f"Formato no soportado. Usa {formats.read_plain()}."}), 400
 
     try:
         right_df, right_code, _ = read_table(file)
@@ -312,6 +333,10 @@ def right_info():
 @app.route("/get_sheets", methods=["POST"])
 def get_sheets():
     file = request.files["file"]
+    if not formats.has_sheets(file.filename):
+        # Parquet (y cualquier formato sin hojas) no tiene selector: se
+        # responde vacío en vez de error para que el front siga su flujo.
+        return jsonify({"sheets": []})
     try:
         xl = pd.ExcelFile(file, engine=excel_engine(file.filename))
         return jsonify({"sheets": xl.sheet_names})
@@ -324,7 +349,7 @@ def get_sheets():
 # activo y resetea el historial igual que /upload. `consolidate_batch`
 # (operations.py) hace la unión outer + alineación; aquí solo se leen los
 # archivos con read_table (mismos detectores de separador/encoding/Excel).
-_BATCH_EXTS = (".csv", ".tsv", ".xlsx", ".xls")
+# Las extensiones son las mismas de siempre: formats.READ_EXTS.
 
 
 def _read_batch(files):
@@ -357,11 +382,11 @@ def batch_preview():
         return jsonify({"error": "Selecciona al menos 2 archivos para consolidar."}), 400
 
     template_file = _batch_template_file()
-    if template_file is not None and not template_file.filename.lower().endswith(_BATCH_EXTS):
-        return jsonify({"error": f"Formato de plantilla no soportado: {template_file.filename}. Usa CSV, TSV, XLSX o XLS."}), 400
+    if template_file is not None and not formats.is_readable(template_file.filename):
+        return jsonify({"error": f"Formato de plantilla no soportado: {template_file.filename}. Usa {formats.read_plain()}."}), 400
     for f in files:
-        if not (f.filename or "").lower().endswith(_BATCH_EXTS):
-            return jsonify({"error": f"Formato no soportado: {f.filename}. Usa CSV, TSV, XLSX o XLS."}), 400
+        if not formats.is_readable(f.filename):
+            return jsonify({"error": f"Formato no soportado: {f.filename}. Usa {formats.read_plain()}."}), 400
 
     try:
         dfs, _, names, encodings = _read_batch(files)
@@ -441,15 +466,15 @@ def batch_merge():
         return jsonify({"error": "`first` debe ser una lista JSON de columnas."}), 400
 
     template_file = _batch_template_file()
-    if template_file is not None and not template_file.filename.lower().endswith(_BATCH_EXTS):
-        return jsonify({"error": f"Formato de plantilla no soportado: {template_file.filename}. Usa CSV, TSV, XLSX o XLS."}), 400
+    if template_file is not None and not formats.is_readable(template_file.filename):
+        return jsonify({"error": f"Formato de plantilla no soportado: {template_file.filename}. Usa {formats.read_plain()}."}), 400
     if mode == "template" and template_file is None:
         return jsonify({"error": "Modo plantilla: sube el archivo de esquema maestro."}), 400
     if mode == "dynamic" and template_file is not None:
         return jsonify({"error": "Subiste una plantilla pero el modo es Dinámico: cambia de modo o quita la plantilla."}), 400
     for f in files:
-        if not (f.filename or "").lower().endswith(_BATCH_EXTS):
-            return jsonify({"error": f"Formato no soportado: {f.filename}. Usa CSV, TSV, XLSX o XLS."}), 400
+        if not formats.is_readable(f.filename):
+            return jsonify({"error": f"Formato no soportado: {f.filename}. Usa {formats.read_plain()}."}), 400
 
     template_cols = None
     if template_file is not None:

@@ -1,4 +1,4 @@
-"""Lectura de `.xls` (BIFF) y coherencia entre lo anunciado y lo soportado.
+"""Lectura de `.xls` (BIFF): el fixture real y la ruta completa.
 
 Contexto del fallo: la app anunciaba `.xls` en el estado vacío, en el
 selector, en el dropzone, en `cli.py` y en los mensajes 400, pero pandas 3
@@ -10,26 +10,22 @@ Aquí:
 - el fixture `tests/fixtures/ventas.xls` es un BIFF de verdad, generado una
   vez con LibreOffice (`soffice --convert-to xls`), no bytes falsos;
 - se prueba la ruta completa (`read_table`, `/upload`, `/get_sheets` y el
-  CLI) con él;
-- tests anti-deriva: leen `templates/index.html` y exigen que el estado
-  vacío, el hint del dropzone y el `accept=` nombren exactamente las
-  extensiones de `cli.INPUT_EXTS`, y que cada una de ellas cargue de verdad.
-  Así el front no puede volver a anunciar de más (ni de menos).
+  CLI) con él, y que el motor no traiga deprecaciones.
+
+La coherencia entre lo anunciado y lo soportado (y la matriz de todos los
+formatos) vive en `tests/test_formats.py`, que comprueba el HTML renderizado.
 """
 import io
-import re
 import warnings
 from pathlib import Path
 
 import pandas as pd
-import pytest
 
 import cli
 from app import read_table
 
 RAIZ = Path(__file__).resolve().parent.parent
 FIXTURE_XLS = RAIZ / "tests" / "fixtures" / "ventas.xls"
-TEMPLATE = RAIZ / "templates" / "index.html"
 
 # Contenido de tests/fixtures/ventas.xls (3 filas, acentos y decimales)
 ESPERADO = {
@@ -114,70 +110,3 @@ def test_cli_carga_xls():
     df, expr, _ = cli._load_frame(FIXTURE_XLS)
     _comprobar(df)
     assert expr.startswith("pd.read_excel('ventas.xls'")
-
-
-# ── Cada formato anunciado carga de verdad ────────────────────────────
-def _fixture_por_extension(ext, tmp_path):
-    """Devuelve (nombre, bytes) de un archivo mínimo válido para `ext`."""
-    if ext == ".xls":
-        return "ventas.xls", FIXTURE_XLS.read_bytes()
-    if ext in (".csv", ".tsv"):
-        sep = "\t" if ext == ".tsv" else ","
-        texto = sep.join(ESPERADO) + "\n"
-        texto += "".join(
-            sep.join(str(ESPERADO[c][i]) for c in ESPERADO) + "\n" for i in range(3)
-        )
-        return f"ventas{ext}", texto.encode("utf-8")
-    if ext == ".xlsx":
-        destino = tmp_path / "ventas.xlsx"
-        pd.DataFrame(ESPERADO).to_excel(destino, index=False)
-        return destino.name, destino.read_bytes()
-    raise AssertionError(f"extensión sin fixture en el test: {ext}")
-
-
-@pytest.mark.parametrize("ext", cli.INPUT_EXTS)
-def test_toda_extension_anunciada_carga(ext, tmp_path, client):
-    nombre, contenido = _fixture_por_extension(ext, tmp_path)
-    resp = client.post(
-        "/upload",
-        data={"file": (io.BytesIO(contenido), nombre)},
-        content_type="multipart/form-data",
-    )
-    assert resp.status_code == 200, f"{ext}: {resp.get_json()}"
-    assert [c for c in resp.get_json()["data"]["columns"]] == list(ESPERADO)
-
-
-# ── Anti-deriva: el front dice lo mismo que el backend ────────────────
-def _extensiones_nombradas(texto):
-    """Extensiones que un fragmento de HTML nombra como formato admitido."""
-    return {
-        m.lower().lstrip(".")
-        for m in re.findall(r"\.?(CSV|TSV|XLSX|XLS)\b", texto)
-    }
-
-
-def test_estado_vacio_nombra_todos_los_formatos():
-    html = TEMPLATE.read_text(encoding="utf-8")
-    vacio = re.search(r"<h2>Cat_flip Studio ETL</h2>\s*<p>(.*?)</p>", html, re.S)
-    assert vacio, "no se encontró el texto del estado vacío"
-    nombradas = _extensiones_nombradas(vacio.group(1))
-    esperadas = {ext.lstrip(".") for ext in cli.INPUT_EXTS}
-    assert nombradas == esperadas, (
-        f"el estado vacío anuncia {sorted(nombradas)}, el backend acepta {sorted(esperadas)}"
-    )
-
-
-def test_hint_del_dropzone_nombra_todos_los_formatos():
-    html = TEMPLATE.read_text(encoding="utf-8")
-    hint = re.search(r'class="ds-dropzone-hint">(.*?)</span>', html, re.S)
-    assert hint, "no se encontró el hint del dropzone"
-    nombradas = _extensiones_nombradas(hint.group(1))
-    faltan = {ext.lstrip(".") for ext in cli.INPUT_EXTS} - nombradas
-    assert not faltan, f"el dropzone no anuncia {sorted(faltan)}"
-
-
-def test_accept_del_selector_ofrece_todos_los_formatos():
-    html = TEMPLATE.read_text(encoding="utf-8")
-    accept = re.search(r'id="file-input" accept="([^"]+)"', html)
-    assert accept, "no se encontró el accept del selector de archivos"
-    assert set(accept.group(1).split(",")) == set(cli.INPUT_EXTS)

@@ -9,6 +9,35 @@ siguiente corte.
 
 ## [Sin publicar]
 
+### Añadido
+
+- **Entrada `.ods` y `.parquet`**: la app lee ahora hojas de cálculo
+  OpenDocument y columnas Parquet, además de CSV, TSV, XLSX y XLS. `.ods`
+  usa `python-calamine` (ya empaquetado para `.xls`): pandas 3 lo leería
+  con `odf`/`odfpy`, una dependencia que no viaja en los bundles, así que
+  el motor va fijo por extensión — y el script exportado lo incluye
+  (`pd.read_excel('x.ods', sheet_name=0, engine='calamine')`) para que se
+  reproduzca sin instalar nada más. `.parquet` se lee con `pyarrow` (que
+  ya estaba, por la exportación) conservando los tipos, sin selector de
+  hoja: `/get_sheets` responde `[]`. Funciona también en el batch merge,
+  en el cruce y en el CLI. Tests con fixtures reales —un `.ods` generado
+  por LibreOffice desde un `.xlsx` (para que los números sigan siendo
+  números) y un `.parquet` de pyarrow—, incluida la reproducción del
+  código generado para cada formato.
+
+### Cambiado
+
+- **La lista de formatos vive en un solo sitio (`formats.py`)**: estaba
+  escrita a mano en nueve lugares (tres `accept=` del HTML, dos
+  validaciones del front y las tuplas del backend y del CLI), que es lo
+  que ya había dejado TSV fuera del estado vacío y `.xls` anunciado sin
+  poder leerse. Ahora backend, CLI, plantilla y JS derivan de ese módulo:
+  los `accept=` y los textos se renderizan desde Jinja y el front recibe
+  `window.CATFLIP_FORMATS` en vez de repetir extensiones. Los tests
+  anti-deriva pasan a comprobar el **HTML renderizado** (y que los módulos
+  JS no vuelvan a escribir la lista), así que añadir un formato es tocar
+  un fichero y no siete.
+
 ### Solucionado
 
 - **`.xls` (Excel 97-2003) no se podía leer**: la extensión se anunciaba

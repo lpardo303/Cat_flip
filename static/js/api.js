@@ -22,7 +22,9 @@ async function handleFile(file) {
     loadRecipeFromFile(file);
     return;
   }
-  if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+  // Solo los formatos con hojas tienen selector (CSV/TSV/Parquet no).
+  // La lista la inyecta el backend desde formats.py (window.CATFLIP_FORMATS).
+  if (window.CATFLIP_FORMATS.sheets.some(ext => name.endsWith(ext))) {
     showLoading();
     const fd = new FormData(); fd.append('file', file);
     currentSheetFile = file;
