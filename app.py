@@ -174,8 +174,9 @@ def excel_engine(filename):
     pandas avisa de que el motor por defecto de `.xlsx` va a cambiar, y este
     conserva el comportamiento de siempre.
 
-    `.xls` (BIFF) y `.ods` → calamine, el motor que pandas 3 mantiene. Para
-    `.ods` el default sería `odf` (odfpy), una dependencia que no empaquetamos.
+    `.xls` (BIFF), `.xlsb` y `.ods` → calamine, el motor que pandas 3 mantiene.
+    Para `.ods` el default sería `odf` (odfpy) y para `.xlsb` `pyxlsb`: dos
+    dependencias que no empaquetamos.
     """
     return "openpyxl" if filename.lower().endswith(".xlsx") else "calamine"
 
@@ -253,10 +254,10 @@ def read_table(file, sheet=None):
         )
     )
     expr = f"pd.read_excel('{file.filename}', sheet_name={repr(sheet)}"
-    if low.endswith(".ods"):
-        # pandas 3 leería .ods con `odf` (odfpy) por defecto: el script
-        # exportado lleva el motor explícito para reproducir la carga sin
-        # pedirle al usuario una dependencia más.
+    if low.endswith((".ods", ".xlsb")):
+        # pandas 3 leería .ods con `odf` (odfpy) y .xlsb con `pyxlsb` por
+        # defecto: el script exportado lleva el motor explícito para
+        # reproducir la carga sin pedirle al usuario una dependencia más.
         expr += ", engine='calamine'"
     return df, expr + ")" + _NULLS_TAIL, None
 
