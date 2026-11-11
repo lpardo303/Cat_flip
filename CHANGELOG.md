@@ -25,6 +25,16 @@ siguiente corte.
   números) y un `.parquet` de pyarrow—, incluida la reproducción del
   código generado para cada formato.
 
+- **Entrada `.json`**: lee JSON plano y anidado. La orientación se detecta
+  —array de registros, `{"col": [valores]}`, `{"fila": {...}}`, array de
+  filas y NDJSON de un objeto por línea— porque pandas no siempre respeta el
+  `orient` que se le pasa: un objeto indexado se leía transpuesto. La
+  orientación detectada va explícita en el código exportado, así que el
+  script reproduce la carga. Los objetos anidados se aplanan a columnas con
+  punto (`Contacto.Ciudad`) sin multiplicar filas, y las listas se conservan
+  como celda. Los errores explican qué pasa: JSON inválido con línea y
+  columna, raíz escalar, un registro suelto sin array, JSON vacío y
+  codificación que no sea UTF-8. Fixtures de esquema plano y anidado.
 - **Entrada `.xlsb` (Excel binario)**: se lee con `calamine`, el mismo
   motor que ya viaja para `.xls`/`.ods` (pandas usaría `pyxlsb`, que no
   se empaqueta), y el script exportado fija `engine='calamine'` por la

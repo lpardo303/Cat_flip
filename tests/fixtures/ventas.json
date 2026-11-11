@@ -1,0 +1,5 @@
+[
+  {"Nombre": "Ana López", "Edad": 30, "Ciudad": "Madrid", "Salario": 2500.5},
+  {"Nombre": "Luis Pérez", "Edad": 41, "Ciudad": "Bogotá", "Salario": 3200.0},
+  {"Nombre": "Marta Ruiz", "Edad": 25, "Ciudad": "Lima", "Salario": 1800.75}
+]
