@@ -25,6 +25,15 @@ siguiente corte.
   números) y un `.parquet` de pyarrow—, incluida la reproducción del
   código generado para cada formato.
 
+- **Entrada `.xlsb` (Excel binario)**: se lee con `calamine`, el mismo
+  motor que ya viaja para `.xls`/`.ods` (pandas usaría `pyxlsb`, que no
+  se empaqueta), y el script exportado fija `engine='calamine'` por la
+  misma razón. Antes de anunciarlo se comprobó contra un fichero real:
+  lista las hojas incluida la oculta, conserva números y texto. El fixture
+  es un `.xlsb` auténtico del corpus de tests de calamine (proyecto MIT),
+  porque ningún conversor local escribe el formato —LibreOffice no lo
+  exporta y `pyxlsb` solo lee— así que no se puede generar como el `.ods`.
+
 ### Cambiado
 
 - **La lista de formatos vive en un solo sitio (`formats.py`)**: estaba

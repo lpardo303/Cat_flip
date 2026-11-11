@@ -17,6 +17,7 @@ LABELS = {
     ".tsv": "TSV",
     ".xlsx": "XLSX",
     ".xls": "XLS",
+    ".xlsb": "XLSB",
     ".ods": "ODS",
     ".parquet": "Parquet",
 }
@@ -25,7 +26,7 @@ READ_EXTS = tuple(LABELS)
 # Texto plano: separador y codificación se autodetectan al leer
 TEXT_EXTS = (".csv", ".tsv")
 # Los que tienen hojas → el front ofrece selector de hoja
-EXCEL_EXTS = (".xlsx", ".xls", ".ods")
+EXCEL_EXTS = (".xlsx", ".xls", ".xlsb", ".ods")
 
 
 def _join(items):

@@ -14,6 +14,11 @@ Fixtures reales, no bytes falsos:
   tipos numéricos sobrevivan a la conversión (un CSV de entrada los dejaría
   como texto y el test no probaría nada).
 - `tests/fixtures/ventas.parquet` → pyarrow desde el mismo DataFrame.
+- `tests/fixtures/hojas.xlsb` → **del corpus de tests de calamine**
+  (proyecto MIT, `tests/any_sheets.xlsb`). Ningún conversor local escribe
+  XLSB —LibreOffice no exporta el formato y `pyxlsb` solo lee—, así que el
+  fixture se versiona tal cual en vez de fabricarlo. Tiene 3 hojas (una
+  oculta), texto y números: es el que además ejercita el selector de hoja.
 CSV/TSV/XLSX se generan al vuelo: son texto y binarios que pandas reescribe
 en cada ejecución, y versionarlos no aportaría nada.
 """
@@ -47,9 +52,31 @@ EXPR_ESPERADA = {
     ".tsv": "pd.read_csv('ventas.tsv'",
     ".xlsx": "pd.read_excel('ventas.xlsx'",
     ".xls": "pd.read_excel('ventas.xls'",
-    # El motor va explícito: pandas 3 leería .ods con odfpy, que no empaquetamos
+    # El motor va explícito: pandas 3 leería .ods con odfpy y .xlsb con
+    # pyxlsb, y no empaquetamos ninguna de las dos.
     ".ods": "pd.read_excel('ventas.ods', sheet_name=0, engine='calamine'",
+    ".xlsb": "pd.read_excel('hojas.xlsb', sheet_name=0, engine='calamine'",
     ".parquet": "pd.read_parquet('ventas.parquet'",
+}
+
+
+# Qué se espera de cada fixture: los cinco formatos que sabemos generar
+# llevan los mismos datos; el .xlsb viene de fuera y declara los suyos.
+ESPERADOS = {
+    ext: {
+        "columnas": list(ESPERADO),
+        "filas": 3,
+        "primera": [ESPERADO[c][0] for c in ESPERADO],
+        "hojas": 1,
+    }
+    for ext in formats.READ_EXTS
+}
+ESPERADOS[".xlsb"] = {
+    # Los encabezados del fixture son números, y calamine los entrega como int
+    "columnas": [1, 2],
+    "filas": 4,
+    "primera": [3, 4.0],
+    "hojas": 3,
 }
 
 
@@ -74,17 +101,21 @@ def _contenido(ext):
         buffer = io.BytesIO()
         pd.DataFrame(ESPERADO).to_excel(buffer, index=False, engine="openpyxl")
         return "ventas.xlsx", buffer.getvalue()
-    fixture = FIXTURES / f"ventas{ext}"
-    assert fixture.is_file(), f"falta el fixture {fixture.name}"
+    nombre = "hojas.xlsb" if ext == ".xlsb" else f"ventas{ext}"
+    fixture = FIXTURES / nombre
+    assert fixture.is_file(), f"falta el fixture {nombre}"
     return fixture.name, fixture.read_bytes()
 
 
-def _comprobar(df):
-    assert list(df.columns) == list(ESPERADO)
-    assert df["Nombre"].tolist() == ESPERADO["Nombre"]
-    assert df["Edad"].tolist() == ESPERADO["Edad"]
-    assert df["Ciudad"].tolist() == ESPERADO["Ciudad"]
-    assert df["Salario"].tolist() == ESPERADO["Salario"]
+def _comprobar(df, ext):
+    esperado = ESPERADOS[ext]
+    assert list(df.columns) == esperado["columnas"]
+    assert len(df) == esperado["filas"]
+    assert df.iloc[0].tolist() == esperado["primera"]
+    if ext != ".xlsb":
+        # Los formatos generables comparten datos: se comparan celda a celda
+        for columna, valores in ESPERADO.items():
+            assert df[columna].tolist() == valores, columna
 
 
 # ── Una sola fuente de verdad ──────────────────────────────────────────
@@ -113,7 +144,7 @@ def test_los_textos_derivados_nombran_todos_los_formatos():
 def test_read_table_lee_cada_formato(ext):
     nombre, contenido = _contenido(ext)
     df, expr, encoding = read_table(_ArchivoConNombre(contenido, nombre))
-    _comprobar(df)
+    _comprobar(df, ext)
     assert expr.startswith(EXPR_ESPERADA[ext]), expr
     assert encoding is None
 
@@ -128,8 +159,8 @@ def test_upload_acepta_cada_formato(ext, client):
     )
     assert resp.status_code == 200, f"{ext}: {resp.get_json()}"
     cuerpo = resp.get_json()
-    assert cuerpo["data"]["columns"] == list(ESPERADO)
-    assert cuerpo["data"]["total_rows"] == 3
+    assert cuerpo["data"]["columns"] == ESPERADOS[ext]["columnas"]
+    assert cuerpo["data"]["total_rows"] == ESPERADOS[ext]["filas"]
 
 
 @pytest.mark.parametrize("ext", formats.READ_EXTS)
@@ -145,7 +176,7 @@ def test_el_codigo_generado_reproduce_la_carga(ext, tmp_path, monkeypatch):
         # aparte, fuera de este cambio.
         warnings.filterwarnings("ignore", message=".*default engine.*")
         reconstruido = eval(expr, {"pd": pd})  # noqa: S307 — expresión propia
-    _comprobar(reconstruido)
+    _comprobar(reconstruido, ext)
 
 
 @pytest.mark.parametrize("ext", formats.EXCEL_EXTS)
@@ -157,7 +188,11 @@ def test_get_sheets_devuelve_las_hojas_de_los_formatos_con_hojas(ext, client):
         content_type="multipart/form-data",
     )
     assert resp.status_code == 200, resp.get_json()
-    assert len(resp.get_json()["sheets"]) == 1
+    hojas = resp.get_json()["sheets"]
+    assert len(hojas) == ESPERADOS[ext]["hojas"]
+    if ext == ".xlsb":
+        # Las hojas ocultas también se listan (el usuario puede elegirlas)
+        assert hojas == ["Visible", "Hidden", "VeryHidden"]
 
 
 @pytest.mark.parametrize("ext", (".parquet", ".csv", ".tsv"))
@@ -172,11 +207,13 @@ def test_get_sheets_no_falla_en_formatos_sin_hojas(ext, client):
     assert resp.get_json()["sheets"] == []
 
 
-def test_cli_carga_ods_y_parquet():
-    for ext in (".ods", ".parquet"):
-        df, expr, _ = cli._load_frame(FIXTURES / f"ventas{ext}")
-        _comprobar(df)
-        assert expr.startswith(EXPR_ESPERADA[ext])
+@pytest.mark.parametrize("ext", (".ods", ".xlsb", ".parquet"))
+def test_cli_carga_los_formatos_con_motor_explicito(ext):
+    """El CLI comparte read_table, así que cubre los tres motores nuevos."""
+    nombre = "hojas.xlsb" if ext == ".xlsb" else f"ventas{ext}"
+    df, expr, _ = cli._load_frame(FIXTURES / nombre)
+    _comprobar(df, ext)
+    assert expr.startswith(EXPR_ESPERADA[ext])
 
 
 def test_un_formato_no_soportado_se_rechaza_nombrando_todos_los_formatos(client):
@@ -258,9 +295,8 @@ def test_el_estado_vacio_nombra_todos_los_formatos_y_solo_esos(client):
     assert vacio, "no se encontró el texto del estado vacío"
     texto = re.sub(r"<[^>]+>", "", vacio.group(1))
     assert formats.read_plain() in texto, texto
-    # Y no anuncia formatos que no se leen: XLSB/JSON siguen fuera de alcance
-    for fuera in ("XLSB", "JSON", "ODS2"):
-        assert fuera not in texto
+    # Y no anuncia formatos que no se leen (JSON de entrada sigue fuera)
+    assert "JSON" not in texto
 
 
 def test_los_hints_de_los_dropzones_salen_de_formats(client):
