@@ -21,8 +21,8 @@ import sys
 from pathlib import Path
 
 from app import apply_recipe_df, read_table, validate_recipe
+from formats import READ_EXTS as INPUT_EXTS, read_plain
 
-INPUT_EXTS = (".csv", ".tsv", ".xlsx", ".xls")
 OUTPUT_EXTS = (".csv", ".tsv", ".xlsx", ".parquet")
 
 
@@ -44,7 +44,7 @@ def _load_frame(path, sheet=None):
         raise ValueError(f"No existe el archivo: {path}")
     if p.suffix.lower() not in INPUT_EXTS:
         raise ValueError(
-            f"Formato de entrada no soportado: {p.suffix or '(sin extensión)'} — usa CSV, TSV, XLSX o XLS."
+            f"Formato de entrada no soportado: {p.suffix or '(sin extensión)'} — usa {read_plain()}."
         )
     return read_table(_NamedFile(p.read_bytes(), p.name), sheet=sheet)
 

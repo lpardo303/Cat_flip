@@ -139,7 +139,7 @@ const modalDefs = {
   },
   merge: {
     title: icon('git-merge') + ' Join / Merge (Cruzar datasets)',
-    body: () => '<div class="merge-src"><div class="merge-src-head"><span>Frame derecho:</span><span id="merge-right-info">Sin cargar</span></div><div class="merge-src-actions"><select id="merge-right-demo" aria-label="Dataset demo para el frame derecho"><option value="">Elegir demo…</option>'+DEMO_DATASETS.map((d, i) => '<option value="'+i+'">'+d.name+'</option>').join('')+'</select><button type="button" class="btn btn-secondary" id="merge-right-browse">Examinar…</button><input type="file" id="merge-right-file" accept=".csv,.tsv,.xlsx,.xls" hidden></div></div>'
+    body: () => '<div class="merge-src"><div class="merge-src-head"><span>Frame derecho:</span><span id="merge-right-info">Sin cargar</span></div><div class="merge-src-actions"><select id="merge-right-demo" aria-label="Dataset demo para el frame derecho"><option value="">Elegir demo…</option>'+DEMO_DATASETS.map((d, i) => '<option value="'+i+'">'+d.name+'</option>').join('')+'</select><button type="button" class="btn btn-secondary" id="merge-right-browse">Examinar…</button><input type="file" id="merge-right-file" accept="'+window.CATFLIP_FORMATS.accept+'" hidden></div></div>'
       + '<label>Columna de cruce (dataset activo):</label><select id="merge-left-col" aria-label="Columna de cruce del dataset activo">'+colOptions()+'</select>'
       + '<label>Columna de cruce (frame derecho):</label><select id="merge-right-col" aria-label="Columna de cruce del frame derecho"><option value="">— carga primero el frame derecho —</option></select>'
       + '<label>Tipo de cruce:</label><select id="merge-how" aria-label="Tipo de cruce"><option value="inner">inner — solo coincidencias</option><option value="left" selected>left — todas las filas izquierdas</option><option value="right">right — todas las filas derechas</option><option value="outer">outer — unión de ambos</option></select>'
@@ -743,8 +743,8 @@ function closeBatchMerge() {
 function addBatchFiles(fileList) {
   for (const f of fileList || []) {
     const low = f.name.toLowerCase();
-    if (!low.endsWith('.csv') && !low.endsWith('.tsv') && !low.endsWith('.xlsx') && !low.endsWith('.xls')) {
-      toast('Formato no soportado: ' + f.name + '. Usa CSV, TSV, XLSX o XLS.', 'error');
+    if (!window.CATFLIP_FORMATS.exts.some(ext => low.endsWith(ext))) {
+      toast('Formato no soportado: ' + f.name + '. Usa ' + window.CATFLIP_FORMATS.plain + '.', 'error');
       continue;
     }
     if (!batchFiles.some(x => x.name === f.name && x.size === f.size)) batchFiles.push(f);
@@ -1269,6 +1269,9 @@ async function openCsvRecipe(input) {
   input.value = ''; // permitir volver a elegir el mismo archivo
   if (!file) return;
   const name = file.name.toLowerCase();
+  // A propósito NO usa CATFLIP_FORMATS: esta receta se deduce de texto
+  // delimitado y solo tiene sentido para .csv/.tsv (aquí el separador se
+  // adivina; un Excel/Parquet no aporta esa información).
   if (!name.endsWith('.csv') && !name.endsWith('.tsv')) {
     toast('La receta desde CSV solo acepta archivos .csv o .tsv', 'error');
     return;

@@ -40,8 +40,10 @@ a = Analysis(
     # el grafo de dependencias (pandas, pyarrow, flask, premium) se analice.
     # `openbrowser` es el ayudante de `entry.py` que abre el navegador.
     # python_calamine: pandas lo importa en diferido como motor de lectura de
-    # .xls; sin este hiddenimport los .xls fallaban en el .exe.
-    hiddenimports=["app", "operations", "premium", "openbrowser", "python_calamine"],
+    # .xls y .ods; sin este hiddenimport fallaban en el .exe.
+    # formats: app.py (dato ejecutado con runpy) hace `import formats` en
+    # tiempo de ejecución, así que el análisis estático no lo ve.
+    hiddenimports=["app", "operations", "premium", "openbrowser", "formats", "python_calamine"],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

@@ -33,9 +33,11 @@ a = Analysis(
     # el grafo de dependencias (pandas, pyarrow, flask, premium) se analice.
     # `openbrowser` es el ayudante de `entry.py` que abre el navegador.
     # python_calamine: pandas lo importa en diferido (import_optional_dependency)
-    # como motor de lectura de .xls, así que el análisis estático de PyInstaller
-    # no lo ve y el bundle fallaba con "Import python-calamine failed".
-    hiddenimports=["app", "operations", "premium", "openbrowser", "python_calamine"],
+    # como motor de lectura de .xls y .ods, así que el análisis estático de
+    # PyInstaller no lo ve y el bundle fallaba con "Import python-calamine failed".
+    # formats: app.py (dato ejecutado con runpy) hace `import formats` al
+    # arrancar; mismo caso, sin el hiddenimport el bundle no lo encuentra.
+    hiddenimports=["app", "operations", "premium", "openbrowser", "formats", "python_calamine"],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
