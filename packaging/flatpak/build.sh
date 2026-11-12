@@ -4,6 +4,14 @@
 # Uso:
 #   packaging/flatpak/build.sh                 # congelado + flatpak + firma
 #   SKIP_FROZEN=1 packaging/flatpak/build.sh   # reutiliza dist/CatFlip ya construido
+#   SKIP_SIGN=1 packaging/flatpak/build.sh     # bundle sin firmar
+#
+# Ojo con la diferencia: el repo ostree DENTRO del bundle se firma durante el
+# build (`flatpak build-export --gpg-sign`) y `flatpak install` la exige, así
+# que re-firmarla después no es posible sin regenerar el bundle. La firma
+# detached (.asc) y los SHA256SUMS, que es lo que el usuario verifica, sí van
+# en packaging/sign.sh como en los otros dos formatos — y por eso el smoke
+# corre antes de esa firma.
 #
 # Requiere: org.flatpak.Builder y org.freedesktop.Sdk//25.08 en flathub (user).
 set -euo pipefail
@@ -11,7 +19,6 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
-FPR="$(tr -d '[:space:]' < "$ROOT/packaging/gpg/FINGERPRINT")"
 VERSION="$(python3 -c "import json; print(json.load(open('package.json'))['version'])")"
 # Python del proyecto: .venv si existe (local); si no, el del entorno (CI).
 PYBIN=".venv/bin/python"
@@ -39,13 +46,22 @@ else
   FB=(flatpak run --filesystem="$ROOT" --command=flatpak-builder org.flatpak.Builder)
 fi
 
-echo "→ flatpak-builder (repo firmado con $FPR)"
+# El repo ostree se firma al exportarlo cuando hay clave: sin esa firma el
+# bundle no se podría instalar (ver la nota de la cabecera).
+FIRMA=()
+if [ "${SKIP_SIGN:-0}" != "1" ]; then
+  FPR="$(tr -d '[:space:]' < "$ROOT/packaging/gpg/FINGERPRINT")"
+  FIRMA=(--gpg-sign="$FPR")
+  echo "→ flatpak-builder (repo firmado con $FPR)"
+else
+  echo "→ flatpak-builder (repo SIN firmar: SKIP_SIGN=1)"
+fi
 mkdir -p "$OUT" "$BUILD"
 rm -rf "$OUT/repo"
 "${FB[@]}" \
   --force-clean \
   --repo="$OUT/repo" \
-  --gpg-sign="$FPR" \
+  ${FIRMA[@]+"${FIRMA[@]}"} \
   "$BUILD/dir" "$MANIFEST"
 
 # 3) Rama real que exportó el builder (no asumir «master»).
@@ -69,14 +85,7 @@ echo "→ bundle"
 rm -f "$BUNDLE" "$BUNDLE.asc" "$BUNDLE.sig"
 flatpak build-bundle "$OUT/repo" "$BUNDLE" "$APP_ID" "$BRANCH"
 
-echo "→ firma GPG ($FPR)"
-gpg --batch --yes --armor --local-user "$FPR" --detach-sign "$BUNDLE"
-(
-  cd "$OUT"
-  rm -f SHA256SUMS.asc SHA256SUMS.sig
-  sha256sum "$(basename "$BUNDLE")" > SHA256SUMS
-  gpg --batch --yes --armor --local-user "$FPR" --detach-sign SHA256SUMS
-)
+# 5) Firma detached + checksums (packaging/sign.sh, común a los 3)
+"$ROOT/packaging/sign.sh" "$BUNDLE"
 
-echo "✅ Flatpak listo:"
-ls -lh "$BUNDLE" "$BUNDLE.asc" "$OUT/SHA256SUMS" "$OUT/SHA256SUMS.asc"
+echo "✅ Flatpak listo en $OUT"

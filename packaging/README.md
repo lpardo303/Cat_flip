@@ -56,6 +56,20 @@ packaging/flatpak/build.sh                   # congelado + flatpak + firma
 packaging/windows/build.sh                   # Git Bash: congelado + .exe + firma
 SKIP_FROZEN=1 packaging/appimage/build.sh    # reutiliza dist/CatFlip ya construido
 SKIP_FROZEN=1 packaging/flatpak/build.sh
+SKIP_SIGN=1 packaging/appimage/build.sh      # sin firmar (CI: no hay clave)
+```
+
+Los tres `build.sh` construyen **y llaman a `packaging/sign.sh`**, que es el
+único sitio donde vive la firma (detached `.asc` + `SHA256SUMS` firmado):
+antes ese bloque estaba copiado en los tres. Con `SKIP_SIGN=1` construyen sin
+tocar la clave. La secuencia completa de un release —y la que sigue la CI—
+es:
+
+```bash
+SKIP_SIGN=1 packaging/appimage/build.sh        # 1. construir
+scripts/smoke_package.sh appimage              # 2. ejecutar el artefacto REAL
+packaging/sign.sh dist/appimage/*.AppImage     # 3. firmar
+packaging/sign.sh --verificar dist/appimage/*.AppImage   # 4. comprobar
 ```
 
 **Windows**: el build se hace en **Git Bash**, no en PowerShell — `gpg` y
@@ -66,6 +80,12 @@ PowerShell (así lo lleva la CI: jobs `windows` y `windows-exe`, ambos con
 que el script renombra y firma; reutiliza `packaging/appimage/entry.py`.
 Local solo funciona en un host Windows (en Linux el artefacto no lleva
 `.exe` y el script lo rechaza).
+
+**Una excepción al «smoke antes de firmar»**: el repo ostree que va dentro
+del `.flatpak` se firma al construirlo (`flatpak build-export --gpg-sign`) y
+`flatpak install` la exige, así que ahí la clave entra antes del build. Lo
+que se firma después del smoke en los tres formatos es el `.asc` detached y
+los `SHA256SUMS`, que es lo que el usuario verifica con `gpg --verify`.
 
 El primer build tarda ~1 min (PyInstaller) + ~2,5 min (flatpak-builder).
 Los pines de herramientas viven en `packaging/appimage/pins.env`.
@@ -126,21 +146,27 @@ los valida.
 
 ## CI (GitHub Actions)
 
-`.github/workflows/packaging.yml` construye y firma ambos paquetes en cada tag
-`v*` y bajo demanda con `workflow_dispatch`:
+`.github/workflows/packaging.yml` construye, prueba y firma los tres paquetes
+en cada tag `v*` y bajo demanda con `workflow_dispatch`:
 
-- **appimage** / **flatpak**: pip + `packaging/*/build.sh` + verificación
-  (`gpg --verify` + `sha256sum -c`) y subida de artifacts. El job de flatpak
-  instala `flatpak-builder` con apt y el runtime 26.08 en `--user`, y usa
+- **Los tres jobs siguen el mismo orden**: construir → `scripts/smoke_package.sh
+  <formato>` → `packaging/sign.sh <artefacto>` → `packaging/sign.sh --verificar
+  <artefacto>` → subida de artifacts. El smoke es **el mismo** para AppImage,
+  Flatpak y `.exe` (delega en `scripts/smoke_lecturas.py` y
+  `scripts/smoke_version_check.sh`): arranca el artefacto real, lee los
+  fixtures versionados —CSV/TSV/XLSX/XLS/XLSB/ODS/Parquet/JSON—, comprueba
+  `/get_sheets`, `/premium/status` y `/version/check`. Antes cada job tenía su
+  copia del smoke y solo el `.exe` comprobaba lecturas; el AppImage y el
+  Flatpak se conformaban con que `/` respondiera.
+- **appimage** / **flatpak**: pip, `build.sh` con `SKIP_SIGN=1` (AppImage) o
+  con la firma ostree interna (Flatpak, que `flatpak install` exige), smoke,
+  firma detached y verificación. El job de flatpak instala `flatpak-builder`
+  con apt y el runtime 26.08 en `--user`, y usa
   `FLATPAK_BUILDER_CMD=flatpak-builder` (sin el sandbox de
   `org.flatpak.Builder` no existe el problema de la instalación de sistema).
 - **windows** (`windows-latest`, todo en `shell: bash`): primer paso de
-  comprobación (`command -v gpg` + `sha256sum` — están en Git Bash, no en el
-  PATH de PowerShell), pip, `packaging/windows/build.sh`, **smoke** (el
-  `.exe` arranca en el runner, sirve `/` + `/premium/status`, lee los
-  fixtures reales con `scripts/smoke_exe.py` —CSV/TSV/XLSX/XLS/XLSB/ODS/
-  Parquet/JSON— y consulta `/version/check`) y verificación de
-  firmas/checksums.
+  comprobación de las herramientas de Git Bash, pip, `build.sh` con
+  `SKIP_SIGN=1`, el mismo smoke que los otros dos y firma posterior.
 - **release** (solo en tag): crea la release si no existe y adjunta los
   artefactos con `gh release upload` (AppImage, flatpak y `.exe`, con los
   `SHA256SUMS.*` renombrados por formato).

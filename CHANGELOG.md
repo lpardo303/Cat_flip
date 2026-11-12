@@ -11,13 +11,26 @@ siguiente corte.
 
 ### Añadido
 
+- **El release prueba los tres paquetes antes de firmarlos, con el mismo
+  smoke.** Cada job de `packaging.yml` firmaba y verificaba el artefacto antes
+  de ejecutarlo, y solo el `.exe` comprobaba que el paquete **leyera** un
+  archivo: un AppImage o un Flatpak sin `python_calamine` arrancaban, servían
+  `/` y fallaban al subir un `.xls`. Ahora los tres siguen el mismo orden
+  —construir → `scripts/smoke_package.sh` → `packaging/sign.sh` → verificar—
+  con una sola implementación del smoke (3 copias de ~50 líneas menos) y una
+  sola de la firma (estaba copiada en los tres `build.sh`). `packaging/sign.sh
+  --verificar` comprueba la firma y los checksums del artefacto exacto, que
+  evita el falso «Firma INCORRECTA» que daba `gpg --verify *.asc *.bin` con
+  residuos de otra versión en `dist/`. El script compartido se llama ahora
+  `scripts/smoke_lecturas.py` (antes `smoke_exe.py`) y añade `/premium/status`
+  para los tres formatos.
 - **CI: el `.exe` de Windows se construye y se prueba en cada PR.** Era el
   único artefacto sin verificar: el job `windows` de `packaging.yml` solo
   corre en tags, así que una regresión de empaquetado (`formats.py`,
   `python_calamine`, plantillas) llegaba a `main` y estallaba al publicar.
   El nuevo job `windows-exe` construye el `.exe` con el spec real —sin
   firmar: la clave GPG es de publicación, vía `SKIP_SIGN=1`—, lo arranca sin
-  navegador y le sube los fixtures reales con `scripts/smoke_exe.py`: los
+  navegador y le sube los fixtures reales con `scripts/smoke_lecturas.py`: los
   ocho formatos de entrada y el selector de hoja. El mismo script se ejecuta
   ahora en el job de release, que antes solo comprobaba `/` y
   `premium/status` — es decir, que el `.exe` arrancara, no que leyera un

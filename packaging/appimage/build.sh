@@ -2,8 +2,13 @@
 # Build del AppImage de Cat_flip, firmado con GPG y con SHA256SUMS.
 #
 # Uso:
-#   packaging/appimage/build.sh              # congelado + AppImage + firma
+#   packaging/appimage/build.sh                # congelado + AppImage + firma
 #   SKIP_FROZEN=1 packaging/appimage/build.sh  # reutiliza dist/CatFlip ya construido
+#   SKIP_SIGN=1 packaging/appimage/build.sh    # sin firma (CI: sin clave)
+#
+# La firma la hace packaging/sign.sh, igual que en Flatpak y Windows. La CI
+# construye con SKIP_SIGN=1, ejecuta scripts/smoke_package.sh sobre el
+# artefacto REAL y solo después firma.
 #
 # Sale si cualquier paso falla; el binario resultante queda en dist/appimage/.
 set -euo pipefail
@@ -12,7 +17,6 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
 source "$ROOT/packaging/appimage/pins.env"
-FPR="$(tr -d '[:space:]' < "$ROOT/packaging/gpg/FINGERPRINT")"
 VERSION="$(python3 -c "import json; print(json.load(open('package.json'))['version'])")"
 # Python del proyecto: .venv si existe (local); si no, el del entorno (CI).
 PYBIN=".venv/bin/python"
@@ -68,15 +72,7 @@ rm -f "$BINARY" "$BINARY.asc" "$BINARY.sig"
 ARCH=x86_64 "$TOOLS/appimagetool.AppImage" --appimage-extract-and-run \
   "$APPDIR" "$BINARY"
 
-# 5) Firma detached + checksums firmados
-echo "→ firma GPG ($FPR)"
-gpg --batch --yes --armor --local-user "$FPR" --detach-sign "$BINARY"
-(
-  cd "$OUT"
-  rm -f SHA256SUMS.asc SHA256SUMS.sig
-  sha256sum "$(basename "$BINARY")" > SHA256SUMS
-  gpg --batch --yes --armor --local-user "$FPR" --detach-sign SHA256SUMS
-)
+# 5) Firma detached + checksums firmados (packaging/sign.sh, común a los 3)
+"$ROOT/packaging/sign.sh" "$BINARY"
 
-echo "✅ AppImage listo:"
-ls -lh "$BINARY" "$BINARY.asc" "$OUT/SHA256SUMS" "$OUT/SHA256SUMS.asc"
+echo "✅ AppImage listo en $OUT"

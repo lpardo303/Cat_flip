@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
-"""Smoke de un binario congelado ya arrancado: ¿lee de verdad los fixtures?
+"""Smoke de un paquete ya arrancado: ¿lee de verdad los fixtures?
 
-El `.exe` de Windows era el único artefacto sin verificar: se compilaba a mano
-y nadie comprobaba que el paquete incluyera lo que el venv da por hecho. Los
-`hiddenimports` (`formats`, `python_calamine`) y los `datas` (plantillas,
-`static`) son exactamente lo que un entorno de desarrollo no necesita y un
-bundle sí: si falta, el binario arranca y luego devuelve 500 al subir un
-`.xls`, o sirve una página sin los formatos.
+Lo que un entorno de desarrollo da por hecho no está garantizado dentro de un
+bundle: los `hiddenimports` (`formats`, `python_calamine`) y los `datas`
+(plantillas, `static`) son justo lo que el venv no necesita y el paquete sí.
+Si falta, el binario arranca, sirve `/` y luego devuelve 500 al subir un
+`.xls`, o pinta una página sin los formatos. Por eso el smoke no se conforma
+con que `/` responda.
 
 Este script no construye nada ni sabe de sistemas operativos: se apunta a una
-URL ya levantada y comprueba, con los fixtures reales del repo, que el paquete
-lee cada formato. Sirve igual para `dist/CatFlip` en Linux que para
-`dist/windows/CatFlip-<ver>-x64.exe` en el runner de Windows.
+URL ya levantada y comprueba, con los fixtures reales del repo, que el
+paquete lee cada formato. Lo usan los tres formatos del release (AppImage,
+Flatpak y `.exe`) a través de `scripts/smoke_package.sh`, y también sirve
+contra `dist/CatFlip` sin empaquetar.
 
 Uso:
-    python scripts/smoke_exe.py [--base-url http://127.0.0.1:5050]
+    python scripts/smoke_lecturas.py [--base-url http://127.0.0.1:5050]
 
 Sale 1 con el error exacto si algo falla.
 """
@@ -125,7 +126,15 @@ def main():
         raise SystemExit(f"✘ /get_sheets devolvió {hojas.get('sheets')}")
     print("✅ /get_sheets lista las 3 hojas de trabajo y descarta la de gráfico")
 
-    print(f"\n{2 + len(CASOS)} comprobaciones OK contra {base}")
+    # 4) Superficie Open Core: el endpoint responde con las tres claves del
+    #    contrato. Sin licencia devuelve `licensed: false` y listas vacías, así
+    #    que el smoke no depende de si el bundle lleva clave premium.
+    estado = json.loads(_get(base, "/premium/status"))
+    if set(estado) != {"licensed", "themes", "connectors"}:
+        raise SystemExit(f"✘ /premium/status devolvió las claves {sorted(estado)}")
+    print(f"✅ /premium/status (licensed={estado['licensed']})")
+
+    print(f"\n{3 + len(CASOS)} comprobaciones OK contra {base}")
 
 
 if __name__ == "__main__":
