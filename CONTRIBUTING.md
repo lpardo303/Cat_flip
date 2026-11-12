@@ -55,10 +55,12 @@ CATFLIP_PREMIUM_KEY=local python app.py   # http://127.0.0.1:5050
    ```
 
 4. Abre un PR contra `main`. Los jobs de CI (`test`, `pg-smoke`,
-   `s3-smoke`, `axe`, `actionlint` y `windows-exe`) deben estar en verde;
-   `windows-exe` construye el `.exe` sin firmar y comprueba que el paquete
-   lee los fixtures reales, así que un `hiddenimport` que falte se ve en el
-   PR y no en la publicación. `main` está
+   `s3-smoke`, `axe`, `actionlint`, `windows-exe` y `linux-bundles`) deben
+   estar en verde; `windows-exe` y `linux-bundles` construyen los tres
+   paquetes sin firmar y comprueban que leen los fixtures reales, así que un
+   `hiddenimport` que falte se ve en el PR y no en la publicación.
+   `linux-bundles` es el más lento (~6 min: congela una vez y construye
+   AppImage y Flatpak). `main` está
    protegida (1 review aprobatoria + checks de estado). Ojo si el PR lo
    escribes tú: **no puedes aprobar tu propio PR**, así que esa única
    review no la reúne nadie — el ritual para mergearlo está en la

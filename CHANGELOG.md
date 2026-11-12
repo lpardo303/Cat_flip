@@ -11,6 +11,18 @@ siguiente corte.
 
 ### Añadido
 
+- **El AppImage y el Flatpak se construyen y se prueban en cada PR.** Hasta
+  ahora los bundles de Linux solo se ejecutaban en el tag: una regresión de
+  empaquetado (`formats.py` sin `hiddenimport`, `python_calamine` fuera,
+  plantillas viejas) pasaba `main` y aparecía al publicar. El job
+  `linux-bundles` los construye sin firmar en un solo runner —el binario
+  congelado se hace una vez y el Flatpak lo reutiliza con `SKIP_FROZEN=1`— y
+  les pasa el mismo `scripts/smoke_package.sh` del release, con
+  `--sin-version-check` (ese check espera en backoff contra api.github.com y
+  en PRs solo aporta intermitencia; el tag lo sigue comprobando). El smoke
+  compartido ahora también **rechaza arrancar si el puerto 5050 ya está
+  ocupado**, porque dos smokes en el mismo job probarían el proceso
+  equivocado y darían un falso verde.
 - **El release prueba los tres paquetes antes de firmarlos, con el mismo
   smoke.** Cada job de `packaging.yml` firmaba y verificaba el artefacto antes
   de ejecutarlo, y solo el `.exe` comprobaba que el paquete **leyera** un

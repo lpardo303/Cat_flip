@@ -149,7 +149,14 @@ los valida.
 `.github/workflows/packaging.yml` construye, prueba y firma los tres paquetes
 en cada tag `v*` y bajo demanda con `workflow_dispatch`:
 
-- **Los tres jobs siguen el mismo orden**: construir → `scripts/smoke_package.sh
+- **En cada PR**, el job `linux-bundles` de `ci.yml` construye el AppImage y el
+  Flatpak **sin firmar** en un solo runner y les pasa el mismo
+  `scripts/smoke_package.sh` con `--sin-version-check` (ese check espera en
+  backoff contra api.github.com y en PRs solo aporta intermitencia; el tag sí
+  lo comprueba). El binario congelado se construye una vez y el Flatpak lo
+  reutiliza con `SKIP_FROZEN=1`; antes estos dos bundles solo se probaban en
+  el tag, así que una regresión de empaquetado llegaba a `main`.
+- **Los tres jobs del tag siguen el mismo orden**: construir → `scripts/smoke_package.sh
   <formato>` → `packaging/sign.sh <artefacto>` → `packaging/sign.sh --verificar
   <artefacto>` → subida de artifacts. El smoke es **el mismo** para AppImage,
   Flatpak y `.exe` (delega en `scripts/smoke_lecturas.py` y

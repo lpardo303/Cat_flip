@@ -308,3 +308,67 @@ jobs:
           name: windows-exe-log
           path: windows-exe.log
           if-no-files-found: ignore
+
+  # Los paquetes de Linux solo se construían y probaban en el tag
+  # (packaging.yml): una regresión de empaquetado —`formats.py` sin
+  # hiddenimport, `python_calamine` fuera, plantillas viejas— pasaba `main` y
+  # estallaba al publicar. Este job les pasa el MISMO smoke que el release,
+  # `scripts/smoke_package.sh`, en cada PR.
+  #
+  # Coste: un único runner para los dos formatos y el binario congelado se
+  # construye una vez (el Flatpak reutiliza `dist/CatFlip` con SKIP_FROZEN=1),
+  # así que no se paga PyInstaller dos veces. Nada se firma aquí (la clave GPG
+  # es de publicación): el AppImage va con `SKIP_SIGN=1` y el Flatpak sin su
+  # firma interna, que se instala igual. `/version/check` se omite
+  # (`--sin-version-check`): su backoff contra el rate limit de api.github.com
+  # llega a 305 s por intento y en PRs solo aporta intermitencia; el tag lo
+  # sigue comprobando.
+  linux-bundles:
+    name: AppImage y Flatpak (sin firmar)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CATFLIP_NO_BROWSER: "1"
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Herramientas del build
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y desktop-file-utils
+
+      - name: AppImage — construye (sin firmar) y smoke
+        run: |
+          SKIP_SIGN=1 packaging/appimage/build.sh
+          scripts/smoke_package.sh appimage --sin-version-check
+
+      - name: flatpak-builder + runtime 26.08
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub \
+            https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub \
+            org.freedesktop.Platform//26.08 org.freedesktop.Sdk//26.08
+
+      - name: Flatpak — construye (sin firmar) y smoke
+        env:
+          # flatpak-builder del host: sin el sandbox de org.flatpak.Builder no
+          # existe el problema de resolver el SDK en la instalación de sistema.
+          FLATPAK_BUILDER_CMD: flatpak-builder
+        run: |
+          SKIP_FROZEN=1 SKIP_SIGN=1 packaging/flatpak/build.sh
+          scripts/smoke_package.sh flatpak --sin-version-check
