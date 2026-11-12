@@ -31,6 +31,13 @@ sys.path.insert(0, str(RAIZ))  # `formats` vive en la raíz del repo
 
 import formats  # noqa: E402 — después de ajustar sys.path
 
+# En Windows, con stdout redirigido el codec es cp1252 y un «✅» lanza
+# UnicodeEncodeError justo cuando el smoke acaba de pasar. UTF-8 explícito:
+# los emoji son parte de la salida legible y el log de la CI los muestra bien.
+for _flujo in (sys.stdout, sys.stderr):
+    if hasattr(_flujo, "reconfigure"):
+        _flujo.reconfigure(encoding="utf-8", errors="replace")
+
 FIXTURES = RAIZ / "tests" / "fixtures"
 
 # Formato → (columnas esperadas, filas). Los nombres salen de los fixtures
