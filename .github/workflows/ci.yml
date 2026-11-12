@@ -237,3 +237,74 @@ jobs:
         run: |
           shellcheck --version | sed -n '2p'
           shellcheck scripts/*.sh
+
+  # El `.exe` de Windows era el único artefacto que nadie probaba: se compilaba
+  # a mano y el primer arranque lo hacía el usuario. Este job lo construye en
+  # el runner oficial (sin firma: la clave GPG es de publicación) y comprueba
+  # lo que un venv no puede comprobar — que el paquete incluya `formats.py`,
+  # `python_calamine`, las plantillas y los fixtures de lectura reales.
+  windows-exe:
+    runs-on: windows-latest
+    # Git Bash: gpg/sha256sum y el arranque en segundo plano del .exe.
+    defaults:
+      run:
+        shell: bash
+    env:
+      CATFLIP_NO_BROWSER: "1"
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Build the unsigned .exe
+        # PyInstaller onefile: tarda unos minutos (pandas + pyarrow).
+        run: SKIP_SIGN=1 packaging/windows/build.sh
+
+      - name: Start the .exe and check it reads the fixtures
+        run: |
+          log="$PWD/windows-exe.log"
+          # El nombre lleva la versión: se resuelve con el glob en un array
+          # (un glob suelto en posición de comando es SC2211).
+          exe=(dist/windows/CatFlip-*-x64.exe)
+          if [ ! -x "${exe[0]}" ]; then
+            echo "::error::No se encontró el .exe: ${exe[0]}"
+            exit 1
+          fi
+          "${exe[0]}" > "$log" 2>&1 &
+          app_pid=$!
+          # onefile se descomprime en un temporal: el primer arranque es lento
+          listo=0
+          for _ in $(seq 1 90); do
+            if curl -sf http://127.0.0.1:5050/ > /dev/null; then listo=1; break; fi
+            sleep 2
+          done
+          if [ "$listo" != "1" ]; then
+            echo "::error::El .exe no respondió en 180 s"
+            tail -60 "$log"
+            exit 1
+          fi
+          status=0
+          python scripts/smoke_exe.py --base-url http://127.0.0.1:5050 || status=$?
+          # onefile deja un hijo: se matan los dos (y por nombre, por si acaso)
+          kill "$app_pid" 2>/dev/null || true
+          taskkill //F //IM CatFlip.exe > /dev/null 2>&1 || true
+          exit "$status"
+
+      - name: Upload the .exe log
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-exe-log
+          path: windows-exe.log
+          if-no-files-found: ignore

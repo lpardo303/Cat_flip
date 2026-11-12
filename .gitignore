@@ -46,6 +46,9 @@ Desktop.ini
 !tests/fixtures/*.xls
 !tests/fixtures/*.xlsx
 
+# Log del smoke del .exe (lo escribe el job windows-exe en la raíz)
+windows-exe.log
+
 # Windows
 *.lnk
 

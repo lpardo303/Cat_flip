@@ -60,7 +60,8 @@ SKIP_FROZEN=1 packaging/flatpak/build.sh
 
 **Windows**: el build se hace en **Git Bash**, no en PowerShell — `gpg` y
 `sha256sum` viven en `/usr/bin` de Git for Windows y no están en el PATH de
-PowerShell (así lo lleva la CI: job `windows` con `shell: bash`). El spec
+PowerShell (así lo lleva la CI: jobs `windows` y `windows-exe`, ambos con
+`shell: bash`). El spec
 `packaging/windows/catflip.spec` produce un **onefile** `dist/CatFlip.exe`
 que el script renombra y firma; reutiliza `packaging/appimage/entry.py`.
 Local solo funciona en un host Windows (en Linux el artefacto no lleva
@@ -136,8 +137,10 @@ los valida.
 - **windows** (`windows-latest`, todo en `shell: bash`): primer paso de
   comprobación (`command -v gpg` + `sha256sum` — están en Git Bash, no en el
   PATH de PowerShell), pip, `packaging/windows/build.sh`, **smoke** (el
-  `.exe` arranca en el runner y sirve `/` + `/premium/status`) y verificación
-  de firmas/checksums.
+  `.exe` arranca en el runner, sirve `/` + `/premium/status`, lee los
+  fixtures reales con `scripts/smoke_exe.py` —CSV/TSV/XLSX/XLS/XLSB/ODS/
+  Parquet/JSON— y consulta `/version/check`) y verificación de
+  firmas/checksums.
 - **release** (solo en tag): crea la release si no existe y adjunta los
   artefactos con `gh release upload` (AppImage, flatpak y `.exe`, con los
   `SHA256SUMS.*` renombrados por formato).

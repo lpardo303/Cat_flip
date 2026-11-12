@@ -336,6 +336,11 @@ jobs:
           fi
           curl -s http://127.0.0.1:5050/premium/status
           echo
+          # Y que el paquete LEA de verdad: si pierde `formats.py` o
+          # `python_calamine`, el .exe arranca, sirve / y falla al subir un
+          # archivo. Mismo script que usa el job `windows-exe` de ci.yml en
+          # cada PR, para que el release no descubra lo que la CI ya sabía.
+          python scripts/smoke_exe.py
           # /version/check es el ÚNICO HTTPS del bundle: si PyInstaller vuelve
           # a empaquetar ssl sin almacén de CAs, checked:false y el aviso de
           # versión muere en silencio (regresión de 1.4.0 → 1.4.1). El backoff
@@ -348,7 +353,7 @@ jobs:
           bash scripts/smoke_version_check.sh \
             http://127.0.0.1:5050/version/check \
             /tmp/catflip-smoke.log "$VERSION"
-          echo "✓ .exe E2E: / y /version/check con current=$VERSION"
+          echo "✓ .exe E2E: /, formatos de entrada y /version/check con current=$VERSION"
 
       - name: Verifica firmas y checksums
         run: |
