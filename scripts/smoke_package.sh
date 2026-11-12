@@ -2,7 +2,12 @@
 # Smoke de un paquete YA construido, idéntico para los tres formatos.
 #
 # Uso:
-#   scripts/smoke_package.sh appimage|flatpak|windows
+#   scripts/smoke_package.sh appimage|flatpak|windows [--sin-version-check]
+#
+# --sin-version-check omite solo el paso 5 (/version/check). Lo usa el job de
+# PR: ese check espera en backoff contra el rate limit anónimo de
+# api.github.com (305 s por intento, 4 intentos) y en un PR solo aporta
+# intermitencia; el job del tag lo sigue comprobando.
 #
 # Antes había tres pasos de workflow con ~50 líneas cada uno que se habían
 # ido copiando: solo el .exe comprobaba que el paquete LEYERA un archivo, y el
@@ -30,6 +35,19 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 FORMATO="${1:-}"
+shift || true
+SIN_VERSION_CHECK=0
+for arg in "$@"; do
+  case "$arg" in
+    --sin-version-check) SIN_VERSION_CHECK=1 ;;
+    *)
+      echo "Opción desconocida: $arg" >&2
+      echo "Uso: scripts/smoke_package.sh appimage|flatpak|windows [--sin-version-check]" >&2
+      exit 2
+      ;;
+  esac
+done
+
 case "$FORMATO" in
   appimage)
     PATRON="dist/appimage/CatFlip-*.AppImage"
@@ -88,6 +106,9 @@ BUNDLE="${BUNDLES[0]}"
 LOG="$(mktemp)"
 SCRATCH=""
 APP_PID=""
+# Si nunca se llegó a arrancar (p. ej. el guard del puerto), no hay log que
+# volcar y el «— log del paquete —» vacío despista.
+ARRANCADO=0
 
 cleanup() {
   local estado=$?
@@ -113,7 +134,7 @@ cleanup() {
   if [ -n "$SCRATCH" ]; then
     rm -rf "$SCRATCH"
   fi
-  if [ "$estado" -ne 0 ]; then
+  if [ "$estado" -ne 0 ] && [ "$ARRANCADO" = "1" ]; then
     echo "" >&2
     echo "— log del paquete ($ETIQUETA) —" >&2
     tail -60 "$LOG" >&2
@@ -123,7 +144,17 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+# Si ya hay algo en el puerto, el smoke mediría el proceso equivocado: un
+# AppImage que no muere del todo, un `python app.py` olvidado o un job
+# anterior en el mismo runner. Falso verde por diseño, así que se corta.
+if curl -sf -o /dev/null --max-time 2 "$BASE_URL/"; then
+  echo "::error::Ya hay algo escuchando en $BASE_URL: el smoke probaría ese" \
+    "proceso en vez de $BUNDLE. Libéralo (ss -ltnp | grep 5050) y repite." >&2
+  exit 1
+fi
+
 echo "→ arrancando $BUNDLE (package.json $VERSION, ref ${GITHUB_REF_NAME:-local})"
+ARRANCADO=1
 case "$FORMATO" in
   appimage)
     # FUSE no siempre está en el runner: se extrae y se lanza AppRun, que es
@@ -166,6 +197,12 @@ if [ "$listo" != "1" ]; then
 fi
 
 "$PYBIN" scripts/smoke_lecturas.py --base-url "$BASE_URL"
+
+if [ "$SIN_VERSION_CHECK" = "1" ]; then
+  echo "✓ $ETIQUETA E2E: / y lecturas (sin /version/check: lo comprueba el tag)"
+  exit 0
+fi
+
 bash scripts/smoke_version_check.sh \
   "$BASE_URL/version/check" "$LOG" "$VERSION"
 
