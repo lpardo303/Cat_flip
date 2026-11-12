@@ -295,7 +295,7 @@ jobs:
             exit 1
           fi
           status=0
-          python scripts/smoke_exe.py --base-url http://127.0.0.1:5050 || status=$?
+          python scripts/smoke_lecturas.py --base-url http://127.0.0.1:5050 || status=$?
           # onefile deja un hijo: se matan los dos (y por nombre, por si acaso)
           kill "$app_pid" 2>/dev/null || true
           taskkill //F //IM CatFlip.exe > /dev/null 2>&1 || true

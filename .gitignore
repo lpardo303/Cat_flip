@@ -83,3 +83,6 @@ premium.key
 
 # Herramientas de packaging (descargadas y verificadas por hash pina)
 packaging/appimage/tools/
+
+# Adjuntos de las conversaciones (pueden traer secretos pegados)
+.cloud-attachments/

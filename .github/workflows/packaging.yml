@@ -6,6 +6,13 @@ name: packaging
 # del repo (GPG_SIGNING_KEY, armored) y su huella está versionada en
 # packaging/gpg/FINGERPRINT: si no coinciden, el paso de firma falla.
 #
+# ORDEN DE CADA JOB: construir (SKIP_SIGN=1 donde se puede) → scripts/
+# smoke_package.sh sobre el artefacto REAL → packaging/sign.sh → verificar.
+# Antes se firmaba y se verificaban las firmas antes de ejecutar el bundle:
+# los .asc eran válidos y el paquete podía no arrancar ni leer un archivo.
+# La única firma que no se puede diferir es la del repo ostree dentro del
+# .flatpak, porque `flatpak install` la exige (ver packaging/flatpak/build.sh).
+#
 # Nota de compatibilidad: el binario se enlaza contra el glibc del runner
 # (ubuntu-latest). Bajar el suelo de glibc (p. ej. Ubuntu 22.04) exigiría
 # construir en un contenedor antiguo; ver packaging/README.md.
@@ -43,6 +50,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y desktop-file-utils
 
+      - name: Construye el AppImage (sin firmar)
+        run: SKIP_SIGN=1 packaging/appimage/build.sh
+
+      # Mismo smoke que Flatpak y .exe, y ANTES de firmar: arranca el
+      # AppImage, lee los fixtures reales y consulta /version/check.
+      - name: Smoke — arranca, lee los fixtures y consulta GitHub
+        run: scripts/smoke_package.sh appimage
+
       - name: Importa la clave de firma
         env:
           GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
@@ -53,75 +68,11 @@ jobs:
           fi
           echo "$GPG_SIGNING_KEY" | gpg --batch --import
 
-      - name: Construye y firma el AppImage
-        run: packaging/appimage/build.sh
-
-      # El AppImage se construía y firmaba sin ejecutarlo nunca: un bundle
-      # roto (sin CAs, sin package.json) salía verde y llegaba al usuario.
-      # Mismo smoke que el job de Windows.
-      - name: Smoke — el AppImage arranca, sirve / y consulta GitHub
-        run: |
-          VERSION="$(python3 -c "import json; print(json.load(open('package.json'))['version'])")"
-          # En un tag, la release y los artefactos deben llevar la MISMA
-          # versión que package.json (los binarios se nombran con ella).
-          if [[ "$GITHUB_REF" == refs/tags/* && "v$VERSION" != "$GITHUB_REF_NAME" ]]; then
-            echo "::error::tag $GITHUB_REF_NAME ≠ package.json $VERSION"
-            exit 1
-          fi
-          # El glob debe casar EXACTAMENTE con 1 bundle: 0 = build incompleto
-          # y >1 = residuo de otra versión (un `head -1` se comió el bundle
-          # 1.0.0 antiguo en local en vez del 1.5.0). Error claro, no elegir
-          # el primero a ciegas.
-          shopt -s nullglob
-          BUNDLES=(dist/appimage/CatFlip-*.AppImage)
-          if [ "${#BUNDLES[@]}" -ne 1 ]; then
-            echo "::error::Se esperaba exactamente 1 AppImage en dist/appimage; hay ${#BUNDLES[@]} (${BUNDLES[*]:-ninguno})"
-            exit 1
-          fi
-          IMG="${BUNDLES[0]}"
-          echo "→ arrancando $IMG (package.json $VERSION, ref $GITHUB_REF_NAME)"
-          # FUSE no siempre está en el runner: se extrae y se lanza AppRun,
-          # que además es el squashfs real que se distribuye.
-          chmod +x "$IMG"
-          # La extracción va a un directorio temporal FUERA de dist/: hecha
-          # dentro, el squashfs-root (~180 MB) viajaba en el artefacto del job
-          # y el job de release intentaba subirlo como asset muriendo con
-          # «read artifacts/appimage/squashfs-root: is a directory» (1.5.1).
-          SCRATCH="$(mktemp -d)"
-          (cd "$SCRATCH" && "$GITHUB_WORKSPACE/dist/appimage/$(basename "$IMG")" --appimage-extract > /dev/null)
-          (cd "$SCRATCH/squashfs-root" && exec ./AppRun > /tmp/catflip-appimage-smoke.log 2>&1) &
-          PID=$!
-          # El proceso se mata SIEMPRE al salir del paso, pase lo que pase
-          # (mismo criterio que el trap del smoke del Flatpak).
-          trap 'kill "$PID" 2>/dev/null || true' EXIT
-          for _ in $(seq 1 60); do
-            curl -sf -o /dev/null http://127.0.0.1:5050/ && break
-            sleep 1
-          done
-          if ! curl -sf -o /dev/null http://127.0.0.1:5050/; then
-            echo "::error::/ no responde en 60 s"
-            cat /tmp/catflip-appimage-smoke.log
-            exit 1
-          fi
-          # /version/check es el ÚNICO HTTPS del bundle: si PyInstaller vuelve
-          # a empaquetar ssl sin almacén de CAs, checked:false y el aviso de
-          # versión muere en silencio (regresión 1.4.0 → 1.4.1). El backoff
-          # contra el rate limit vive en scripts/smoke_version_check.sh,
-          # compartido por los tres smokes (4 intentos, espera base de 305 s
-          # > _RELEASE_TTL_ERR, estirada al reset del rate limit). Exige
-          # checked:true y que el current EMPAQUETADO sea el del tag: si no
-          # coincide, fallo duro sin reintentar.
-          bash scripts/smoke_version_check.sh \
-            http://127.0.0.1:5050/version/check \
-            /tmp/catflip-appimage-smoke.log "$VERSION"
-          echo "✓ AppImage E2E: / y /version/check con current=$VERSION"
+      - name: Firma el AppImage (detached + SHA256SUMS)
+        run: packaging/sign.sh dist/appimage/*.AppImage
 
       - name: Verifica firmas y checksums
-        run: |
-          cd dist/appimage
-          gpg --verify ./*.AppImage.asc ./*.AppImage
-          gpg --verify SHA256SUMS.asc SHA256SUMS
-          sha256sum -c SHA256SUMS
+        run: packaging/sign.sh --verificar dist/appimage/*.AppImage
 
       - uses: actions/upload-artifact@v7
         with:
@@ -148,6 +99,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
 
+      # La clave entra ANTES del build solo aquí: el repo ostree que va
+      # dentro del .flatpak se firma al exportarlo y `flatpak install` la
+      # exige, así que un bundle sin esa firma no se podría ni instalar en el
+      # smoke. La firma detached (.asc) y los SHA256SUMS, que es lo que el
+      # usuario verifica, sí se generan después del smoke como en los otros.
       - name: Importa la clave de firma
         env:
           GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
@@ -161,95 +117,30 @@ jobs:
       - name: flatpak-builder + runtime 26.08
         run: |
           sudo apt-get update
-          sudo apt-get install -y flatpak flatpak-builder
+          sudo apt-get install -y flatpak flatpak-builder desktop-file-utils
           flatpak remote-add --user --if-not-exists flathub \
             https://dl.flathub.org/repo/flathub.flatpakrepo
           flatpak install --user -y flathub \
             org.freedesktop.Platform//26.08 org.freedesktop.Sdk//26.08
 
-      - name: Construye y firma el Flatpak
+      - name: Construye el Flatpak (repo ostree firmado, detached pendiente)
         env:
           # flatpak-builder del host: sin sandbox de org.flatpak.Builder no
           # existe el problema de resolver el SDK en la instalación de sistema.
           FLATPAK_BUILDER_CMD: flatpak-builder
         run: packaging/flatpak/build.sh
 
-      - name: Verifica firmas y checksums
-        run: |
-          cd dist/flatpak
-          gpg --verify ./*.flatpak.asc ./*.flatpak
-          gpg --verify SHA256SUMS.asc SHA256SUMS
-          sha256sum -c SHA256SUMS
+      # El mismo smoke que AppImage y .exe, pero por el camino del usuario
+      # final: `flatpak install` del bundle y `flatpak run`, que es lo único
+      # que demuestra que el sandbox sirve HTTP y sale a la red.
+      - name: Smoke — instala, arranca, lee los fixtures y consulta GitHub
+        run: scripts/smoke_package.sh flatpak
 
-      # El Flatpak se construía y firmaba sin instalarse nunca: un bundle
-      # roto (sin CAs, sin package.json, sandbox sin red) salía verde y
-      # llegaba al usuario. Mismo smoke que AppImage y .exe, pero pasando
-      # por el camino del usuario final: instalar el bundle, `flatpak run`
-      # y comprobar que el sandbox sirve HTTP y sale a la red. Va DESPUÉS
-      # de la verificación de firmas: solo se ejecuta un bundle cuya
-      # firma detach y su checksum ya cuadran.
-      - name: Smoke — el Flatpak arranca, sirve / y consulta GitHub
-        run: |
-          VERSION="$(python3 -c "import json; print(json.load(open('package.json'))['version'])")"
-          # En un tag, la release y el bundle deben llevar la MISMA versión
-          # que package.json (el bundle se nombra con ella).
-          if [[ "$GITHUB_REF" == refs/tags/* && "v$VERSION" != "$GITHUB_REF_NAME" ]]; then
-            echo "::error::tag $GITHUB_REF_NAME ≠ package.json $VERSION"
-            exit 1
-          fi
-          APP_ID=io.github.lpardo303.CatFlip
-          # El glob debe casar EXACTAMENTE con 1 bundle: 0 = build incompleto
-          # y >1 = residuo de otra versión (un `head -1` se comió el bundle
-          # 1.0.0 antiguo en local en vez del 1.5.0). Error claro, no elegir
-          # el primero a ciegas.
-          shopt -s nullglob
-          BUNDLES=("$PWD"/dist/flatpak/CatFlip-*.flatpak)
-          if [ "${#BUNDLES[@]}" -ne 1 ]; then
-            echo "::error::Se esperaba exactamente 1 Flatpak en dist/flatpak; hay ${#BUNDLES[@]} (${BUNDLES[*]:-ninguno})"
-            exit 1
-          fi
-          BUNDLE="${BUNDLES[0]}"
-          echo "→ instalando $BUNDLE (package.json $VERSION, ref $GITHUB_REF_NAME)"
-          # Limpieza SIEMPRE: la app se mata por app-id (`flatpak run`
-          # deja el bwrap colgando si solo se mata al cliente) y el bundle
-          # se desinstala — también si el smoke falla o el paso se corta.
-          cleanup() {
-            kill "$PID" 2>/dev/null || true
-            flatpak kill "$APP_ID" 2>/dev/null || true
-            for _ in 1 2 3 4 5; do
-              flatpak ps 2>/dev/null | grep -q "$APP_ID" || break
-              sleep 1
-            done
-            flatpak --user uninstall -y --delete-data "$APP_ID" 2>/dev/null || true
-          }
-          trap cleanup EXIT
-          # --user: la MISMA instalación del resto del job, donde el paso
-          # «flatpak-builder + runtime 26.08» ya instaló el runtime (sin
-          # --user flatpak buscaría una instalación de sistema y sudo).
-          flatpak install --user -y "$BUNDLE"
-          flatpak run "$APP_ID" > /tmp/catflip-flatpak-smoke.log 2>&1 &
-          PID=$!
-          for _ in $(seq 1 60); do
-            curl -sf -o /dev/null http://127.0.0.1:5050/ && break
-            sleep 1
-          done
-          if ! curl -sf -o /dev/null http://127.0.0.1:5050/; then
-            echo "::error::/ no responde en 60 s — ¿arranca el binario dentro del sandbox o comparte la red?"
-            cat /tmp/catflip-flatpak-smoke.log
-            exit 1
-          fi
-          # /version/check es el ÚNICO HTTPS del bundle: dentro del sandbox
-          # debe valer lo mismo que en AppImage y .exe (CAs del bundle y
-          # red del sandbox). El backoff contra el rate limit vive en
-          # scripts/smoke_version_check.sh, compartido por los tres smokes
-          # (4 intentos, espera base de 305 s > _RELEASE_TTL_ERR, estirada
-          # al reset del rate limit). Exige checked:true y que el current
-          # EMPAQUETADO sea el del tag: si no coincide, fallo duro sin
-          # reintentar.
-          bash scripts/smoke_version_check.sh \
-            http://127.0.0.1:5050/version/check \
-            /tmp/catflip-flatpak-smoke.log "$VERSION"
-          echo "✓ Flatpak E2E: / y /version/check con current=$VERSION"
+      - name: Firma el bundle (detached + SHA256SUMS)
+        run: packaging/sign.sh dist/flatpak/*.flatpak
+
+      - name: Verifica firmas y checksums
+        run: packaging/sign.sh --verificar dist/flatpak/*.flatpak
 
       - uses: actions/upload-artifact@v7
         with:
@@ -291,6 +182,12 @@ jobs:
           gpg --version | head -2
           command -v sha256sum
 
+      - name: Construye el .exe (sin firmar)
+        run: SKIP_SIGN=1 packaging/windows/build.sh
+
+      - name: Smoke — arranca, lee los fixtures y consulta GitHub
+        run: scripts/smoke_package.sh windows
+
       - name: Importa la clave de firma
         env:
           GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
@@ -301,66 +198,11 @@ jobs:
           fi
           echo "$GPG_SIGNING_KEY" | gpg --batch --import
 
-      - name: Construye y firma el .exe
-        run: packaging/windows/build.sh
-
-      - name: Smoke — el .exe arranca, sirve / y consulta GitHub
-        run: |
-          VERSION="$(python3 -c "import json; print(json.load(open('package.json'))['version'])")"
-          # El glob debe casar EXACTAMENTE con 1 bundle: 0 = build incompleto
-          # y >1 = residuo de otra versión (un `head -1` se comió el bundle
-          # 1.0.0 antiguo en local en vez del 1.5.0). Error claro, no elegir
-          # el primero a ciegas.
-          shopt -s nullglob
-          BUNDLES=(dist/windows/CatFlip-*.exe)
-          if [ "${#BUNDLES[@]}" -ne 1 ]; then
-            echo "::error::Se esperaba exactamente 1 .exe en dist/windows; hay ${#BUNDLES[@]} (${BUNDLES[*]:-ninguno})"
-            exit 1
-          fi
-          EXE="${BUNDLES[0]}"
-          echo "→ arrancando $EXE (package.json $VERSION, ref $GITHUB_REF_NAME)"
-          "$EXE" > /tmp/catflip-smoke.log 2>&1 &
-          PID=$!
-          # El proceso se mata SIEMPRE al salir del paso (antes el kill iba
-          # tras el reintento y un fallo del check lo dejaba huérfano).
-          trap 'kill "$PID" 2>/dev/null || true' EXIT
-          for _ in $(seq 1 60); do
-            curl -sf -o /dev/null http://127.0.0.1:5050/ && break
-            sleep 1
-          done
-          if ! curl -sf -o /dev/null http://127.0.0.1:5050/; then
-            echo "::error::/ no responde en 60 s"
-            cat /tmp/catflip-smoke.log
-            kill "$PID" 2>/dev/null || true
-            exit 1
-          fi
-          curl -s http://127.0.0.1:5050/premium/status
-          echo
-          # Y que el paquete LEA de verdad: si pierde `formats.py` o
-          # `python_calamine`, el .exe arranca, sirve / y falla al subir un
-          # archivo. Mismo script que usa el job `windows-exe` de ci.yml en
-          # cada PR, para que el release no descubra lo que la CI ya sabía.
-          python scripts/smoke_exe.py
-          # /version/check es el ÚNICO HTTPS del bundle: si PyInstaller vuelve
-          # a empaquetar ssl sin almacén de CAs, checked:false y el aviso de
-          # versión muere en silencio (regresión de 1.4.0 → 1.4.1). El backoff
-          # contra el rate limit vive en scripts/smoke_version_check.sh,
-          # compartido por los tres smokes (4 intentos, espera base de 305 s
-          # > _RELEASE_TTL_ERR, estirada al reset del rate limit — lo que
-          # reventó este job en el PR #46). Como AppImage y Flatpak exige
-          # además que el current EMPAQUETADO sea el del tag: si no coincide,
-          # fallo duro sin reintentar.
-          bash scripts/smoke_version_check.sh \
-            http://127.0.0.1:5050/version/check \
-            /tmp/catflip-smoke.log "$VERSION"
-          echo "✓ .exe E2E: /, formatos de entrada y /version/check con current=$VERSION"
+      - name: Firma el .exe (detached + SHA256SUMS)
+        run: packaging/sign.sh dist/windows/*.exe
 
       - name: Verifica firmas y checksums
-        run: |
-          cd dist/windows
-          gpg --verify ./*.exe.asc ./*.exe
-          gpg --verify SHA256SUMS.asc SHA256SUMS
-          sha256sum -c SHA256SUMS
+        run: packaging/sign.sh --verificar dist/windows/*.exe
 
       - uses: actions/upload-artifact@v7
         with:
