@@ -175,12 +175,12 @@ def test_el_codigo_generado_reproduce_la_carga(ext, tmp_path, monkeypatch):
     _, expr, _ = read_table(_ArchivoConNombre(contenido, nombre))
     (tmp_path / nombre).write_bytes(contenido)
     monkeypatch.chdir(tmp_path)  # la expresión usa el nombre relativo
-    with warnings.catch_warnings():
-        # El código exportado para .xlsx no fija motor (comportamiento
-        # histórico) y pandas avisa de que el default cambiará: decisión
-        # aparte, fuera de este cambio.
-        warnings.filterwarnings("ignore", message=".*default engine.*")
+    # Todos los formatos con motor lo fijan en el código generado, así que
+    # aquí no debe aparecer el aviso de pandas sobre el default de .xlsx.
+    with warnings.catch_warnings(record=True) as avisos:
+        warnings.simplefilter("always")
         reconstruido = eval(expr, {"pd": pd})  # noqa: S307 — expresión propia
+    assert [str(w.message) for w in avisos] == []
     _comprobar(reconstruido, ext)
 
 

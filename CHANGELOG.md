@@ -46,6 +46,22 @@ siguiente corte.
 
 ### Cambiado
 
+- **La lectura de `.xlsx` pasa a `calamine`** (antes `openpyxl`), después de
+  medirlo. Los mismos cuadernos leídos por ambos motores dan las mismas
+  columnas, dtypes y valores en todo lo probado —fechas con y sin hora,
+  booleanos, enteros por encima de 2^53, errores de fórmula, celdas
+  combinadas, encabezados vacíos/duplicados/numéricos, acentos, emoji,
+  espacios en los extremos, tabuladores y saltos de línea—; la única
+  diferencia bruta era una celda con un solo espacio, que la normalización
+  de nulos ya convertía en `null`. A cambio: **7× más rápido** (0,8 s frente
+  a 6,0 s en 50.000×8, medido también en la app instalada) y lee los
+  cuadernos con hoja de gráfico, que hacían fallar a openpyxl 3.1.5 con
+  `AttributeError`. Coste asumido: ~25 % más de pico de memoria al leer.
+  `excel_engine()` queda como único interruptor y el código exportado fija
+  `engine='calamine'`, de modo que el script sigue reproduciendo la carga
+  aunque cambie el motor por defecto de pandas. `openpyxl` sigue en las
+  dependencias: es quien **escribe** el `.xlsx` (exportación y CLI), y hay un
+  test de ida y vuelta entre ambos.
 - **La lista de formatos vive en un solo sitio (`formats.py`)**: estaba
   escrita a mano en nueve lugares (tres `accept=` del HTML, dos
   validaciones del front y las tuplas del backend y del CLI), que es lo
