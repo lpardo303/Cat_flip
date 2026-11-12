@@ -11,6 +11,17 @@ siguiente corte.
 
 ### Añadido
 
+- **CI: el `.exe` de Windows se construye y se prueba en cada PR.** Era el
+  único artefacto sin verificar: el job `windows` de `packaging.yml` solo
+  corre en tags, así que una regresión de empaquetado (`formats.py`,
+  `python_calamine`, plantillas) llegaba a `main` y estallaba al publicar.
+  El nuevo job `windows-exe` construye el `.exe` con el spec real —sin
+  firmar: la clave GPG es de publicación, vía `SKIP_SIGN=1`—, lo arranca sin
+  navegador y le sube los fixtures reales con `scripts/smoke_exe.py`: los
+  ocho formatos de entrada y el selector de hoja. El mismo script se ejecuta
+  ahora en el job de release, que antes solo comprobaba `/` y
+  `premium/status` — es decir, que el `.exe` arrancara, no que leyera un
+  archivo.
 - **Entrada `.ods` y `.parquet`**: la app lee ahora hojas de cálculo
   OpenDocument y columnas Parquet, además de CSV, TSV, XLSX y XLS. `.ods`
   usa `python-calamine` (ya empaquetado para `.xls`): pandas 3 lo leería

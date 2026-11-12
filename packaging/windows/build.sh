@@ -2,9 +2,14 @@
 # Build del .exe de Windows (PyInstaller onefile), firmado con GPG y con
 # SHA256SUMS — el equivalente a packaging/appimage/build.sh.
 #
-# Uso (Git Bash en Windows, o el job `windows` de la CI con `shell: bash`):
+# Uso (Git Bash en Windows, o el job `windows-exe` de la CI con `shell: bash`):
 #   packaging/windows/build.sh                 # congelado + .exe + firma
 #   SKIP_FROZEN=1 packaging/windows/build.sh   # reutiliza dist/CatFlip.exe
+#   SKIP_SIGN=1 packaging/windows/build.sh     # sin firma (CI: no hay clave)
+#
+# `SKIP_SIGN=1` construye y deja el .exe en dist/windows/ sin firmar: es lo
+# que usa el job de CI para probar el artefacto. La firma es un paso de
+# publicación, con la clave GPG privada, y por eso no se ejerce en la CI.
 #
 # Nota: gpg y sha256sum viven en Git Bash (no en el PATH de PowerShell);
 # por eso este script es bash y la CI corre este job con `shell: bash`.
@@ -21,7 +26,11 @@ PYBIN="${PYBIN:-python}"
 OUT="$ROOT/dist/windows"
 WORK="$ROOT/build/windows"
 
-for tool in gpg sha256sum "$PYBIN"; do
+HERRAMIENTAS=("$PYBIN")
+if [ "${SKIP_SIGN:-0}" != "1" ]; then
+  HERRAMIENTAS+=(gpg sha256sum)
+fi
+for tool in "${HERRAMIENTAS[@]}"; do
   if ! command -v "$tool" > /dev/null 2>&1; then
     echo "::error::Falta «$tool». En Windows usa Git Bash (gpg y sha256sum)" \
       "viven en /usr/bin) o instala GnuPG con choco install gnupg."
@@ -51,6 +60,13 @@ rm -f "$BINARY" "$BINARY.asc"
 mv dist/CatFlip.exe "$BINARY"
 
 # 2) Firma detached + checksums firmados (mismo patrón que AppImage/Flatpak).
+if [ "${SKIP_SIGN:-0}" = "1" ]; then
+  echo "→ firma omitida (SKIP_SIGN=1): .exe sin firmar, solo para probar el artefacto"
+  echo "✅ .exe listo (sin firmar):"
+  ls -lh "$BINARY"
+  exit 0
+fi
+
 echo "→ firma GPG ($FPR)"
 gpg --batch --yes --armor --local-user "$FPR" --detach-sign "$BINARY"
 (
