@@ -11,6 +11,16 @@ siguiente corte.
 
 ### Añadido
 
+- **La firma comprueba que la clave usada sea la que se distribuye.** Nadie
+  verificaba que `packaging/gpg/catflip-release.asc` (la clave publicada) fuera
+  la de `packaging/gpg/FINGERPRINT` (la que firma): una rotación hecha a medias
+  publicaba `.asc` que **no verifican** con la clave que recibe el usuario, y se
+  descubría al comprobar una descarga. Ahora `packaging/sign.sh` lo hace en dos
+  pasos: antes de firmar exige que el `.asc` versionado contenga la huella de
+  `FINGERPRINT` (falla sin tocar el artefacto); y después verifica las dos
+  firmas en una jaula de claves vacía que solo importa esa clave pública, que es
+  lo mismo que hace quien descarga el paquete. Al ser parte del camino de firma,
+  lo cubren el tag y la corrida semanal.
 - **El camino firmado se ejercita cada semana, no solo al publicar.** Una
   rotura de la clave GPG, del secreto o del runtime de flathub solo se veía en
   el tag (o en un `workflow_dispatch` manual), es decir, en el peor momento. El
