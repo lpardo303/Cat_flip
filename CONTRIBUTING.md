@@ -56,11 +56,17 @@ CATFLIP_PREMIUM_KEY=local python app.py   # http://127.0.0.1:5050
 
 4. Abre un PR contra `main`. Los jobs de CI (`test`, `pg-smoke`,
    `s3-smoke`, `axe`, `actionlint`, `windows-exe` y `linux-bundles`) deben
-   estar en verde; `windows-exe` y `linux-bundles` construyen los tres
+   estar en verde;    `windows-exe` y `linux-bundles` construyen los tres
    paquetes sin firmar y comprueban que leen los fixtures reales, así que un
-   `hiddenimport` que falte se ve en el PR y no en la publicación.
-   `linux-bundles` es el más lento (~6 min: congela una vez y construye
-   AppImage y Flatpak). `main` está
+   `hiddenimport` que falte se ve en el PR y no en la publicación. Los dos
+   usan el mismo `scripts/smoke_package.sh` del release.
+   `linux-bundles` es el más lento (~5 min: congela una vez y construye
+   AppImage y Flatpak), así que **se salta solo** cuando el diff no toca nada
+   que acabe en el bundle: lo decide el job `cambios` con
+   `scripts/toca_bundle.sh`, que responde «no construir» únicamente si todo lo
+   cambiado es documentación, `tests/` (sin `tests/fixtures/`) o metadatos.
+   Ante la duda construye, así que un filtro roto nunca deja un PR sin
+   cobertura. `main` está
    protegida (1 review aprobatoria + checks de estado). Ojo si el PR lo
    escribes tú: **no puedes aprobar tu propio PR**, así que esa única
    review no la reúne nadie — el ritual para mergearlo está en la

@@ -155,7 +155,10 @@ en cada tag `v*` y bajo demanda con `workflow_dispatch`:
   backoff contra api.github.com y en PRs solo aporta intermitencia; el tag sí
   lo comprueba). El binario congelado se construye una vez y el Flatpak lo
   reutiliza con `SKIP_FROZEN=1`; antes estos dos bundles solo se probaban en
-  el tag, así que una regresión de empaquetado llegaba a `main`.
+  el tag, así que una regresión de empaquetado llegaba a `main`. El job se
+  salta solo si el diff no toca nada que acabe en el bundle
+  (`scripts/toca_bundle.sh` mediante el job `cambios`), y responde «construir»
+  ante cualquier duda.
 - **Los tres jobs del tag siguen el mismo orden**: construir → `scripts/smoke_package.sh
   <formato>` → `packaging/sign.sh <artefacto>` → `packaging/sign.sh --verificar
   <artefacto>` → subida de artifacts. El smoke es **el mismo** para AppImage,
