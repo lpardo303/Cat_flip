@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
-"""Avisa de un fallo del cron de packaging abriendo o actualizando un issue.
+"""Avisa de los fallos del cron de packaging y cierra el aviso al recuperarse.
 
 El cron semanal existe para no descubrir en el tag una clave GPG caducada, un
 secreto mal rotado o un runtime que desapareció de flathub. Pero un lunes en
-rojo no lo mira nadie: el fallo quedaba en Actions hasta que alguien entraba.
-Este script convierte ese rojo en un issue.
+rojo no lo mira nadie, y un issue de fallo sin cerrar tampoco dice nada: seis
+meses después no se sabe si sigue roto o si se arregló en su momento.
 
-Reglas para no llenar la lista de issues:
+Modos (los dos usan la búsqueda de issues para no duplicar):
 
-* si no existe, lo abre;
-* si existe y está abierto, **comenta** la corrida nueva en vez de abrir otro;
-* si existe cerrado, lo reabre y comenta (alguien lo dio por resuelto y no lo
-  estaba).
+* **fallo** (por defecto): abre el issue si no existe, comenta si está abierto
+  y reabre el que alguien cerró sin que estuviera arreglado.
+* **`--ok`**: si hay un issue abierto del cron, comenta la corrida buena y lo
+  cierra. Si no hay nada abierto, no toca nada.
 
-Lo llama el job `avisar-fallo` de `packaging.yml` solo en corridas
-programadas: un `workflow_dispatch` lo lanza alguien que ya está mirando.
+El issue se localiza con `GET /search/issues` (`in:title`, `type:issue`), no
+listando los últimos N: con la lista, un repo con más de 100 issues abiertos
+dejaría de encontrar el suyo y abriría un duplicado cada lunes.
+
+Lo llama `packaging.yml` solo en corridas programadas: un `workflow_dispatch`
+lo lanza alguien que ya está mirando.
 
 Variables de entorno:
     GH_TOKEN             token con permiso de issues (github.token en Actions)
@@ -26,6 +30,7 @@ Variables de entorno:
 import json
 import os
 import sys
+import urllib.parse
 import urllib.request
 
 TITULO = "Fallo en el cron semanal de packaging"
@@ -58,30 +63,38 @@ def api(metodo, ruta, payload=None):
         return json.load(respuesta)
 
 
-def main():
-    repo = os.environ["GITHUB_REPOSITORY"]
+def buscar_issue(repo, titulo):
+    """El issue del cron por búsqueda, abierto o cerrado.
+
+    La búsqueda es difusa (encuentra por palabras), así que se compara el
+    título exacto antes de darlo por bueno. `type:issue` descarta los PRs, que
+    si no aparecen con el mismo texto.
+    """
+    consulta = f'repo:{repo} in:title type:issue "{titulo}"'
+    ruta = "/search/issues?per_page=100&q=" + urllib.parse.quote(consulta)
+    for issue in api("GET", ruta).get("items", []):
+        if issue.get("title") == titulo:
+            return issue
+    return None
+
+
+def datos_corrida(repo):
     corrida = os.environ.get("GITHUB_RUN_ID", "").strip()
     sha = os.environ.get("GITHUB_SHA", "").strip()[:7]
-    resultados = os.environ.get("RESULTADOS", "").strip()
-
     detalle = []
     if corrida:
         detalle.append(f"- Corrida: https://github.com/{repo}/actions/runs/{corrida}")
     if sha:
         detalle.append(f"- Commit: `{sha}`")
+    resultados = os.environ.get("RESULTADOS", "").strip()
     if resultados:
         detalle.append(f"- Jobs: {resultados}")
+    return detalle
 
-    # `state=all` para reabrir el anterior en vez de crear otro cada lunes.
-    issues = api("GET", f"/repos/{repo}/issues?state=all&per_page=100")
-    previo = next(
-        (
-            i
-            for i in issues
-            if "pull_request" not in i and i["title"] == TITULO
-        ),
-        None,
-    )
+
+def avisar_fallo(repo):
+    previo = buscar_issue(repo, TITULO)
+    detalle = datos_corrida(repo)
 
     if previo is None:
         cuerpo = "\n".join(
@@ -94,6 +107,8 @@ def main():
                 "del secreto o del runtime. El log del job en rojo dice cuál fue;",
                 "`packaging/sign.sh` distingue la clave mal rotada del `.asc`",
                 "desfasado, y `scripts/auditar_bundle.py` el paquete que engordó.",
+                "",
+                "Se cerrará solo cuando una corrida programada vuelva a salir bien.",
                 "",
                 "_Abierto automáticamente por el workflow «packaging»._",
             ]
@@ -110,14 +125,48 @@ def main():
     api(
         "POST",
         f"/repos/{repo}/issues/{numero}/comments",
-        {
-            "body": "\n".join(
-                ["Otra corrida programada en rojo.", "", *detalle]
-            )
-        },
+        {"body": "\n".join(["Otra corrida programada en rojo.", "", *detalle])},
     )
     print(f"comentado en el issue #{numero}")
     return 0
+
+
+def cerrar_aviso(repo):
+    previo = buscar_issue(repo, TITULO)
+    if previo is None:
+        print("no hay issue del cron: no hay nada que cerrar")
+        return 0
+    if previo["state"] != "open":
+        print(f"el issue #{previo['number']} ya estaba cerrado")
+        return 0
+
+    numero = previo["number"]
+    api(
+        "POST",
+        f"/repos/{repo}/issues/{numero}/comments",
+        {
+            "body": "\n".join(
+                [
+                    "La corrida programada ha vuelto a salir bien; se cierra.",
+                    "",
+                    *datos_corrida(repo),
+                ]
+            )
+        },
+    )
+    api("PATCH", f"/repos/{repo}/issues/{numero}", {"state": "closed"})
+    print(f"issue #{numero} cerrado")
+    return 0
+
+
+def main():
+    if os.environ.get("GH_TOKEN", "").strip() == "":
+        print("::error::falta GH_TOKEN", file=sys.stderr)
+        return 1
+    repo = os.environ["GITHUB_REPOSITORY"]
+    if "--ok" in sys.argv[1:]:
+        return cerrar_aviso(repo)
+    return avisar_fallo(repo)
 
 
 if __name__ == "__main__":
