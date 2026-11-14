@@ -46,7 +46,12 @@ build para).
   `gpg --s2k-mode 3 --passphrase` y firma con el agente).
 - Rotación: `gpg --quick-generate-key ...` nueva → actualizar
   `FINGERPRINT` y `catflip-release.asc` en el mismo commit, y recomunicar
-  la pública.
+  la pública. **`packaging/sign.sh` lo verifica**: antes de firmar exige que
+  el `.asc` versionado contenga la huella de `FINGERPRINT` (si no, falla sin
+  llegar a firmar), y después comprueba las dos firmas en una jaula de claves
+  vacía con **solo** esa clave pública — exactamente lo que hace quien
+descarga el paquete. Una rotación a medias ya no puede publicar `.asc` que no
+  verifiquen con la clave que se distribuye.
 
 ## Build
 

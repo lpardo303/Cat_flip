@@ -21,6 +21,14 @@
 #
 # Recibe un solo artefacto: si el glob del llamador casa con dos (residuo de
 # otra versión), falla en vez de firmar el que elija el shell.
+#
+# Comprueba que la clave con la que se firma sea la que se DISTRIBUYE
+# (`packaging/gpg/catflip-release.asc`), en los dos sentidos: antes de firmar,
+# que el `.asc` versionado contenga la huella de `packaging/gpg/FINGERPRINT`;
+# y después, que las firmas verifiquen en una jaula de claves vacía con SOLO
+# esa clave pública —lo mismo que hace quien descarga el paquete—. Una
+# rotación a medias (clave nueva en el secreto y `FINGERPRINT`, `.asc` viejo, o
+# al revés) publicaba `.asc` que no verificaban con la clave distribuida.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -69,8 +77,34 @@ for tool in gpg sha256sum; do
   fi
 done
 
-DIR="$(cd "$(dirname "$ART")" && pwd)"
+# GnuPG en Git Bash es un binario nativo: no entiende rutas POSIX (/tmp/...,
+# /d/...). Por eso, desde aquí y para todo lo que toque gpg, se trabaja con
+# rutas RELATIVAS a la raíz del repo (la CI pasa los artefactos así).
+cd "$ROOT"
+PUB="packaging/gpg/catflip-release.asc"
+# La jaula de claves también relativa, por el mismo motivo.
+JAULA="build/gnupg-publica"
+
+if [ ! -f "$PUB" ]; then
+  echo "::error::Falta la clave pública versionada: $ROOT/$PUB" >&2
+  exit 1
+fi
+
+# 1) Antes de firmar: la clave que se distribuye tiene que ser esta misma.
+#    Falla aquí y no después para no dejar `.asc` de una clave que los
+#    usuarios no tienen (y para no tocar el artefacto ya construido).
+publicadas="$(gpg --batch --with-colons --import-options show-only \
+  --import "$PUB" 2> /dev/null | awk -F: '$1 == "fpr" { print $10 }')"
+if ! grep -qx "$FPR" <<< "$publicadas"; then
+  echo "::error::La clave pública versionada no es la de FINGERPRINT." \
+    "$PUB trae [${publicadas//$'\n'/, }] y FINGERPRINT dice $FPR:" \
+    "rotación a medias — los .asc publicados NO verificarían con la clave" \
+    "que se distribuye. Actualiza el .asc y la huella en el mismo commit." >&2
+  exit 1
+fi
+
 NAME="$(basename "$ART")"
+DIR="$(cd "$(dirname "$ART")" && pwd)"
 
 echo "→ firma GPG ($FPR) de $NAME"
 rm -f "$ART.asc" "$ART.sig"
@@ -81,6 +115,26 @@ gpg --batch --yes --armor --local-user "$FPR" --detach-sign "$ART"
   sha256sum "$NAME" > SHA256SUMS
   gpg --batch --yes --armor --local-user "$FPR" --detach-sign SHA256SUMS
 )
+
+# 2) Después de firmar: que verifiquen con LO MISMO que tiene el usuario, es
+#    decir en una jaula de claves vacía que solo importa la clave publicada.
+#    En la jaula normal verificaría igual aunque el .asc versionado fuera otro,
+#    porque ahí está la privada.
+rm -rf "$JAULA"
+mkdir -p "$JAULA"
+chmod 700 "$JAULA"
+# shellcheck disable=SC2317,SC2329  # se invoca vía trap
+limpiar_jaula() {
+  gpgconf --homedir "$JAULA" --kill all 2> /dev/null || true
+  rm -rf "$JAULA"
+}
+trap limpiar_jaula EXIT
+ARTDIR="$(dirname "$ART")"
+gpg --homedir "$JAULA" --batch --quiet --import "$PUB"
+gpg --homedir "$JAULA" --batch --verify "$ART.asc" "$ART"
+gpg --homedir "$JAULA" --batch --verify \
+  "$ARTDIR/SHA256SUMS.asc" "$ARTDIR/SHA256SUMS"
+echo "✅ las firmas verifican con la clave pública versionada"
 
 echo "✅ firmado:"
 ls -lh "$ART" "$ART.asc" "$DIR/SHA256SUMS" "$DIR/SHA256SUMS.asc"
