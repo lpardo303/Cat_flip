@@ -21,6 +21,17 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+  # Semanal: el camino firmado (clave GPG, flatpak-builder + runtime, los tres
+  # bundles) solo se ejercitaba en un tag o con un dispatch a mano, así que una
+  # clave caducada, un secreto mal rotado o un runtime que desaparece de
+  # flathub se descubrían al publicar. Esta corrida hace lo mismo que un tag
+  # MENOS publicar: el job `release` está atado a `refs/tags/`, y los artifacts
+  # no se suben fuera de un tag (ver `if` en cada upload).
+  #
+  # Ojo: GitHub desactiva los workflows programados tras 60 días sin actividad
+  # en el repositorio. Si el cron deja de aparecer, se reactiva en Actions.
+  schedule:
+    - cron: "15 4 * * 1" # lunes 04:15 UTC
 
 permissions:
   contents: write
@@ -29,6 +40,9 @@ jobs:
   appimage:
     name: AppImage firmado
     runs-on: ubuntu-latest
+    # Con `/version/check` y su backoff, una corrida sin rate limit tarda ~1,5
+    # min; el tope solo evita que un cuelgue se coma la cuota del runner.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
 
@@ -74,7 +88,11 @@ jobs:
       - name: Verifica firmas y checksums
         run: packaging/sign.sh --verificar dist/appimage/*.AppImage
 
+      # En la corrida semanal NO se sube nada: son ~115 MB por formato y el
+      # objetivo del cron es ejercitar firma y runtime, no distribuir. El log
+      # del smoke ya vuelca lo necesario para diagnosticar un fallo.
       - uses: actions/upload-artifact@v7
+        if: github.event_name != 'schedule'
         with:
           name: appimage
           path: dist/appimage/
@@ -83,6 +101,7 @@ jobs:
   flatpak:
     name: Flatpak firmado
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
 
@@ -143,6 +162,7 @@ jobs:
         run: packaging/sign.sh --verificar dist/flatpak/*.flatpak
 
       - uses: actions/upload-artifact@v7
+        if: github.event_name != 'schedule'
         with:
           name: flatpak
           path: dist/flatpak/
@@ -151,6 +171,7 @@ jobs:
   windows:
     name: .exe firmado (Windows)
     runs-on: windows-latest
+    timeout-minutes: 25
     # gpg y sha256sum NO están en el PATH de PowerShell: existen en Git
     # Bash (Git for Windows /usr/bin). Todo el job corre en bash y el
     # primer paso comprueba los dos binarios antes de gastar minutos.
@@ -205,6 +226,7 @@ jobs:
         run: packaging/sign.sh --verificar dist/windows/*.exe
 
       - uses: actions/upload-artifact@v7
+        if: github.event_name != 'schedule'
         with:
           name: windows
           path: dist/windows/
