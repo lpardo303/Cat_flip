@@ -274,7 +274,7 @@ jobs:
         # copia del arranque, la espera, el smoke y la limpieza (incluido el
         # `taskkill` del hijo que deja el onefile). Sin `/version/check`: su
         # backoff contra api.github.com no cabe en cada PR, y el tag lo hace.
-        run: scripts/smoke_package.sh windows --sin-version-check
+        run: scripts/smoke_package.sh windows --version-check-una-llamada
 
   # ¿El diff toca algo que acabe DENTRO del bundle? Lo decide
   # `scripts/toca_bundle.sh` con el propio git (sin acciones de terceros) y
@@ -325,9 +325,10 @@ jobs:
   # PR no toca nada del bundle (~5 min que no se pagan en un PR de docs). Nada
   # se firma aquí (la clave GPG es de publicación): el AppImage va con
   # `SKIP_SIGN=1` y el Flatpak sin su firma interna, que se instala igual.
-  # `/version/check` se omite (`--sin-version-check`): su backoff contra el
-  # rate limit de api.github.com llega a 305 s por intento y en PRs solo aporta
-  # intermitencia; el tag lo sigue comprobando.
+  # `/version/check` se hace con `--version-check-una-llamada`: UNA petición,
+  # sin el backoff de 305 s por intento del tag. Así una regresión de CAs en
+  # el bundle (sin CAs no hay HTTPS con api.github.com) se ve en el PR; si
+  # checked:false se atribuye con /rate_limit, que no consume cuota.
   linux-bundles:
     name: AppImage y Flatpak (sin firmar)
     needs: [cambios]
@@ -360,7 +361,7 @@ jobs:
       - name: AppImage — construye (sin firmar) y smoke
         run: |
           SKIP_SIGN=1 packaging/appimage/build.sh
-          scripts/smoke_package.sh appimage --sin-version-check
+          scripts/smoke_package.sh appimage --version-check-una-llamada
 
       - name: flatpak-builder + runtime 26.08
         run: |
@@ -378,4 +379,4 @@ jobs:
           FLATPAK_BUILDER_CMD: flatpak-builder
         run: |
           SKIP_FROZEN=1 SKIP_SIGN=1 packaging/flatpak/build.sh
-          scripts/smoke_package.sh flatpak --sin-version-check
+          scripts/smoke_package.sh flatpak --version-check-una-llamada

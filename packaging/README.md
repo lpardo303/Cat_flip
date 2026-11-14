@@ -151,9 +151,11 @@ en cada tag `v*` y bajo demanda con `workflow_dispatch`:
 
 - **En cada PR**, el job `linux-bundles` de `ci.yml` construye el AppImage y el
   Flatpak **sin firmar** en un solo runner y les pasa el mismo
-  `scripts/smoke_package.sh` con `--sin-version-check` (ese check espera en
-  backoff contra api.github.com y en PRs solo aporta intermitencia; el tag sí
-  lo comprueba). El binario congelado se construye una vez y el Flatpak lo
+  `scripts/smoke_package.sh` con `--version-check-una-llamada`: una sola petición a `/version/check` que
+  exige `checked:true` (el tag mantiene el backoff de 305 s por intento). Ante
+  `checked:false` se consulta `/rate_limit` —no consume cuota— para no fallar
+  por un límite ajeno al bundle; con cuota disponible, `checked:false` es la
+  regresión de CAs. El binario congelado se construye una vez y el Flatpak lo
   reutiliza con `SKIP_FROZEN=1`; antes estos dos bundles solo se probaban en
   el tag, así que una regresión de empaquetado llegaba a `main`. El job se
   salta solo si el diff no toca nada que acabe en el bundle

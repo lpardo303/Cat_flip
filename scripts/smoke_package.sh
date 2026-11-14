@@ -2,12 +2,12 @@
 # Smoke de un paquete YA construido, idéntico para los tres formatos.
 #
 # Uso:
-#   scripts/smoke_package.sh appimage|flatpak|windows [--sin-version-check]
+#   scripts/smoke_package.sh appimage|flatpak|windows [--version-check-una-llamada]
 #
-# --sin-version-check omite solo el paso 5 (/version/check). Lo usa el job de
-# PR: ese check espera en backoff contra el rate limit anónimo de
-# api.github.com (305 s por intento, 4 intentos) y en un PR solo aporta
-# intermitencia; el job del tag lo sigue comprobando.
+# --version-check-una-llamada hace el paso 5 con UNA sola petición, sin el
+# backoff de 305 s por intento que usa el tag. Lo usan los jobs de PR: así una
+# regresión de CAs en el bundle (sin almacén de CAs no hay HTTPS con
+# api.github.com) se ve en el PR y no al publicar, sin pagar el backoff.
 #
 # Antes había tres pasos de workflow con ~50 líneas cada uno que se habían
 # ido copiando: solo el .exe comprobaba que el paquete LEYERA un archivo, y el
@@ -36,13 +36,13 @@ cd "$ROOT"
 
 FORMATO="${1:-}"
 shift || true
-SIN_VERSION_CHECK=0
+MODO_VERSION=""
 for arg in "$@"; do
   case "$arg" in
-    --sin-version-check) SIN_VERSION_CHECK=1 ;;
+    --version-check-una-llamada) MODO_VERSION="--una-llamada" ;;
     *)
       echo "Opción desconocida: $arg" >&2
-      echo "Uso: scripts/smoke_package.sh appimage|flatpak|windows [--sin-version-check]" >&2
+      echo "Uso: scripts/smoke_package.sh appimage|flatpak|windows [--version-check-una-llamada]" >&2
       exit 2
       ;;
   esac
@@ -198,12 +198,8 @@ fi
 
 "$PYBIN" scripts/smoke_lecturas.py --base-url "$BASE_URL"
 
-if [ "$SIN_VERSION_CHECK" = "1" ]; then
-  echo "✓ $ETIQUETA E2E: / y lecturas (sin /version/check: lo comprueba el tag)"
-  exit 0
-fi
-
-bash scripts/smoke_version_check.sh \
+# Sin modo, el tag paga el backoff completo; con modo, una sola llamada.
+bash scripts/smoke_version_check.sh $MODO_VERSION \
   "$BASE_URL/version/check" "$LOG" "$VERSION"
 
 echo "✓ $ETIQUETA E2E: /, lecturas y /version/check con current=$VERSION"
