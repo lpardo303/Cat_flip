@@ -11,6 +11,17 @@ siguiente corte.
 
 ### Añadido
 
+- **El smoke de PR ya valida `/version/check`.** Era el último hueco: los jobs
+  de PR se saltaban ese check porque su backoff llega a 305 s por intento, así
+  que un bundle sin almacén de CAs —el único HTTPS del paquete— pasaba los PRs
+  y se descubría al publicar. Ahora hay un modo
+  `--version-check-una-llamada`: **una** petición, sin reintentos, que exige
+  `checked:true` y que `current` sea la del `package.json` empaquetado (fallo
+  duro sin reintentar). Como el endpoint solo dice `checked: true/false`, ante
+  un `false` el script consulta `https://api.github.com/rate_limit` (no
+  consume cuota) para distinguir un límite ajeno al bundle (aviso y se omite)
+  de la regresión real (fallo duro con el diagnóstico: «con cuota disponible,
+  este bundle no llega a api.github.com»). El tag conserva el backoff.
 - **El job de bundles se salta en PRs que no tocan el paquete.** `linux-bundles`
   cuesta ~5 min, así que un PR de solo documentación no lo paga: el job
   `cambios` ejecuta `scripts/toca_bundle.sh`, que compara el diff con git y
@@ -20,7 +31,7 @@ siguiente corte.
   falla— responde «construir»: el filtro puede gastar de más, nunca de menos.
 - **`windows-exe` usa el smoke compartido.** Su copia del arranque, la espera,
   el `taskkill` y la subida del log dejan paso a
-  `scripts/smoke_package.sh windows --sin-version-check`, el mismo script que
+  `scripts/smoke_package.sh windows --version-check-una-llamada`, el mismo script que
   usan los bundles de Linux y el release; ahora los tres se prueban con una
   sola implementación.
 - **El AppImage y el Flatpak se construyen y se prueban en cada PR.** Hasta
@@ -30,8 +41,7 @@ siguiente corte.
   `linux-bundles` los construye sin firmar en un solo runner —el binario
   congelado se hace una vez y el Flatpak lo reutiliza con `SKIP_FROZEN=1`— y
   les pasa el mismo `scripts/smoke_package.sh` del release, con
-  `--sin-version-check` (ese check espera en backoff contra api.github.com y
-  en PRs solo aporta intermitencia; el tag lo sigue comprobando). El smoke
+  el smoke del release (hoy ya con el modo de una sola llamada; ver arriba). El smoke
   compartido ahora también **rechaza arrancar si el puerto 5050 ya está
   ocupado**, porque dos smokes en el mismo job probarían el proceso
   equivocado y darían un falso verde.

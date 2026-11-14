@@ -4,17 +4,32 @@
 # triplicado en el workflow.
 #
 # Uso:
-#   scripts/smoke_version_check.sh <url> [log_del_app] [versión_esperada]
+#   scripts/smoke_version_check.sh [--una-llamada] <url> [log_del_app] [versión]
 #
+#   --una-llamada     UNA sola petición, sin reintentos ni backoff. Lo usan los
+#                     jobs de PR (ver más abajo).
 #   url               p. ej. http://127.0.0.1:5050/version/check
 #   log_del_app       log del binario arrancado; se vuelca si el check falla
-#   versión_esperada  si se pasa, `current` debe coincidir: fallo duro SIN
+#   versión           si se pasa, `current` debe coincidir: fallo duro SIN
 #                     reintentar (reintentar solo vuelve a consultar a
 #                     GitHub, la versión ya la sabe el propio bundle). Si se
 #                     omite, solo se exige checked:true.
 #
 # Sale con 0 si el check pasa y con 1 si no (imprimiendo ::error::, que la
 # CI interpreta como anotación de error).
+#
+# ── Modo --una-llamada (PRs) ─────────────────────────────────────────
+# El backoff de abajo existe para no fallar por un rate limit pasajero, pero
+# cuesta hasta 305 s por intento: en cada PR no cabe. Una sola llamada sí
+# detecta la regresión que importa —el bundle sin CAs, que no puede hablar
+# HTTPS con api.github.com— si se distingue de «GitHub nos está limitando».
+# El endpoint /version/check solo devuelve checked true/false, así que ante
+# checked:false se consulta https://api.github.com/rate_limit (NO consume
+# cuota):
+#   cuota agotada          → aviso (::warning::) y se omite: no es el bundle
+#   runner sin acceso      → aviso y se omite: tampoco es el bundle
+#   cuota y acceso OK      → fallo duro: este bundle no llega a GitHub
+# `SMOKE_RATE_URL` solo existe para probar esa atribución en local.
 #
 # Por qué backoff y no «3 × sleep 3» (lo que reventó el job de Windows en
 # el PR #46 con tres checked:false en 9 s):
@@ -35,9 +50,60 @@
 # ve un Python nativo.
 set -uo pipefail
 
-URL="${1:?Uso: scripts/smoke_version_check.sh <url> [log_del_app] [versión_esperada]}"
+MODO="backoff"
+if [ "${1:-}" = "--una-llamada" ]; then
+  MODO="una"
+  shift
+fi
+
+URL="${1:?Uso: scripts/smoke_version_check.sh [--una-llamada] <url> [log_del_app] [versión]}"
 APPLOG="${2:-}"
 EXPECT="${3:-}"
+RATE_URL="${SMOKE_RATE_URL:-https://api.github.com/rate_limit}"
+
+# ¿Por qué este bundle no ve GitHub? Ver la cabecera.
+atribuir_fallo() {
+  local rl remain
+  rl="$(curl -s --max-time 10 "$RATE_URL" || true)"
+  remain="$(grep -oE '"remaining"[[:space:]]*:[[:space:]]*[0-9]+' <<< "$rl" \
+    | head -1 | grep -oE '[0-9]+$' || true)"
+  if [ -z "$remain" ]; then
+    echo "::warning::checked:false y el runner tampoco pudo consultar $RATE_URL:" \
+      "sin acceso a api.github.com desde el runner, no se puede atribuir al bundle"
+    return 0
+  fi
+  if [ "$remain" = 0 ]; then
+    echo "::warning::checked:false por rate limit agotado (remaining=0):" \
+      "no se puede atribuir al bundle (la CI lo comprobará en el tag)"
+    return 0
+  fi
+  echo "::error::$URL da checked:false pero el runner SÍ tiene cuota" \
+    "(remaining=$remain): este bundle no llega a api.github.com — sin" \
+    "almacén de CAs, la regresión de 1.4.0 → 1.4.1"
+  if [ -n "$APPLOG" ]; then cat "$APPLOG" 2>/dev/null || true; fi
+  return 1
+}
+
+if [ "$MODO" = "una" ]; then
+  rm -f /tmp/version.json
+  curl -sf -o /tmp/version.json "$URL" || true
+  cat /tmp/version.json 2>/dev/null || true
+  echo
+  if ! grep -Eq '"checked"[[:space:]]*:[[:space:]]*true' /tmp/version.json 2>/dev/null; then
+    if atribuir_fallo; then
+      exit 0
+    fi
+    exit 1
+  fi
+  if [ -n "$EXPECT" ] && \
+    ! grep -Eq "\"current\"[[:space:]]*:[[:space:]]*\"$EXPECT\"" /tmp/version.json 2>/dev/null; then
+    echo "::error::$URL da current ≠ $EXPECT — el package.json EMPAQUETADO no es el de la release"
+    if [ -n "$APPLOG" ]; then cat "$APPLOG" 2>/dev/null || true; fi
+    exit 1
+  fi
+  echo "✓ /version/check checked:true${EXPECT:+ con current=$EXPECT} (una sola llamada)"
+  exit 0
+fi
 
 BASE="${SMOKE_BASE_DELAY:-305}"
 CAP="${SMOKE_MAX_WAIT:-600}"

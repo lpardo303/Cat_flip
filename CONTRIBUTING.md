@@ -60,6 +60,9 @@ CATFLIP_PREMIUM_KEY=local python app.py   # http://127.0.0.1:5050
    paquetes sin firmar y comprueban que leen los fixtures reales, así que un
    `hiddenimport` que falte se ve en el PR y no en la publicación. Los dos
    usan el mismo `scripts/smoke_package.sh` del release.
+   Los dos hacen el check de `/version/check` con una sola petición
+   (`--version-check-una-llamada`), que exige `checked:true` y así detecta un
+   bundle sin CAs sin pagar el backoff del tag.
    `linux-bundles` es el más lento (~5 min: congela una vez y construye
    AppImage y Flatpak), así que **se salta solo** cuando el diff no toca nada
    que acabe en el bundle: lo decide el job `cambios` con
