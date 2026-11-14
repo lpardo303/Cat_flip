@@ -30,6 +30,13 @@ import re
 import sys
 from pathlib import Path
 
+# En Windows, con stdout redirigido el codec es cp1252: un «→» o un «✅» lanza
+# UnicodeEncodeError justo cuando el check acaba de pasar. Misma trampa (y
+# misma solución) que scripts/smoke_lecturas.py.
+for _flujo in (sys.stdout, sys.stderr):
+    if hasattr(_flujo, "reconfigure"):
+        _flujo.reconfigure(encoding="utf-8", errors="replace")
+
 MiB = 1024 * 1024
 
 # Presupuesto por formato, en MiB. Medido el 2026-11-14:
