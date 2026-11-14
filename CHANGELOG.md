@@ -15,10 +15,14 @@ siguiente corte.
   existía para no descubrir en el tag una clave caducada, un secreto mal
   rotado o un runtime desaparecido, pero si fallaba lo único que quedaba era
   un job en rojo que nadie mira. Ahora el job `avisar-fallo` (solo en
-  `schedule`, con `issues: write`) ejecuta `scripts/avisar_fallo_cron.py`:
-  abre un issue con la corrida, el commit y qué jobs fallaron; si ya hay uno
-  abierto **comenta** la corrida nueva, y si está cerrado lo reabre. Nunca
-  duplica issues.
+  `schedule`, con `issues: write`) ejecuta `scripts/avisar_cron.py`: abre un
+  issue con la corrida, el commit y qué jobs fallaron; si ya hay uno abierto
+  **comenta** la corrida nueva, y si está cerrado lo reabre. Cuando la corrida
+  programada vuelve a salir bien, `cerrar-aviso` comenta cuál lo arregló y
+  **cierra** el issue, para que un aviso viejo no parezca un fallo vivo. Nunca
+  duplica: el issue se busca con `GET /search/issues` (`in:title`,
+  `type:issue`), no listando los últimos 100, que con el repo crecido habría
+  dejado de encontrarlo y habría abierto uno nuevo cada lunes.
 - **El smoke mide el peso y revisa lo que viaja dentro de los bundles.**
   Nadie miraba ni el tamaño ni el contenido: el paquete crecía y el smoke
   seguía verde. Nuevo `scripts/auditar_bundle.py`, que el smoke ejecuta para

@@ -336,8 +336,9 @@ jobs:
   # El cron semanal puede quedar en rojo y nadie entra a mirar Actions un
   # lunes: el fallo se descubría en el tag, que es justo lo que el cron quería
   # evitar. Si la corrida programada falla, este job deja constancia en un
-  # issue (lo abre, o comenta/reabre el que ya haya: ver
-  # scripts/avisar_fallo_cron.py).
+  # issue (lo abre, o comenta/reabre el que ya haya). Y si vuelve a salir bien,
+  # `cerrar-aviso` lo cierra: un issue de fallo eternamente abierto tampoco
+  # dice si el problema sigue vivo. Ver scripts/avisar_cron.py.
   #
   # Solo `schedule`: un `workflow_dispatch` lo lanza alguien que ya está
   # mirando, y en un tag el fallo se ve en la release que no aparece.
@@ -363,4 +364,29 @@ jobs:
             appimage=${{ needs.appimage.result }},
             flatpak=${{ needs.flatpak.result }},
             windows=${{ needs.windows.result }}
-        run: python3 scripts/avisar_fallo_cron.py
+        run: python3 scripts/avisar_cron.py
+
+  # El reverso: cuando la corrida programada vuelve a salir bien, el issue que
+  # abrió el fallo se cierra con el enlace de la corrida que lo arregló.
+  # `success()` con `needs` exige que los tres formatos hayan ido bien; si la
+  # corrida se cancela, ninguno de los dos jobs toca nada.
+  cerrar-aviso:
+    name: Cierra el aviso del cron
+    if: success() && github.event_name == 'schedule'
+    needs: [appimage, flatpak, windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Cierra el issue si había un fallo abierto
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULTADOS: >-
+            appimage=${{ needs.appimage.result }},
+            flatpak=${{ needs.flatpak.result }},
+            windows=${{ needs.windows.result }}
+        run: python3 scripts/avisar_cron.py --ok

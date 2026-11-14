@@ -217,13 +217,18 @@ aparecer, hay que reactivarlo en la pestaña Actions.
 - **release** (solo en tag): crea la release si no existe y adjunta los
   artefactos con `gh release upload` (AppImage, flatpak y `.exe`, con los
   `SHA256SUMS.*` renombrados por formato).
-- **avisar-fallo** (solo en la corrida programada): el cron existe para no
-  descubrir en el tag una clave caducada o un runtime que desapareció, pero un
-  lunes en rojo no lo mira nadie. Si la corrida semanal falla, este job ejecuta
-  `scripts/avisar_fallo_cron.py`, que abre un issue con la corrida, el commit y
-  qué jobs fallaron; si ya hay uno abierto **comenta** en vez de duplicar, y si
-  está cerrado lo reabre. Necesita `issues: write` (el único permiso que pide).
-  Un `workflow_dispatch` no dispara el aviso: quien lo lanza ya está mirando.
+- **avisar-fallo** / **cerrar-aviso** (solo en la corrida programada): el cron
+  existe para no descubrir en el tag una clave caducada o un runtime que
+  desapareció, pero un lunes en rojo no lo mira nadie. Si la corrida semanal
+  falla, `avisar-fallo` ejecuta `scripts/avisar_cron.py`, que abre un issue con
+  la corrida, el commit y qué jobs fallaron; si ya hay uno abierto **comenta**
+  en vez de duplicar, y si está cerrado lo reabre. Cuando la corrida vuelve a
+  salir bien, `cerrar-aviso` comenta la corrida que lo arregló y lo **cierra**.
+  Los dos necesitan `issues: write` (el único permiso que piden). El issue se
+  localiza con `GET /search/issues` (`in:title`, `type:issue`), no listando los
+  últimos 100: así sigue encontrándolo con el repo crecido. Un
+  `workflow_dispatch` no dispara ni el aviso ni el cierre: quien lo lanza ya
+  está mirando.
 - **verificar-release** (solo en tag, después de `release`): el último tramo
   que nadie comprobaba. Todo lo anterior verifica sobre `dist/`, así que un
   asset subido truncado o un renombrado roto dejaba una release mal publicada
