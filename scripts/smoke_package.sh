@@ -29,7 +29,10 @@
 #      AppImage, `flatpak install` + `flatpak run`, o el .exe directo);
 #   3. espera a que `/` responda;
 #   4. scripts/smoke_lecturas.py: los 8 formatos de entrada, /get_sheets,
-#      /premium/status y el anuncio de formatos en la página;
+#      /premium/status y el anuncio de formatos en la página. El bundle se
+#      arranca con una licencia de prueba, así que además se exige el
+#      manifiesto de temas y que cada CSS premium responda: esos ficheros solo
+#      los usa quien paga y sin esto un `datas` olvidado no lo vería nadie;
 #   5. scripts/smoke_version_check.sh: /version/check (el único HTTPS del
 #      bundle, con su backoff) y que el current EMPAQUETADO sea el del build;
 #   6. limpia SIEMPRE (trap): mata la app, desinstala el flatpak y borra el
@@ -217,6 +220,12 @@ if curl -sf -o /dev/null --max-time 2 "$BASE_URL/"; then
   exit 1
 fi
 
+# Licencia de prueba (misma idea que el job axe): sin ella /premium/status
+# sale vacío y los temas del bundle no se tocan nunca, así que un `datas`
+# olvidado de premium/themes solo rompería a quien paga. El valor no se valida
+# (cualquier texto no vacío activa la licencia), así que no es un secreto.
+export CATFLIP_PREMIUM_KEY="${CATFLIP_PREMIUM_KEY:-smoke}"
+
 echo "→ arrancando $BUNDLE (package.json $VERSION, ref ${GITHUB_REF_NAME:-local})"
 ARRANCADO=1
 case "$FORMATO" in
@@ -263,10 +272,10 @@ if [ "$listo" != "1" ]; then
   exit 1
 fi
 
-"$PYBIN" scripts/smoke_lecturas.py --base-url "$BASE_URL"
+"$PYBIN" scripts/smoke_lecturas.py --base-url "$BASE_URL" --exigir-premium
 
 # Sin modo, el tag paga el backoff completo; con modo, una sola llamada.
 bash scripts/smoke_version_check.sh $MODO_VERSION \
   "$BASE_URL/version/check" "$LOG" "$VERSION"
 
-echo "✓ $ETIQUETA E2E: /, lecturas y /version/check con current=$VERSION"
+echo "✓ $ETIQUETA E2E: /, lecturas, premium y /version/check con current=$VERSION"
