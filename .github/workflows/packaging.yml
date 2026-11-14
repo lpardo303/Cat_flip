@@ -30,6 +30,7 @@ on:
   #
   # Ojo: GitHub desactiva los workflows programados tras 60 días sin actividad
   # en el repositorio. Si el cron deja de aparecer, se reactiva en Actions.
+  # Y si la corrida falla, el job `avisar-fallo` lo deja en un issue.
   schedule:
     - cron: "15 4 * * 1" # lunes 04:15 UTC
 
@@ -331,3 +332,35 @@ jobs:
           mkdir -p dist/appimage
           cp release/*.AppImage dist/appimage/
           scripts/smoke_package.sh appimage
+
+  # El cron semanal puede quedar en rojo y nadie entra a mirar Actions un
+  # lunes: el fallo se descubría en el tag, que es justo lo que el cron quería
+  # evitar. Si la corrida programada falla, este job deja constancia en un
+  # issue (lo abre, o comenta/reabre el que ya haya: ver
+  # scripts/avisar_fallo_cron.py).
+  #
+  # Solo `schedule`: un `workflow_dispatch` lo lanza alguien que ya está
+  # mirando, y en un tag el fallo se ve en la release que no aparece.
+  avisar-fallo:
+    name: Avisa del fallo del cron
+    if: failure() && github.event_name == 'schedule'
+    needs: [appimage, flatpak, windows]
+    runs-on: ubuntu-latest
+    # Si GitHub no responde, el aviso no debe quedarse colgado 25 minutos.
+    timeout-minutes: 5
+    # El workflow declara `contents: write` para la release; este job no
+    # publica nada, solo necesita escribir issues.
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Abre o actualiza el issue del cron
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULTADOS: >-
+            appimage=${{ needs.appimage.result }},
+            flatpak=${{ needs.flatpak.result }},
+            windows=${{ needs.windows.result }}
+        run: python3 scripts/avisar_fallo_cron.py

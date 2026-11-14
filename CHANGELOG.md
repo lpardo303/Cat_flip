@@ -11,6 +11,14 @@ siguiente corte.
 
 ### Añadido
 
+- **Un fallo del cron de packaging deja de ser invisible.** La corrida semanal
+  existía para no descubrir en el tag una clave caducada, un secreto mal
+  rotado o un runtime desaparecido, pero si fallaba lo único que quedaba era
+  un job en rojo que nadie mira. Ahora el job `avisar-fallo` (solo en
+  `schedule`, con `issues: write`) ejecuta `scripts/avisar_fallo_cron.py`:
+  abre un issue con la corrida, el commit y qué jobs fallaron; si ya hay uno
+  abierto **comenta** la corrida nueva, y si está cerrado lo reabre. Nunca
+  duplica issues.
 - **El smoke mide el peso y revisa lo que viaja dentro de los bundles.**
   Nadie miraba ni el tamaño ni el contenido: el paquete crecía y el smoke
   seguía verde. Nuevo `scripts/auditar_bundle.py`, que el smoke ejecuta para
