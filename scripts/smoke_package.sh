@@ -35,7 +35,10 @@
 #      los usa quien paga y sin esto un `datas` olvidado no lo vería nadie;
 #   5. scripts/smoke_version_check.sh: /version/check (el único HTTPS del
 #      bundle, con su backoff) y que el current EMPAQUETADO sea el del build;
-#   6. limpia SIEMPRE (trap): mata la app, desinstala el flatpak y borra el
+#   6. presupuesto y contenidos (scripts/auditar_bundle.py): falla si el
+#      paquete pasa del tope o si viaja algo que no debería (tests, .git,
+#      logs, .env, __pycache__), y deja en el log el reparto del peso;
+#   7. limpia SIEMPRE (trap): mata la app, desinstala el flatpak y borra el
 #      directorio temporal del AppImage, también si un check falla.
 #
 # Se ejecuta ANTES de firmar (packaging/sign.sh): firmar y verificar un
@@ -149,6 +152,20 @@ fi
 
 VERSION="$("$PYBIN" -c "import json; print(json.load(open('package.json'))['version'])")"
 
+# Presupuesto de tamaño y lista de contenidos (scripts/auditar_bundle.py). Se
+# revisa ANTES de arrancar: un paquete que mete tests o un venv dentro no se
+# distribuye, y no tiene sentido gastar el smoke en él.
+auditar_bundle() {
+  local formato="$1" dir="${2:-}" archivo="${3:-}"
+  if [ -n "$archivo" ]; then
+    "$PYBIN" scripts/auditar_bundle.py "$formato" \
+      --tamano "$(stat -c%s "$archivo")" --exe "$archivo"
+  else
+    "$PYBIN" scripts/auditar_bundle.py "$formato" \
+      --tamano "$(stat -c%s "$BUNDLE")" --dir "$dir"
+  fi
+}
+
 # En un tag, la release, el bundle y package.json deben llevar la MISMA
 # versión: los binarios se nombran con ella y el asset de la release también.
 if [[ "${GITHUB_REF:-}" == refs/tags/* && "v$VERSION" != "${GITHUB_REF_NAME:-}" ]]; then
@@ -236,6 +253,7 @@ case "$FORMATO" in
     chmod +x "$BUNDLE"
     SCRATCH="$(mktemp -d)"
     (cd "$SCRATCH" && "$ROOT/$BUNDLE" --appimage-extract > /dev/null)
+    auditar_bundle appimage "$SCRATCH/squashfs-root"
     (cd "$SCRATCH/squashfs-root" && exec ./AppRun > "$LOG" 2>&1) &
     APP_PID=$!
     ;;
@@ -249,10 +267,15 @@ case "$FORMATO" in
       verificar_firma_ostree "$BUNDLE"
     fi
     flatpak install --user -y --reinstall "$BUNDLE"
+    # Lo instalado es el contenido del bundle ya desplegado: sus `files/` es lo
+    # que un usuario acaba teniendo en disco.
+    auditar_bundle flatpak "$(flatpak --user info --show-location "$APP_ID")/files"
     flatpak run "$APP_ID" > "$LOG" 2>&1 &
     APP_PID=$!
     ;;
   windows)
+    # El .exe es un onefile: los contenidos se leen del propio archivo.
+    auditar_bundle windows "" "$BUNDLE"
     CATFLIP_NO_BROWSER=1 "$BUNDLE" > "$LOG" 2>&1 &
     APP_PID=$!
     ;;

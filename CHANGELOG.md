@@ -11,6 +11,21 @@ siguiente corte.
 
 ### Añadido
 
+- **El smoke mide el peso y revisa lo que viaja dentro de los bundles.**
+  Nadie miraba ni el tamaño ni el contenido: el paquete crecía y el smoke
+  seguía verde. Nuevo `scripts/auditar_bundle.py`, que el smoke ejecuta para
+  los tres formatos antes de arrancarlos: compara el fichero distribuido con
+  un presupuesto por formato (AppImage 145 MiB, flatpak 110, `.exe` 72; medido
+  sobre la release v1.6.0 y los builds locales, con ~10 % de margen) e
+  imprime el reparto del peso por grupos —`_internal/pyarrow` 157 MiB, los
+  `.so` de arrow, `numpy.libs`— para que el número esté justificado y no solo
+  medido. También falla si dentro viaja `tests/`, `.git`, logs, `.env`,
+  `__pycache__` o un venv.
+- **Lo que el auditor encontró, ya arreglado en el origen:** el AppImage y el
+  `.exe` llevaban la carpeta `pyarrow/tests/` (17 ficheros con fixtures
+  `.parquet`/`.orc`) y la `__pycache__` de `premium`; los specs ahora filtran
+  `tests`, `__pycache__`, `*.pyc` y `premium.key` de los `datas`, así que una
+  licencia local tampoco puede colarse en el binario que se distribuye.
 - **El smoke toca por fin los temas premium.** El bundle se smokeaba sin
   licencia: `/premium/status` devolvía listas vacías y los ficheros de
   `premium/themes/*.css` no los abría nadie, así que un `datas` olvidado en el
