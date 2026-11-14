@@ -52,6 +52,25 @@ a = Analysis(
     optimize=0,
 )
 
+# Lo que PyInstaller arrastra por «datos del paquete» y no se usa al ejecutar:
+#   * pyarrow publica su carpeta `tests/`, con fixtures .parquet y .orc dentro;
+#   * copiar `premium` entero se lleva su `__pycache__` y, si quien construye
+#     tiene licencia local, también `premium.key` (una licencia viajando dentro
+#     del binario que se distribuye).
+# Nada de eso hace falta para leer un Excel ni para servir un tema, y el smoke
+# lo rechaza (scripts/auditar_bundle.py). Se quita en el origen, no se avisa.
+def _sobra(destino):
+    partes = destino.replace("\\", "/").split("/")
+    return (
+        "__pycache__" in partes
+        or "tests" in partes
+        or destino.endswith(".pyc")
+        or partes[-1] == "premium.key"
+    )
+
+
+a.datas = [dato for dato in a.datas if not _sobra(dato[0])]
+
 pyz = PYZ(a.pure)
 
 exe = EXE(

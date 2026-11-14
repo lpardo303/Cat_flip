@@ -186,6 +186,17 @@ aparecer, hay que reactivarlo en la pestaña Actions.
   `/get_sheets`, `/premium/status` y `/version/check`. Antes cada job tenía su
   copia del smoke y solo el `.exe` comprobaba lecturas; el AppImage y el
   Flatpak se conformaban con que `/` respondiera.
+- **El smoke mira el peso y lo que viaja dentro** (`scripts/auditar_bundle.py`,
+  antes de arrancar): el fichero distribuido tiene que caber en el presupuesto
+  del formato (145 MiB AppImage, 110 flatpak, 72 `.exe`; medido sobre v1.6.0 y
+  builds locales, con ~10 % de margen) y no puede llevar `tests/`, `.git`,
+  logs, `.env`, `__pycache__` ni un venv. Además imprime el reparto del peso
+  por grupos (`_internal/pyarrow`, `.so` de arrow, `numpy.libs`…), para que el
+  tamaño quede justificado en el log. Si el crecimiento es legítimo, se sube
+  `PRESUPUESTO` en el mismo commit que lo explica. Los `.spec` filtran `tests`,
+  `__pycache__`, `*.pyc` y `premium.key` de los `datas`: el primero que
+  apareció fue `pyarrow/tests/`, que PyInstaller arrastraba por ser datos del
+  paquete.
 - **El smoke arranca el bundle con una licencia premium de prueba**
   (`CATFLIP_PREMIUM_KEY=smoke`, misma idea que el job `axe` con `ci`). Sin
   licencia `/premium/status` sale vacío y los ficheros de `premium/themes` no
