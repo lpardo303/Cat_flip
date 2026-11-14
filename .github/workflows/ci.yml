@@ -245,12 +245,10 @@ jobs:
   # `python_calamine`, las plantillas y los fixtures de lectura reales.
   windows-exe:
     runs-on: windows-latest
-    # Git Bash: gpg/sha256sum y el arranque en segundo plano del .exe.
+    # Git Bash: el arranque en segundo plano del .exe y curl.
     defaults:
       run:
         shell: bash
-    env:
-      CATFLIP_NO_BROWSER: "1"
     steps:
       - uses: actions/checkout@v7
 
@@ -271,43 +269,49 @@ jobs:
         # PyInstaller onefile: tarda unos minutos (pandas + pyarrow).
         run: SKIP_SIGN=1 packaging/windows/build.sh
 
-      - name: Start the .exe and check it reads the fixtures
-        run: |
-          log="$PWD/windows-exe.log"
-          # El nombre lleva la versión: se resuelve con el glob en un array
-          # (un glob suelto en posición de comando es SC2211).
-          exe=(dist/windows/CatFlip-*-x64.exe)
-          if [ ! -x "${exe[0]}" ]; then
-            echo "::error::No se encontró el .exe: ${exe[0]}"
-            exit 1
-          fi
-          "${exe[0]}" > "$log" 2>&1 &
-          app_pid=$!
-          # onefile se descomprime en un temporal: el primer arranque es lento
-          listo=0
-          for _ in $(seq 1 90); do
-            if curl -sf http://127.0.0.1:5050/ > /dev/null; then listo=1; break; fi
-            sleep 2
-          done
-          if [ "$listo" != "1" ]; then
-            echo "::error::El .exe no respondió en 180 s"
-            tail -60 "$log"
-            exit 1
-          fi
-          status=0
-          python scripts/smoke_lecturas.py --base-url http://127.0.0.1:5050 || status=$?
-          # onefile deja un hijo: se matan los dos (y por nombre, por si acaso)
-          kill "$app_pid" 2>/dev/null || true
-          taskkill //F //IM CatFlip.exe > /dev/null 2>&1 || true
-          exit "$status"
+      - name: Smoke — el .exe arranca y lee los fixtures
+        # Mismo script que usan los bundles de Linux y el release: una sola
+        # copia del arranque, la espera, el smoke y la limpieza (incluido el
+        # `taskkill` del hijo que deja el onefile). Sin `/version/check`: su
+        # backoff contra api.github.com no cabe en cada PR, y el tag lo hace.
+        run: scripts/smoke_package.sh windows --sin-version-check
 
-      - name: Upload the .exe log
-        if: failure()
-        uses: actions/upload-artifact@v7
+  # ¿El diff toca algo que acabe DENTRO del bundle? Lo decide
+  # `scripts/toca_bundle.sh` con el propio git (sin acciones de terceros) y
+  # de forma conservadora: solo dice «no» si todo lo cambiado es
+  # documentación, tests o metadatos. Ante la duda responde «sí», así que un
+  # fallo del filtro construye de más, nunca de menos.
+  cambios:
+    name: ¿Afecta al bundle?
+    runs-on: ubuntu-latest
+    outputs:
+      bundle: ${{ steps.filtro.outputs.bundle }}
+    steps:
+      - uses: actions/checkout@v7
         with:
-          name: windows-exe-log
-          path: windows-exe.log
-          if-no-files-found: ignore
+          # El diff necesita la base en el clon: con el fetch superficial por
+          # defecto solo hay un commit y todo saldría «sí».
+          fetch-depth: 0
+
+      - id: filtro
+        env:
+          BASE_PR: ${{ github.event.pull_request.base.sha }}
+          BASE_PUSH: ${{ github.event.before }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            BASE="$BASE_PR"
+          else
+            BASE="$BASE_PUSH"
+          fi
+          # Si el filtro se rompe, el paso NO debe caer: un paso que falla
+          # deja `linux-bundles` en «skipped» (needs incompleto) y el PR
+          # perdería la cobertura en silencio. Se construye.
+          if ! DECISION="$(scripts/toca_bundle.sh "$BASE" "$GITHUB_SHA")"; then
+            echo "::warning::El filtro falló; se construye el bundle"
+            DECISION=true
+          fi
+          echo "base=$BASE head=$GITHUB_SHA → bundle=$DECISION"
+          echo "bundle=$DECISION" >> "$GITHUB_OUTPUT"
 
   # Los paquetes de Linux solo se construían y probaban en el tag
   # (packaging.yml): una regresión de empaquetado —`formats.py` sin
@@ -317,14 +321,17 @@ jobs:
   #
   # Coste: un único runner para los dos formatos y el binario congelado se
   # construye una vez (el Flatpak reutiliza `dist/CatFlip` con SKIP_FROZEN=1),
-  # así que no se paga PyInstaller dos veces. Nada se firma aquí (la clave GPG
-  # es de publicación): el AppImage va con `SKIP_SIGN=1` y el Flatpak sin su
-  # firma interna, que se instala igual. `/version/check` se omite
-  # (`--sin-version-check`): su backoff contra el rate limit de api.github.com
-  # llega a 305 s por intento y en PRs solo aporta intermitencia; el tag lo
-  # sigue comprobando.
+  # así que no se paga PyInstaller dos veces. Además se salta entero cuando el
+  # PR no toca nada del bundle (~5 min que no se pagan en un PR de docs). Nada
+  # se firma aquí (la clave GPG es de publicación): el AppImage va con
+  # `SKIP_SIGN=1` y el Flatpak sin su firma interna, que se instala igual.
+  # `/version/check` se omite (`--sin-version-check`): su backoff contra el
+  # rate limit de api.github.com llega a 305 s por intento y en PRs solo aporta
+  # intermitencia; el tag lo sigue comprobando.
   linux-bundles:
     name: AppImage y Flatpak (sin firmar)
+    needs: [cambios]
+    if: needs.cambios.outputs.bundle == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:

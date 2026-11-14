@@ -11,6 +11,18 @@ siguiente corte.
 
 ### Añadido
 
+- **El job de bundles se salta en PRs que no tocan el paquete.** `linux-bundles`
+  cuesta ~5 min, así que un PR de solo documentación no lo paga: el job
+  `cambios` ejecuta `scripts/toca_bundle.sh`, que compara el diff con git y
+  responde «no construir» únicamente si **todo** lo cambiado es documentación,
+  `tests/` (salvo `tests/fixtures/`, que son la entrada del smoke) o
+  metadatos. Ante cualquier duda —base desconocida, diff vacío, git que
+  falla— responde «construir»: el filtro puede gastar de más, nunca de menos.
+- **`windows-exe` usa el smoke compartido.** Su copia del arranque, la espera,
+  el `taskkill` y la subida del log dejan paso a
+  `scripts/smoke_package.sh windows --sin-version-check`, el mismo script que
+  usan los bundles de Linux y el release; ahora los tres se prueban con una
+  sola implementación.
 - **El AppImage y el Flatpak se construyen y se prueban en cada PR.** Hasta
   ahora los bundles de Linux solo se ejecutaban en el tag: una regresión de
   empaquetado (`formats.py` sin `hiddenimport`, `python_calamine` fuera,
