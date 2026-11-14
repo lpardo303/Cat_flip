@@ -186,6 +186,14 @@ aparecer, hay que reactivarlo en la pestaña Actions.
   `/get_sheets`, `/premium/status` y `/version/check`. Antes cada job tenía su
   copia del smoke y solo el `.exe` comprobaba lecturas; el AppImage y el
   Flatpak se conformaban con que `/` respondiera.
+- **El smoke arranca el bundle con una licencia premium de prueba**
+  (`CATFLIP_PREMIUM_KEY=smoke`, misma idea que el job `axe` con `ci`). Sin
+  licencia `/premium/status` sale vacío y los ficheros de `premium/themes` no
+  se tocan nunca, así que un `datas` olvidado en el `.spec` solo rompía a quien
+  paga. Con `--exigir-premium`, `scripts/smoke_lecturas.py` exige
+  `licensed: true`, que el manifiesto liste los temas esperados
+  (`premium.THEMES`) y que cada `/premium/themes/<id>.css` responda `text/css`
+  con contenido; un `datas` ausente da 404 y corta el smoke en PR y en tag.
 - **appimage** / **flatpak**: pip, `build.sh` con `SKIP_SIGN=1` (AppImage) o
   con la firma ostree interna (Flatpak, que `flatpak install` exige), smoke,
   firma detached y verificación. El job de flatpak instala `flatpak-builder`

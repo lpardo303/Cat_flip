@@ -31,6 +31,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))  # `formats` vive en la raíz del repo
 
 import formats  # noqa: E402 — después de ajustar sys.path
+import premium  # noqa: E402 — manifiesto de temas, para saber qué exigir
 
 # En Windows, con stdout redirigido el codec es cp1252 y un «✅» lanza
 # UnicodeEncodeError justo cuando el smoke acaba de pasar. UTF-8 explícito:
@@ -87,10 +88,67 @@ def _get(base, ruta):
         return respuesta.read().decode("utf-8", "replace")
 
 
+def _get_css(base, ruta):
+    """Devuelve (Content-Type, texto). Un 404 aquí es un `datas` olvidado."""
+    try:
+        with urllib.request.urlopen(f"{base}{ruta}", timeout=30) as respuesta:
+            return (
+                respuesta.headers.get("Content-Type", ""),
+                respuesta.read().decode("utf-8", "replace"),
+            )
+    except urllib.error.HTTPError as error:
+        raise SystemExit(
+            f"✘ {ruta}: HTTP {error.code} — el bundle no trae premium/themes "
+            "(revisa el `datas` de premium en el .spec)"
+        )
+
+
+def _comprobar_premium(base, exigir):
+    """Superficie Open Core: contrato de /premium/status y, con licencia, CSS.
+
+    Sin --exigir-premium solo se valida el contrato (sin licencia las listas
+    van vacías). Con el flag, el smoke corre con una licencia de prueba y
+    exige que el manifiesto liste los temas reales y que cada CSS responda: es
+    lo único que toca los ficheros de `premium/themes`, que solo usan quienes
+    pagan.
+    """
+    estado = json.loads(_get(base, "/premium/status"))
+    if set(estado) != {"licensed", "themes", "connectors"}:
+        raise SystemExit(f"✘ /premium/status devolvió las claves {sorted(estado)}")
+    if not exigir:
+        print(f"✅ /premium/status (licensed={estado['licensed']})")
+        return
+    if not estado["licensed"]:
+        raise SystemExit(
+            "✘ /premium/status dice licensed=false: el smoke arranca el bundle "
+            "con CATFLIP_PREMIUM_KEY, así que o no llega al proceso o el "
+            "paquete no lee la licencia"
+        )
+    esperados = [t["id"] for t in premium.THEMES]
+    obtenidos = [t["id"] for t in estado["themes"]]
+    if obtenidos != esperados:
+        raise SystemExit(f"✘ /premium/status lista {obtenidos} ≠ {esperados}")
+    print(f"✅ /premium/status con licencia: {len(esperados)} temas ({', '.join(esperados)})")
+    for tema in premium.THEMES:
+        ruta = f"/premium/themes/{tema['id']}.css"
+        tipo, css = _get_css(base, ruta)
+        if "text/css" not in tipo:
+            raise SystemExit(f"✘ {ruta} servido como «{tipo}», no text/css")
+        if len(css.strip()) < 50:
+            raise SystemExit(f"✘ {ruta} devuelve {len(css.strip())} bytes: CSS vacío")
+        print(f"✅ {ruta} → {len(css)} bytes de CSS")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default="http://127.0.0.1:5050")
-    base = parser.parse_args().base_url.rstrip("/")
+    parser.add_argument(
+        "--exigir-premium",
+        action="store_true",
+        help="exige licencia activa, manifiesto con todos los temas y CSS servido",
+    )
+    args = parser.parse_args()
+    base = args.base_url.rstrip("/")
 
     # 1) La página debe anunciar los formatos: formats.py + Jinja en el bundle.
     html = _get(base, "/")
@@ -126,15 +184,13 @@ def main():
         raise SystemExit(f"✘ /get_sheets devolvió {hojas.get('sheets')}")
     print("✅ /get_sheets lista las 3 hojas de trabajo y descarta la de gráfico")
 
-    # 4) Superficie Open Core: el endpoint responde con las tres claves del
-    #    contrato. Sin licencia devuelve `licensed: false` y listas vacías, así
-    #    que el smoke no depende de si el bundle lleva clave premium.
-    estado = json.loads(_get(base, "/premium/status"))
-    if set(estado) != {"licensed", "themes", "connectors"}:
-        raise SystemExit(f"✘ /premium/status devolvió las claves {sorted(estado)}")
-    print(f"✅ /premium/status (licensed={estado['licensed']})")
+    # 4) Superficie Open Core: el contrato de /premium/status y, con
+    #    --exigir-premium (lo que hace smoke_package.sh con una licencia de
+    #    prueba), el manifiesto de temas y el CSS real de cada uno.
+    _comprobar_premium(base, args.exigir_premium)
 
-    print(f"\n{3 + len(CASOS)} comprobaciones OK contra {base}")
+    checks = 3 + len(CASOS) + (2 + len(premium.THEMES) if args.exigir_premium else 1)
+    print(f"\n{checks} comprobaciones OK contra {base}")
 
 
 if __name__ == "__main__":

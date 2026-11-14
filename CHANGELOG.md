@@ -11,6 +11,16 @@ siguiente corte.
 
 ### Añadido
 
+- **El smoke toca por fin los temas premium.** El bundle se smokeaba sin
+  licencia: `/premium/status` devolvía listas vacías y los ficheros de
+  `premium/themes/*.css` no los abría nadie, así que un `datas` olvidado en el
+  `.spec` pasaba PRs y tag y solo rompía a quien paga. `scripts/smoke_package.sh`
+  arranca el paquete con una licencia de prueba (`CATFLIP_PREMIUM_KEY=smoke`,
+  la misma idea que el job `axe` con `ci`) y pasa `--exigir-premium` a
+  `scripts/smoke_lecturas.py`: exige `licensed: true`, que el manifiesto liste
+  los temas de `premium.THEMES` y que cada `/premium/themes/<id>.css` responda
+  `text/css` con CSS real. Un tema ausente da 404 con el mensaje que apunta al
+  `datas` del spec.
 - **La release publicada se verifica descargándola.** El camino firmado
   terminaba en `gh release upload` y ahí no se comprobaba nada: un asset subido
   truncado, un renombrado por formato que se rompe o un fichero que no llegó
