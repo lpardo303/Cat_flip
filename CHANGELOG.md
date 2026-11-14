@@ -11,6 +11,15 @@ siguiente corte.
 
 ### Añadido
 
+- **El camino firmado se ejercita cada semana, no solo al publicar.** Una
+  rotura de la clave GPG, del secreto o del runtime de flathub solo se veía en
+  el tag (o en un `workflow_dispatch` manual), es decir, en el peor momento. El
+  workflow `packaging` pasa a tener un `schedule` los lunes a las 04:15 UTC que
+  hace lo mismo que un tag **menos publicar**: importa la clave, construye con
+  `flatpak-builder`, pasa los tres smokes, firma y verifica. El job `release`
+  sigue atado a `refs/tags/` y los artifacts no se suben en esa corrida, así
+  que no distribuye nada; además se añadió `timeout-minutes` a los tres jobs
+  para que un cuelgue (el check de versión tiene backoff) no consuma cuota.
 - **El smoke de PR ya valida `/version/check`.** Era el último hueco: los jobs
   de PR se saltaban ese check porque su backoff llega a 305 s por intento, así
   que un bundle sin almacén de CAs —el único HTTPS del paquete— pasaba los PRs

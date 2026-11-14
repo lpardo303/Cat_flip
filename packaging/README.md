@@ -147,7 +147,18 @@ los valida.
 ## CI (GitHub Actions)
 
 `.github/workflows/packaging.yml` construye, prueba y firma los tres paquetes
-en cada tag `v*` y bajo demanda con `workflow_dispatch`:
+en cada tag `v*`, bajo demanda con `workflow_dispatch` y **cada lunes a las
+04:15 UTC** (`schedule`):
+
+La corrida semanal existe porque el camino firmado solo se ejercitaba al
+publicar. Hace lo mismo que un tag **menos publicar**: importa la clave GPG,
+construye con `flatpak-builder` y el runtime 26.08, pasa los tres smokes, firma
+y verifica. El job `release` no se ejecuta (está atado a `refs/tags/`) y los
+artifacts no se suben (`if: github.event_name != 'schedule'`), así que no
+distribuye nada: si la clave caduca, el secreto se rota mal o flathub retira el
+runtime, se ve en el lunes siguiente y no en el tag. GitHub desactiva los
+workflows programados tras 60 días sin actividad en el repo; si el cron deja de
+aparecer, hay que reactivarlo en la pestaña Actions.
 
 - **En cada PR**, el job `linux-bundles` de `ci.yml` construye el AppImage y el
   Flatpak **sin firmar** en un solo runner y les pasa el mismo
