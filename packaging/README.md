@@ -198,6 +198,23 @@ aparecer, hay que reactivarlo en la pestaña Actions.
 - **release** (solo en tag): crea la release si no existe y adjunta los
   artefactos con `gh release upload` (AppImage, flatpak y `.exe`, con los
   `SHA256SUMS.*` renombrados por formato).
+- **verificar-release** (solo en tag, después de `release`): el último tramo
+  que nadie comprobaba. Todo lo anterior verifica sobre `dist/`, así que un
+  asset subido truncado o un renombrado roto dejaba una release mal publicada
+  con la CI en verde. Este job **descarga los assets publicados** y ejecuta
+  `scripts/verificar_release.sh release`: juego exacto de 12 assets, las 3
+  firmas y los 3 `SHA256SUMS.*.asc` en una jaula vacía que solo importa
+  `packaging/gpg/catflip-release.asc` (exigiendo además la huella de
+  `FINGERPRINT`), y `sha256sum -c` de cada `SHA256SUMS.*`. Después arranca el
+  `.AppImage` **descargado** con el smoke completo. Si falla, la release existe
+  pero queda probado que sus assets están mal: el rojo es la señal.
+- **Firma ostree del Flatpak**: el smoke del job `flatpak` usa
+  `--exigir-firma-ostree`, que importa el bundle a un repo temporal con una
+  jaula que solo tiene la pública versionada y exige `Good signature`. Sin
+  eso, un bundle **sin** firma interna se instala igual y el smoke pasaría: se
+  probó que `flatpak install --gpg-file=<otra clave>` también lo instala, así
+  que `--gpg-file` no restringe, solo añade claves. Los jobs de PR construyen
+  sin firma y por eso no llevan el flag.
 
 ### Secreto obligatorio
 

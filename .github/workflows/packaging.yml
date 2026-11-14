@@ -152,8 +152,12 @@ jobs:
       # El mismo smoke que AppImage y .exe, pero por el camino del usuario
       # final: `flatpak install` del bundle y `flatpak run`, que es lo único
       # que demuestra que el sandbox sirve HTTP y sale a la red.
+      # --exigir-firma-ostree: importa el bundle a un repo temporal y exige
+      # «Good signature» de la clave versionada. Sin el flag, un bundle SIN
+      # firma ostree interna se instala igual y este smoke pasaría tan contento
+      # (`--gpg-file` no sirve de guardia: añade la clave a las confiables).
       - name: Smoke — instala, arranca, lee los fixtures y consulta GitHub
-        run: scripts/smoke_package.sh flatpak
+        run: scripts/smoke_package.sh flatpak --exigir-firma-ostree
 
       - name: Firma el bundle (detached + SHA256SUMS)
         run: packaging/sign.sh dist/flatpak/*.flatpak
@@ -282,3 +286,48 @@ jobs:
             artifacts/windows/*.exe.asc \
             artifacts/windows/SHA256SUMS.windows \
             artifacts/windows/SHA256SUMS.windows.asc
+
+  # Lo único que nadie comprobaba era la release YA PUBLICADA. Todo lo anterior
+  # verifica sobre `dist/`: si un asset se sube truncado, si el renombrado del
+  # job `release` se rompe o si un fichero no llega, los tres jobs siguen verdes.
+  # Este job baja los assets de la release y repite el chequeo de quien
+  # descarga: juego exacto de 12 assets, firmas y checksums con la clave
+  # versionada en una jaula vacía (`scripts/verificar_release.sh`) y un smoke
+  # real del AppImage descargado. Si falla, la release existe pero queda probado
+  # que sus assets están mal: el rojo es la señal.
+  verificar-release:
+    name: Verifica la release publicada
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      # El smoke importa `formats` del repo; se instala lo mismo que en el job
+      # del AppImage para que el chequeo de formatos no falle por un import.
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Descarga los assets publicados
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release download "$GITHUB_REF_NAME" --dir release
+
+      - name: Firmas, checksums y juego exacto de assets
+        run: scripts/verificar_release.sh release
+
+      - name: Smoke del AppImage publicado
+        # Se arranca el fichero DESCARGADO, no el de `dist/` (que en este job
+        # no existe): es la única forma de saber que lo publicado funciona.
+        run: |
+          mkdir -p dist/appimage
+          cp release/*.AppImage dist/appimage/
+          scripts/smoke_package.sh appimage

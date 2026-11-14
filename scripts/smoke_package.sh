@@ -3,11 +3,19 @@
 #
 # Uso:
 #   scripts/smoke_package.sh appimage|flatpak|windows [--version-check-una-llamada]
+#                                                [--exigir-firma-ostree]
 #
 # --version-check-una-llamada hace el paso 5 con UNA sola petición, sin el
 # backoff de 305 s por intento que usa el tag. Lo usan los jobs de PR: así una
 # regresión de CAs en el bundle (sin almacén de CAs no hay HTTPS con
 # api.github.com) se ve en el PR y no al publicar, sin pagar el backoff.
+#
+# --exigir-firma-ostree exige que el bundle lleve su firma ostree interna
+# válida con la clave publicada. Sin el flag, un bundle SIN firmar se instala
+# igual y el smoke pasa: `flatpak install --gpg-file` no sirve como guardia
+# porque AÑADE la clave a las ya confiables en vez de restringirlas (probado:
+# con otra clave en --gpg-file el bundle se instala igual). Solo lo usan los
+# jobs que firman (tag y cron); los de PR construyen sin firma y romperían.
 #
 # Antes había tres pasos de workflow con ~50 líneas cada uno que se habían
 # ido copiando: solo el .exe comprobaba que el paquete LEYERA un archivo, y el
@@ -40,13 +48,20 @@ MODO_VERSION=""
 for arg in "$@"; do
   case "$arg" in
     --version-check-una-llamada) MODO_VERSION="--una-llamada" ;;
+    --exigir-firma-ostree) EXIGIR_FIRMA_OSTREE=1 ;;
     *)
       echo "Opción desconocida: $arg" >&2
-      echo "Uso: scripts/smoke_package.sh appimage|flatpak|windows [--version-check-una-llamada]" >&2
+      echo "Uso: scripts/smoke_package.sh appimage|flatpak|windows" \
+        "[--version-check-una-llamada] [--exigir-firma-ostree]" >&2
       exit 2
       ;;
   esac
 done
+
+if [ -n "${EXIGIR_FIRMA_OSTREE:-}" ] && [ "$FORMATO" != "flatpak" ]; then
+  echo "::error::--exigir-firma-ostree solo aplica al Flatpak (formato: ${FORMATO:-ninguno})" >&2
+  exit 2
+fi
 
 case "$FORMATO" in
   appimage)
@@ -69,6 +84,52 @@ esac
 
 APP_ID="io.github.lpardo303.CatFlip"
 BASE_URL="http://127.0.0.1:5050"
+OSTREE_TMP=""
+
+# Firma ostree interna del bundle: se importa a un repo temporal con una jaula
+# de claves que SOLO tiene la pública versionada y se exige «Good signature».
+# `flatpak install` no vale como comprobación (un bundle sin firmar se instala),
+# y `flatpak build-import-bundle` tampoco verifica. Para que ostree encuentre la
+# clave, el homedir necesita además `trustedkeys.gpg`: con solo `pubring.kbx`
+# responde «public key not found». Se acepta ÚNICAMENTE el éxito literal, así
+# que una firma ausente, de otra clave o rota falla igual.
+# shellcheck disable=SC2317,SC2329  # se invoca desde la rama flatpak
+verificar_firma_ostree() {
+  local bundle="$1" ref commit salida esperado
+  if ! command -v ostree > /dev/null 2>&1; then
+    echo "::error::--exigir-firma-ostree necesita ostree (viene con flatpak)" >&2
+    return 1
+  fi
+  OSTREE_TMP="$(mktemp -d)"
+  mkdir -p "$OSTREE_TMP/gpg" "$OSTREE_TMP/repo"
+  chmod 700 "$OSTREE_TMP/gpg"
+  gpg --homedir "$OSTREE_TMP/gpg" --batch --quiet \
+    --import packaging/gpg/catflip-release.asc 2> /dev/null
+  gpg --homedir "$OSTREE_TMP/gpg" --export \
+    > "$OSTREE_TMP/gpg/trustedkeys.gpg" 2> /dev/null
+  ostree init --repo="$OSTREE_TMP/repo" --mode=archive > /dev/null 2>&1
+  flatpak build-import-bundle "$OSTREE_TMP/repo" "$bundle" > /dev/null 2>&1 || {
+    echo "::error::no se pudo importar $bundle para comprobar su firma" >&2
+    return 1
+  }
+  ref="$(ostree --repo="$OSTREE_TMP/repo" refs | head -1)"
+  if [ -z "$ref" ]; then
+    echo "::error::$bundle no declara ninguna ref: no se puede comprobar su firma" >&2
+    return 1
+  fi
+  commit="$(ostree --repo="$OSTREE_TMP/repo" rev-parse "$ref")"
+  salida="$(ostree --repo="$OSTREE_TMP/repo" show \
+    --gpg-homedir="$OSTREE_TMP/gpg" "$commit" 2>&1)"
+  esperado="$(tr -d '[:space:]' < packaging/gpg/FINGERPRINT)"
+  if ! grep -q "Good signature" <<< "$salida"; then
+    echo "::error::$bundle no lleva una firma ostree válida con la clave" \
+      "publicada ($esperado): el bundle no se puede verificar." >&2
+    grep -iE "signature|firma|not found|key ID" <<< "$salida" | sed 's/^/  /' >&2
+    return 1
+  fi
+  echo "  firma ostree interna: $(grep -i "Good signature" <<< "$salida" | sed 's/^ *//')"
+}
+
 
 # Python del proyecto: .venv si existe (local); si no, el del entorno (CI).
 # En Windows `python3` puede no existir y sí `python`.
@@ -134,6 +195,9 @@ cleanup() {
   if [ -n "$SCRATCH" ]; then
     rm -rf "$SCRATCH"
   fi
+  if [ -n "$OSTREE_TMP" ]; then
+    rm -rf "$OSTREE_TMP"
+  fi
   if [ "$estado" -ne 0 ] && [ "$ARRANCADO" = "1" ]; then
     echo "" >&2
     echo "— log del paquete ($ETIQUETA) —" >&2
@@ -172,6 +236,9 @@ case "$FORMATO" in
     # secas falla con «ya está instalada» y el smoke parecería roto.
     # El bundle lleva su firma ostree interna; lo que se difiere hasta después
     # del smoke es la firma detached y los checksums.
+    if [ -n "${EXIGIR_FIRMA_OSTREE:-}" ]; then
+      verificar_firma_ostree "$BUNDLE"
+    fi
     flatpak install --user -y --reinstall "$BUNDLE"
     flatpak run "$APP_ID" > "$LOG" 2>&1 &
     APP_PID=$!

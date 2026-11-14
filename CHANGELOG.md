@@ -11,6 +11,25 @@ siguiente corte.
 
 ### Añadido
 
+- **La release publicada se verifica descargándola.** El camino firmado
+  terminaba en `gh release upload` y ahí no se comprobaba nada: un asset subido
+  truncado, un renombrado por formato que se rompe o un fichero que no llegó
+  dejaban una release mal publicada con la CI en verde, porque todo lo demás
+  verifica sobre `dist/`. Ahora `scripts/verificar_release.sh` trabaja sobre lo
+  descargado: exige el juego exacto de 12 assets, verifica las 3 firmas y los 3
+  `SHA256SUMS.*.asc` en una jaula vacía que solo importa la clave publicada
+  (exigiendo la huella de `FINGERPRINT`) y pasa `sha256sum -c` a cada
+  `SHA256SUMS.*`. En el tag, el job `verificar-release` baja los assets de la
+  release, ejecuta ese script y arranca el **AppImage descargado** con el smoke
+  completo.
+- **El `.flatpak` tiene que llevar su firma ostree interna.** Nadie lo
+  comprobaba: un bundle **sin** firma se instala igual y el smoke pasaba, así
+  que perder `--gpg-sign` no se notaba en ninguna parte. El smoke del job
+  `flatpak` usa ahora `--exigir-firma-ostree`: importa el bundle a un repo
+  temporal con una jaula que solo tiene la clave publicada y exige
+  `Good signature`. Se probó primero `flatpak install --gpg-file=<otra clave>`
+  y **no sirve de guardia**: `--gpg-file` añade claves a las confiables, no las
+  restringe, así que instalaba igual; de ahí el rodeo por ostree.
 - **La firma comprueba que la clave usada sea la que se distribuye.** Nadie
   verificaba que `packaging/gpg/catflip-release.asc` (la clave publicada) fuera
   la de `packaging/gpg/FINGERPRINT` (la que firma): una rotación hecha a medias
