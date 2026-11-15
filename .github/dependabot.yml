@@ -11,6 +11,13 @@
 # Agrupado por ecosistema: un PR semanal como mucho para cada uno, en vez
 # de un PR por dependencia. Todo PR pasa por la CI (actionlint incluido),
 # así que un update roto se ve antes de mergear.
+#
+# Los `uses:` están fijados por SHA de commit, con la versión en un comentario
+# (`@<sha> # v7`): un tag mayor es un puntero que se mueve, y es el vector
+# clásico de cadena de suministro. Dependabot mantiene el SHA y el comentario,
+# así que subir una action sigue siendo un PR revisable; no se cambia el pin
+# a mano salvo para adelantar una versión, y entonces se actualiza también el
+# comentario.
 version: 2
 updates:
   - package-ecosystem: "github-actions"

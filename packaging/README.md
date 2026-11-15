@@ -151,6 +151,13 @@ los valida.
 
 ## CI (GitHub Actions)
 
+Las `uses:` de los workflows van **fijadas por SHA de commit** con la versión en
+un comentario (`actions/checkout@3d3c42e5… # v7`): una etiqueta mayor es un
+puntero que se puede mover y ejecutar código distinto sin cambiar el repo.
+Dependabot (`.github/dependabot.yml`) mantiene SHA y comentario al día en un
+solo PR semanal; los binarios fijados por `sha256sum` (actionlint, shellcheck)
+no son actions y se vigilan con el workflow «Avisos de versiones fijadas».
+
 `.github/workflows/packaging.yml` construye, prueba y firma los tres paquetes
 en cada tag `v*`, bajo demanda con `workflow_dispatch` y **cada lunes a las
 04:15 UTC** (`schedule`):

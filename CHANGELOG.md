@@ -11,6 +11,16 @@ siguiente corte.
 
 ### Añadido
 
+- **Las actions están fijadas por SHA de commit.** Los 31 `uses:` de `ci.yml`,
+  `packaging.yml` y `tool-versions.yml` llevaban la etiqueta mayor
+  (`actions/checkout@v7`), que es un puntero que se puede mover: si alguien
+  force-pushea ese tag, el siguiente run ejecuta otro código sin que cambie
+  nada en el repo. Ahora llevan el SHA del commit con la versión en un
+  comentario (`@3d3c42e5… # v7`), y Dependabot —que ya estaba configurado para
+  `github-actions` y agrupaba las subidas en un solo PR semanal— mantiene el
+  SHA y el comentario al día. Los binarios fijados por `sha256sum`
+  (actionlint, shellcheck) siguen con su workflow de avisos, que no son
+  actions.
 - **Un fallo del cron de packaging deja de ser invisible.** La corrida semanal
   existía para no descubrir en el tag una clave caducada, un secreto mal
   rotado o un runtime desaparecido, pero si fallaba lo único que quedaba era
