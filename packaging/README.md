@@ -252,7 +252,11 @@ aparecer, hay que reactivarlo en la pestaña Actions.
   para verificar una release ya publicada sin cortar una versión: es la forma
   de probar este job y de reverificar una release antigua. Hace checkout del
   tag y le pasa al script `GITHUB_REF`/`GITHUB_REF_NAME` de ese tag, para que
-  la comprobación «tag == package.json» siga valiendo.
+  la comprobación «tag == package.json» siga valiendo. Los scripts de
+  verificación se toman del commit actual (`git checkout "$GITHUB_SHA" --
+  scripts packaging/gpg`), no del tag: un tag antiguo puede no traerlos —v1.6.0
+  no tiene `scripts/verificar_release.sh`— y el verificador que manda es el de
+  hoy. `package.json` y los fixtures sí son los del tag.
 - **publicar** (solo en tag, después de `verificar-release`): quita el
   borrador con `gh release edit --draft=false --latest`. Atado a
   `refs/tags/`, así que una verificación manual nunca publica nada.
