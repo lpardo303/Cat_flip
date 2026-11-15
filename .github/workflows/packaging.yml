@@ -338,6 +338,17 @@ jobs:
           # `package.json` y la clave pública con la que se compara.
           ref: ${{ inputs.tag || github.ref_name }}
 
+      - name: Trae el verificador del commit actual
+        if: inputs.tag != ''
+        # Un tag antiguo puede no traer los scripts de verificación: v1.6.0 no
+        # tiene `verificar_release.sh`, que se añadió después (probado: el job
+        # murió con «No such file or directory»). El verificador que manda es
+        # el del commit que corre el workflow; `package.json` y los fixtures
+        # siguen siendo los del tag, que es lo que se está verificando.
+        run: |
+          git fetch --depth=1 origin "$GITHUB_SHA"
+          git checkout "$GITHUB_SHA" -- scripts packaging/gpg
+
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: "3.14"
