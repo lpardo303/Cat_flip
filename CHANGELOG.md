@@ -11,6 +11,21 @@ siguiente corte.
 
 ### Añadido
 
+- **Se publica solo lo que ya se verificó.** El job `release` creaba la
+  release publicada y subía los assets; la verificación corría después, así que
+  entre una cosa y otra los ficheros estaban descargables sin comprobar. Ahora
+  la release nace en **borrador**, `verificar-release` la descarga y verifica
+  (12 assets, firmas, checksums y smoke del AppImage), y un job nuevo
+  `publicar` quita el borrador con `gh release edit --draft=false --latest`
+  solo si todo pasó. Si algo falla, la release se queda en borrador. Además,
+  un rerun sobre una release **ya publicada** ahora falla en vez de reescribir
+  sus assets con `--clobber`.
+- **Verificar una release ya publicada, sin cortar versión.** `workflow_dispatch`
+  gana el input `tag` (`v1.6.0`): `verificar-release` hace checkout de ese tag y
+  repite el chequeo del usuario sobre sus assets, con `GITHUB_REF`/`GITHUB_REF_NAME`
+  del tag para que la comprobación con `package.json` siga aplicando. Es la
+  primera forma de ejercitar ese job sin publicar, y sirve para reverificar una
+  release antigua.
 - **Las actions están fijadas por SHA de commit.** Los 31 `uses:` de `ci.yml`,
   `packaging.yml` y `tool-versions.yml` llevaban la etiqueta mayor
   (`actions/checkout@v7`), que es un puntero que se puede mover: si alguien

@@ -21,6 +21,14 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    # Con `tag`, se verifica una release YA publicada sin cortar una versión:
+    # es la primera prueba de fuego del job `verificar-release` y sirve para
+    # reverificar una release antigua. Vacío = solo construir (lo de siempre).
+    inputs:
+      tag:
+        description: "Tag ya publicado a verificar (p. ej. v1.6.0). Vacío = solo construir."
+        required: false
+        default: ""
   # Semanal: el camino firmado (clave GPG, flatpak-builder + runtime, los tres
   # bundles) solo se ejercitaba en un tag o con un dispatch a mano, así que una
   # clave caducada, un secreto mal rotado o un runtime que desaparece de
@@ -238,7 +246,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    name: Adjunta los paquetes a la release
+    name: Prepara el borrador con los paquetes
     if: startsWith(github.ref, 'refs/tags/')
     needs: [appimage, flatpak, windows]
     runs-on: ubuntu-latest
@@ -247,7 +255,7 @@ jobs:
         with:
           path: artifacts
 
-      - name: Crea la release (si no existe) y sube los artefactos
+      - name: Prepara el borrador (si no existe) y sube los artefactos
         env:
           GH_TOKEN: ${{ github.token }}
           # Sin checkout en este job: GH_REPO evita que gh resuelva el repo
@@ -263,8 +271,21 @@ jobs:
           mv artifacts/flatpak/SHA256SUMS.asc  artifacts/flatpak/SHA256SUMS.flatpak.asc
           mv artifacts/windows/SHA256SUMS      artifacts/windows/SHA256SUMS.windows
           mv artifacts/windows/SHA256SUMS.asc  artifacts/windows/SHA256SUMS.windows.asc
-          gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1 ||
-            gh release create "$GITHUB_REF_NAME" --generate-notes
+          # La release nace en BORRADOR: los assets no son visibles hasta que
+          # `publicar` los da por buenos. Un asset truncado no llega a quien
+          # descarga porque antes lo verifica `verificar-release`.
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            # Un rerun no debe reescribir una release ya publicada: `--clobber`
+            # cambiaría ficheros que alguien ya descargó y verificó.
+            if [ "$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft)" != "true" ]; then
+              echo "::error::La release $GITHUB_REF_NAME ya está publicada; no se" \
+                "tocan sus assets. Publica una versión nueva." >&2
+              exit 1
+            fi
+            echo "→ el borrador $GITHUB_REF_NAME ya existe: se reemplazan sus assets"
+          else
+            gh release create "$GITHUB_REF_NAME" --draft --generate-notes
+          fi
           # Solo ficheros y sin duplicados: artifacts/flatpak/ también trae el
           # directorio repo/ (el ostree firmado, que sí queda en el artifact del
           # run) y los assets de una release solo aceptan ficheros con nombre
@@ -297,13 +318,25 @@ jobs:
   # real del AppImage descargado. Si falla, la release existe pero queda probado
   # que sus assets están mal: el rojo es la señal.
   verificar-release:
-    name: Verifica la release publicada
-    if: startsWith(github.ref, 'refs/tags/')
+    name: Verifica la release
+    # Dos entradas: el borrador recién montado por `release`, o un tag ya
+    # publicado que se pasa por input. `always()` hace falta porque en un
+    # dispatch `release` no corre, y un `needs` saltado se llevaría por delante
+    # este job.
+    if: |
+      always() && (
+        (startsWith(github.ref, 'refs/tags/') && needs.release.result == 'success')
+        || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
+      )
     needs: [release]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Se verifica el tag, no `main`: de ahí salen los fixtures, el
+          # `package.json` y la clave pública con la que se compara.
+          ref: ${{ inputs.tag || github.ref_name }}
 
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
@@ -316,14 +349,23 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Descarga los assets publicados
+      - name: Descarga los assets de la release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: gh release download "$GITHUB_REF_NAME" --dir release
+          TAG: ${{ inputs.tag || github.ref_name }}
+        # `gh release download` sí ve los borradores: el CLI cae a `GET
+        # /releases` porque `GET /releases/tags/{tag}` devuelve 404 en ellos.
+        run: gh release download "$TAG" --dir release
 
       - name: Firmas, checksums y juego exacto de assets
-        run: scripts/verificar_release.sh release
+        env:
+          # El script exige que el tag case con `package.json`. En un dispatch
+          # el ref es `main`, así que se le da el tag que se está verificando.
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          GITHUB_REF="refs/tags/$TAG" GITHUB_REF_NAME="$TAG" \
+            scripts/verificar_release.sh release
 
       - name: Smoke del AppImage publicado
         # Se arranca el fichero DESCARGADO, no el de `dist/` (que en este job
@@ -332,6 +374,26 @@ jobs:
           mkdir -p dist/appimage
           cp release/*.AppImage dist/appimage/
           scripts/smoke_package.sh appimage
+
+  # Publicar va aparte y solo después de verificar: si `verificar-release`
+  # falla, la release se queda en borrador y nadie ve paquetes rotos. Atado a
+  # `refs/tags/`, así que una verificación manual nunca publica nada.
+  publicar:
+    name: Publica la release verificada
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [verificar-release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # El workflow ya declara `contents: write`; se repite para que el job
+    # diga lo que necesita.
+    permissions:
+      contents: write
+    steps:
+      - name: Quita el borrador y marca la release como Latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release edit "$GITHUB_REF_NAME" --draft=false --latest
 
   # El cron semanal puede quedar en rojo y nadie entra a mirar Actions un
   # lunes: el fallo se descubría en el tag, que es justo lo que el cron quería

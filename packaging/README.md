@@ -221,9 +221,11 @@ aparecer, hay que reactivarlo en la pestaña Actions.
 - **windows** (`windows-latest`, todo en `shell: bash`): primer paso de
   comprobación de las herramientas de Git Bash, pip, `build.sh` con
   `SKIP_SIGN=1`, el mismo smoke que los otros dos y firma posterior.
-- **release** (solo en tag): crea la release si no existe y adjunta los
-  artefactos con `gh release upload` (AppImage, flatpak y `.exe`, con los
-  `SHA256SUMS.*` renombrados por formato).
+- **release** (solo en tag): crea la release **en borrador** si no existe y
+  adjunta los artefactos con `gh release upload` (AppImage, flatpak y `.exe`,
+  con los `SHA256SUMS.*` renombrados por formato). Si la release ya existiera
+  **publicada**, el job falla en vez de reemplazar assets: `--clobber`
+  cambiaría ficheros que alguien ya descargó y verificó.
 - **avisar-fallo** / **cerrar-aviso** (solo en la corrida programada): el cron
   existe para no descubrir en el tag una clave caducada o un runtime que
   desapareció, pero un lunes en rojo no lo mira nadie. Si la corrida semanal
@@ -244,8 +246,16 @@ aparecer, hay que reactivarlo en la pestaña Actions.
   firmas y los 3 `SHA256SUMS.*.asc` en una jaula vacía que solo importa
   `packaging/gpg/catflip-release.asc` (exigiendo además la huella de
   `FINGERPRINT`), y `sha256sum -c` de cada `SHA256SUMS.*`. Después arranca el
-  `.AppImage` **descargado** con el smoke completo. Si falla, la release existe
-  pero queda probado que sus assets están mal: el rojo es la señal.
+  `.AppImage` **descargado** con el smoke completo. Si falla, la release se
+  queda en **borrador**: nadie ve paquetes rotos.
+  También corre con `workflow_dispatch` y el input `tag` (p. ej. `v1.6.0`),
+  para verificar una release ya publicada sin cortar una versión: es la forma
+  de probar este job y de reverificar una release antigua. Hace checkout del
+  tag y le pasa al script `GITHUB_REF`/`GITHUB_REF_NAME` de ese tag, para que
+  la comprobación «tag == package.json» siga valiendo.
+- **publicar** (solo en tag, después de `verificar-release`): quita el
+  borrador con `gh release edit --draft=false --latest`. Atado a
+  `refs/tags/`, así que una verificación manual nunca publica nada.
 - **Firma ostree del Flatpak**: el smoke del job `flatpak` usa
   `--exigir-firma-ostree`, que importa el bundle a un repo temporal con una
   jaula que solo tiene la pública versionada y exige `Good signature`. Sin
