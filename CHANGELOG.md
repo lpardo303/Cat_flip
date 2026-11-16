@@ -11,6 +11,16 @@ siguiente corte.
 
 ### Añadido
 
+- **El paquete se mide contra la release anterior, no solo contra el tope.**
+  `verificar-release` ejecuta `scripts/comparar_tamanos.py`: compara cada
+  paquete con el de la release publicada previa y falla si crece más de un 15 %
+  (`CRECIMIENTO_PCT`), y deja la tabla en el resumen del run. El tope absoluto
+  deja engordar mientras quepa; esto dice cuánto ha engordado.
+- **El auditor mira más cosas y se lee en el PR.** `scripts/auditar_bundle.py`
+  falla también si un fichero suelto pasa de 60 MiB, o si aparece `.so.debug`,
+  `.map`, `.pdb` o `node_modules`, e imprime los cinco ficheros más grandes. El
+  smoke vuelca su tabla de pesos a `$GITHUB_STEP_SUMMARY`, así que el número se
+  ve en el PR sin abrir logs.
 - **El tag tiene que salir de `main`.** `release` comprueba con la API de
   `compare` que el commit del tag es ancestro de `main` (`behind`/`identical`)
   antes de subir nada: publicar desde una rama sería publicar código que el
