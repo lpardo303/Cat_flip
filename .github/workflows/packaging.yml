@@ -441,6 +441,16 @@ jobs:
           done
           echo "✅ los 3 paquetes tienen atestación de este workflow"
 
+      # La firma ostree del Flatpak se comprobaba en el build, no en el fichero
+      # que se descarga: aquí se importa el bundle publicado a un repo temporal
+      # con una jaula que solo tiene la clave versionada y se exige
+      # «Good signature». Solo importa; no necesita runtime ni instalar nada.
+      - name: Firma ostree del Flatpak publicado
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends flatpak
+          scripts/smoke_package.sh flatpak --solo-firma-ostree
+
       - name: Smoke del AppImage publicado
         # Se arranca el fichero DESCARGADO, no el de `dist/` (que en este job
         # no existe): es la única forma de saber que lo publicado funciona.
@@ -449,13 +459,67 @@ jobs:
           cp release/*.AppImage dist/appimage/
           scripts/smoke_package.sh appimage
 
+  # El `.exe` era el único formato cuyo asset publicado no se ejecutaba nunca:
+  # firmas y checksums sí, pero el binario que descarga un usuario de Windows no
+  # se probaba en ningún lado. Corre en Windows porque ahí es donde se prueba de
+  # verdad; en el job de build sí se smokea, pero eso es el `dist/` del runner,
+  # no lo que quedó en la release.
+  verificar-release-windows:
+    name: Ejecuta el .exe publicado
+    if: |
+      always() && (
+        (startsWith(github.ref, 'refs/tags/') && needs.release.result == 'success')
+        || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
+      )
+    needs: [release]
+    runs-on: windows-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Descarga el .exe publicado
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: gh release download "$TAG" --dir release --pattern "*.exe"
+
+      - name: Smoke del .exe descargado
+        env:
+          # Igual que en la verificación de Linux: el tag verificado manda, no
+          # el ref del dispatch (que sería `main`).
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          mkdir -p dist/windows
+          cp release/*.exe dist/windows/
+          GITHUB_REF="refs/tags/$TAG" GITHUB_REF_NAME="$TAG" \
+            scripts/smoke_package.sh windows
+
   # Publicar va aparte y solo después de verificar: si `verificar-release`
   # falla, la release se queda en borrador y nadie ve paquetes rotos. Atado a
   # `refs/tags/`, así que una verificación manual nunca publica nada.
   publicar:
     name: Publica la release verificada
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [verificar-release]
+    needs: [verificar-release, verificar-release-windows]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     # El workflow ya declara `contents: write`; se repite para que el job
@@ -538,7 +602,9 @@ jobs:
   avisar-fallo-tag:
     name: Avisa del fallo del tag
     if: failure() && startsWith(github.ref, 'refs/tags/')
-    needs: [appimage, flatpak, windows, release, verificar-release, publicar]
+    needs:
+      [appimage, flatpak, windows, release, verificar-release,
+       verificar-release-windows, publicar]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -565,7 +631,9 @@ jobs:
   cerrar-aviso-tag:
     name: Cierra el aviso del tag
     if: success() && startsWith(github.ref, 'refs/tags/')
-    needs: [appimage, flatpak, windows, release, verificar-release, publicar]
+    needs:
+      [appimage, flatpak, windows, release, verificar-release,
+       verificar-release-windows, publicar]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

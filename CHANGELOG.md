@@ -11,6 +11,13 @@ siguiente corte.
 
 ### Añadido
 
+- **Se ejecuta lo que se descarga, no solo lo que se construye.** El `.exe`
+  publicado solo pasaba firmas y checksums, y la firma ostree del Flatpak se
+  comprobaba en el build. Ahora `verificar-release-windows` baja el `.exe` de la
+  release y corre el smoke en `windows-latest`, y la verificación de Linux
+  importa el bundle publicado a un repo temporal con una jaula que solo tiene la
+  clave versionada para exigir `Good signature` (`smoke_package.sh flatpak
+  --solo-firma-ostree`). `publicar` espera a las dos verificaciones.
 - **Atestación de build en los tres paquetes.** La firma GPG prueba quién
   firmó; no prueba de dónde salió el binario. Cada job de build atestigua ahora
   el fichero final (`actions/attest-build-provenance`, con `id-token` y
