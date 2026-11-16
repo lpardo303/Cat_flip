@@ -9,17 +9,9 @@ siguiente corte.
 
 ## [Sin publicar]
 
-### Conocido
+_(nada todavía)_
 
-- **La release v1.6.0 lleva 17 ficheros de `pyarrow/tests/` dentro del
-  AppImage.** Se construyó antes del filtro `_sobra` (PR #92), y la verificación
-  manual de ese tag (`workflow_dispatch` con `tag: v1.6.0`) lo destapó: las
-  firmas y los `SHA256SUMS` de la release son correctos, pero el bundle trae
-  fixtures de test que no se distribuyen. **Los assets de una release publicada
-  no se reescriben** —quien ya descargó y verificó tendría otros bytes con la
-  misma firma, otro `SHA256SUMS` y un tag que ya no corresponde a un build de su
-  propio código—: el filtro sale en la próxima versión y el aviso queda en las
-  notas de v1.6.0.
+## [1.6.1] — 2026-11-16
 
 ### Añadido
 
@@ -245,6 +237,15 @@ siguiente corte.
 
 ### Solucionado
 
+- **El AppImage ya no lleva fixtures de test dentro.** La 1.6.0 se construyó
+  antes de que los specs filtraran `tests`, `__pycache__`, `*.pyc` y
+  `premium.key` de los `datas` (PR #92), así que su AppImage distribuía 17
+  ficheros de `pyarrow/tests/`; lo destapó la verificación manual de ese tag
+  (`workflow_dispatch` con `tag: v1.6.0`). Esta versión sale con el filtro
+  puesto y el smoke del AppImage descargado lo comprueba antes de publicarse.
+  Los assets de v1.6.0 **no** se reescribieron (quien ya descargó y verificó
+  tendría otros bytes con la misma firma): el aviso vive en las notas de esa
+  release.
 - **`.xls` (Excel 97-2003) no se podía leer**: la extensión se anunciaba
   en el selector, el dropzone, el CLI y los mensajes de error, pero
   pandas 3 ya no incluye motor para BIFF y, sin él, subir un `.xls` real
@@ -808,7 +809,8 @@ diagnóstico y CI de accesibilidad.
   escritorio — sustituido por el diálogo nativo de archivo.
 - Auto-mapeo de fechas: `dayfirst` mal inferido para días ISO > 12.
 
-[Sin publicar]: https://github.com/lpardo303/Cat_flip/compare/v1.6.0...HEAD
+[Sin publicar]: https://github.com/lpardo303/Cat_flip/compare/v1.6.1...HEAD
+[1.6.1]: https://github.com/lpardo303/Cat_flip/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/lpardo303/Cat_flip/compare/v1.5.1...v1.6.0
 [1.5.1]: https://github.com/lpardo303/Cat_flip/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/lpardo303/Cat_flip/compare/v1.4.1...v1.5.0
