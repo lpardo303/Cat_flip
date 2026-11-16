@@ -233,9 +233,13 @@ aparecer, hay que reactivarlo en la pestaña Actions.
   `SKIP_SIGN=1`, el mismo smoke que los otros dos y firma posterior.
 - **release** (solo en tag): crea la release **en borrador** si no existe y
   adjunta los artefactos con `gh release upload` (AppImage, flatpak y `.exe`,
-  con los `SHA256SUMS.*` renombrados por formato). Si la release ya existiera
-  **publicada**, el job falla en vez de reemplazar assets: `--clobber`
-  cambiaría ficheros que alguien ya descargó y verificó.
+  con los `SHA256SUMS.*` renombrados por formato). Antes de subir nada comprueba
+  con `GET /compare/main...<tag>` que el commit del tag es ancestro de `main`
+  (`behind`/`identical`): no se publica lo que no está en `main`. Si la release
+  ya existiera **publicada**, el rerun solo sale verde cuando este build produce
+  **exactamente los mismos bytes** (comparación `cmp` contra lo descargado); si
+  difiere, falla diciendo qué fichero cambia: `--clobber` reescribiría ficheros
+  que alguien ya descargó y verificó.
 - **avisar-fallo** / **cerrar-aviso** (solo en la corrida programada): el cron
   existe para no descubrir en el tag una clave caducada o un runtime que
   desapareció, pero un lunes en rojo no lo mira nadie. Si la corrida semanal
