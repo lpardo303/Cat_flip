@@ -11,6 +11,23 @@ siguiente corte.
 
 ### Añadido
 
+- **El cron vigila dos cosas más.** `pip-audit` sobre `requirements.txt` (lo que
+  se empaqueta) y `scripts/revisar_caducidad_clave.py`, que avisa 30 días antes
+  de que caduque la clave de firma. Antes, una dependencia con CVE o una clave
+  a punto de expirar se descubrían el día del tag. (La clave actual no caduca:
+  la vigilancia empieza a morder cuando se rote a una con fecha.)
+- **Reverificación mensual de la última release**
+  (`.github/workflows/reverificar-release.yml`): baja la `latest`, verifica
+  firmas, checksums y assets, y arranca el AppImage. Una release publicada es lo
+  que descarga la gente meses después, y hasta ahora solo se verificaba en el
+  momento de publicar. Si falla, abre su propio issue.
+- **Permisos mínimos y `concurrency`.** El workflow solo declara
+  `contents: read`; escriben `release`, `publicar` y `limpiar-borradores`
+  (`contents: write`) y los avisos (`issues: write`). Dos tags a la vez ya no se
+  pelean por el mismo borrador.
+- **Procedimiento de retirada de una release mala** en `packaging/README.md`:
+  `gh release edit --draft=true` + devolver `--latest` a la anterior y cortar
+  una versión corregida; no se borra la release ni se reescriben sus assets.
 - **El paquete se mide contra la release anterior, no solo contra el tope.**
   `verificar-release` ejecuta `scripts/comparar_tamanos.py`: compara cada
   paquete con el de la release publicada previa y falla si crece más de un 15 %

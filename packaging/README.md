@@ -267,6 +267,23 @@ aparecer, hay que reactivarlo en la pestaña Actions.
   `needs` con los seis jobs: un fallo al subir assets, al verificar o al
   publicar también cuenta. `cerrar-aviso-tag` exige `success()` de esos seis,
   así que un tag que publicó pero falló al verificar no cierra nada.
+- **auditar-dependencias** / **avisar-caducidad** (solo en cron): `pip-audit`
+  sobre `requirements.txt` (lo que se empaqueta, no lo que solo se testea) y
+  `scripts/revisar_caducidad_clave.py`, que avisa 30 días antes de que caduque
+  la clave de `FINGERPRINT`. Las dos cosas se descubrían el día del tag. Si
+  alguno falla, entra en el aviso del cron como un job más. Ojo: la clave
+  actual no tiene fecha de caducidad, así que hoy esa comprobación es un no-op
+  — empieza a vigilar de verdad el día que se rote a una clave con expiración.
+- **`concurrency: packaging-${{ github.ref }}`** y permisos mínimos: el workflow
+  solo declara `contents: read` y cada job que escribe pide lo suyo
+  (`release`, `publicar` y `limpiar-borradores` → `contents: write`; los avisos
+  → `issues: write`). Dos tags a la vez no se pelean por el mismo borrador.
+- **Reverificación mensual** (`.github/workflows/reverificar-release.yml`, día 1
+  a las 05:00 UTC): baja la release `latest` y repite el chequeo del usuario
+  —12 assets, firmas, checksums y smoke del AppImage— semanas después de
+  publicar. Si falla, abre su propio issue con `scripts/avisar_cron.py` y
+  `TITULO_PERSONALIZADO`. Detecta que un asset cambió en el alojamiento o que
+  el binario dejó de arrancar.
 - **limpiar-borradores** (solo en cron): desde que la release nace en borrador,
   un tag que no pasa la verificación deja un borrador invisible que nadie borra
   a mano. `scripts/limpiar_borradores.py` lista las releases, se queda con los
@@ -407,6 +424,20 @@ release afectada se queda con un aviso en sus notas. Caso real: v1.6.0 lleva 17
 ficheros de `pyarrow/tests/` dentro del AppImage (el filtro llegó en el PR #92,
 después del tag); las firmas y checksums de ese corte son válidos y no se
 tocaron.
+
+Si lo que hay que hacer es **retirar** una release mala (un fallo funcional
+serio), el procedimiento es despublicar, no reescribir:
+
+```bash
+# Deja de estar visible y de contar como latest; los assets y el tag siguen ahí.
+gh release edit vX.Y.Z --draft=true
+gh release edit vX.Y.Z.anterior --latest
+```
+
+Después se comunica en el issue del aviso (o en las notas de la siguiente) y se
+corta una versión corregida, que pasa otra vez por borrador → verificar →
+publicar. **No se borra la release**: el tag y sus assets son la evidencia de lo
+que se publicó, y `vX.Y.Z` sin release es un estado que nadie entiende.
 
 Sólo un problema de seguridad justificaría tocar una release publicada, y
 entonces se hace explícito y completo: reconstruir con el mismo código + el
