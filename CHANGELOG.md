@@ -11,6 +11,14 @@ siguiente corte.
 
 ### Añadido
 
+- **Atestación de build en los tres paquetes.** La firma GPG prueba quién
+  firmó; no prueba de dónde salió el binario. Cada job de build atestigua ahora
+  el fichero final (`actions/attest-build-provenance`, con `id-token` y
+  `attestations`, sin clave que guardar) y la verificación de la release lo
+  comprueba con `gh attestation verify --signer-workflow packaging.yml`. Así un
+  asset sustituido por alguien con la clave deja de ser indistinguible de uno
+  legítimo. Las releases anteriores no tienen atestaciones: `workflow_dispatch`
+  acepta `exigir_atestacion: false` para reverificarlas.
 - **Un tag en rojo ya no falla en silencio.** El aviso por issue existía solo
   para el cron semanal: si un tag no publicaba (build roto, verificación en
   rojo), quedaba el tag creado, la release sin publicar y ningún aviso. Ahora

@@ -29,6 +29,14 @@ on:
         description: "Tag ya publicado a verificar (p. ej. v1.6.0). Vacío = solo construir."
         required: false
         default: ""
+      exigir_atestacion:
+        description: >-
+          Exigir atestación de build. Desactívalo solo para reverificar
+          releases publicadas antes de que existieran las atestaciones (1.6.1
+          y anteriores).
+        type: boolean
+        required: false
+        default: true
   # Semanal: el camino firmado (clave GPG, flatpak-builder + runtime, los tres
   # bundles) solo se ejercitaba en un tag o con un dispatch a mano, así que una
   # clave caducada, un secreto mal rotado o un runtime que desaparece de
@@ -49,6 +57,12 @@ jobs:
   appimage:
     name: AppImage firmado
     runs-on: ubuntu-latest
+    # El workflow declara `contents: write` para la release; los jobs de build
+    # solo leen y atestiguan (OIDC + attestations).
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     # Con `/version/check` y su backoff, una corrida sin rate limit tarda ~1,5
     # min; el tope solo evita que un cuelgue se coma la cuota del runner.
     timeout-minutes: 25
@@ -97,6 +111,15 @@ jobs:
       - name: Verifica firmas y checksums
         run: packaging/sign.sh --verificar dist/appimage/*.AppImage
 
+      # La firma dice «lo firmé yo»; esto dice «salió de este repo, este
+      # commit y este workflow», que es lo que distingue un asset sustituido
+      # por alguien con la clave de uno legítimo. Se atestigua el fichero FINAL,
+      # el que se descarga: el `release` solo lo renombra si hace falta.
+      - name: Atestigua el AppImage (provenance)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
+        with:
+          subject-path: dist/appimage/*.AppImage
+
       # En la corrida semanal NO se sube nada: son ~115 MB por formato y el
       # objetivo del cron es ejercitar firma y runtime, no distribuir. El log
       # del smoke ya vuelca lo necesario para diagnosticar un fallo.
@@ -110,6 +133,10 @@ jobs:
   flatpak:
     name: Flatpak firmado
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -174,6 +201,11 @@ jobs:
       - name: Verifica firmas y checksums
         run: packaging/sign.sh --verificar dist/flatpak/*.flatpak
 
+      - name: Atestigua el Flatpak (provenance)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
+        with:
+          subject-path: dist/flatpak/*.flatpak
+
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: github.event_name != 'schedule'
         with:
@@ -184,6 +216,10 @@ jobs:
   windows:
     name: .exe firmado (Windows)
     runs-on: windows-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     timeout-minutes: 25
     # gpg y sha256sum NO están en el PATH de PowerShell: existen en Git
     # Bash (Git for Windows /usr/bin). Todo el job corre en bash y el
@@ -237,6 +273,11 @@ jobs:
 
       - name: Verifica firmas y checksums
         run: packaging/sign.sh --verificar dist/windows/*.exe
+
+      - name: Atestigua el .exe (provenance)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
+        with:
+          subject-path: dist/windows/*.exe
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: github.event_name != 'schedule'
@@ -377,6 +418,28 @@ jobs:
         run: |
           GITHUB_REF="refs/tags/$TAG" GITHUB_REF_NAME="$TAG" \
             scripts/verificar_release.sh release
+
+      # Las firmas prueban autoría; la atestación prueba origen: que esos bytes
+      # salieron de este workflow, en este repo, desde ese commit. Sin ella,
+      # alguien con la clave privada podría subir otro binario y todo lo demás
+      # seguiría verde.
+      - name: Atestaciones de build (provenance)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # En un push de tag `inputs` está vacío: el default es exigir.
+          EXIGIR: ${{ inputs.exigir_atestacion }}
+        run: |
+          if [ "${EXIGIR:-true}" = "false" ]; then
+            echo "→ atestación no exigida: releases anteriores a 1.6.2"
+            exit 0
+          fi
+          for f in release/*.AppImage release/*.flatpak release/*.exe; do
+            echo "→ $f"
+            gh attestation verify "$f" \
+              --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/packaging.yml"
+          done
+          echo "✅ los 3 paquetes tienen atestación de este workflow"
 
       - name: Smoke del AppImage publicado
         # Se arranca el fichero DESCARGADO, no el de `dist/` (que en este job
