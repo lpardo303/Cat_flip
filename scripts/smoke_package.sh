@@ -165,14 +165,26 @@ VERSION="$("$PYBIN" -c "import json; print(json.load(open('package.json'))['vers
 # revisa ANTES de arrancar: un paquete que mete tests o un venv dentro no se
 # distribuye, y no tiene sentido gastar el smoke en él.
 auditar_bundle() {
-  local formato="$1" dir="${2:-}" archivo="${3:-}"
+  local formato="$1" dir="${2:-}" archivo="${3:-}" salida estado=0
   if [ -n "$archivo" ]; then
-    "$PYBIN" scripts/auditar_bundle.py "$formato" \
-      --tamano "$(stat -c%s "$archivo")" --exe "$archivo"
+    salida="$("$PYBIN" scripts/auditar_bundle.py "$formato" \
+      --tamano "$(stat -c%s "$archivo")" --exe "$archivo" 2>&1)" || estado=$?
   else
-    "$PYBIN" scripts/auditar_bundle.py "$formato" \
-      --tamano "$(stat -c%s "$BUNDLE")" --dir "$dir"
+    salida="$("$PYBIN" scripts/auditar_bundle.py "$formato" \
+      --tamano "$(stat -c%s "$BUNDLE")" --dir "$dir" 2>&1)" || estado=$?
   fi
+  printf '%s\n' "$salida"
+  # En Actions el resumen del run es lo que se lee sin abrir los logs: el peso,
+  # el reparto y lo más grande quedan ahí también para el PR.
+  if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+    {
+      echo "### $ETIQUETA — peso y contenidos"
+      echo '```'
+      printf '%s\n' "$salida"
+      echo '```'
+    } >> "$GITHUB_STEP_SUMMARY"
+  fi
+  return "$estado"
 }
 
 # En un tag, la release, el bundle y package.json deben llevar la MISMA

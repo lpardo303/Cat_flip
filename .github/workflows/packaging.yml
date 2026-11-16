@@ -448,6 +448,16 @@ jobs:
         # /releases` porque `GET /releases/tags/{tag}` devuelve 404 en ellos.
         run: gh release download "$TAG" --dir release
 
+      # El presupuesto del auditor es absoluto: mientras quepa, el paquete puede
+      # engordar sin que nadie lo mire. Esto compara con la release anterior y
+      # deja la tabla en el resumen del run.
+      - name: Peso frente a la release anterior
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: python3 scripts/comparar_tamanos.py
+
       - name: Firmas, checksums y juego exacto de assets
         env:
           # El script exige que el tag case con `package.json`. En un dispatch

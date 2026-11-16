@@ -62,7 +62,18 @@ PROHIBIDOS = [
     (re.compile(r"(^|/)venv(/|$)"), "entorno virtual"),
     (re.compile(r"(^|/)__pycache__(/|$)"), "__pycache__"),
     (re.compile(r"\.pyc$"), "__pycache__"),
+    # Restos de build y de desarrollo que nadie ejecuta: símbolos de depuración,
+    # mapas de fuentes, dependencias de node y ficheros de símbolos de Windows.
+    (re.compile(r"\.so\.debug$"), "símbolos de depuración"),
+    (re.compile(r"\.map$"), "mapas de fuentes"),
+    (re.compile(r"\.pdb$"), "símbolos de depuración"),
+    (re.compile(r"(^|/)node_modules(/|$)"), "node_modules"),
 ]
+
+# Un fichero suelto por encima de esto se revisa: el más grande legítimo de hoy
+# es `libarrow.so` con ~46 MiB, así que 60 no salta por una librería normal pero
+# sí por un dato pegado con `--add-data`.
+TOPE_FICHERO = 60
 
 
 # Rutas que se parecen a lo prohibido pero son datos legítimos.
@@ -185,7 +196,24 @@ def main():
     for grupo, bytes_grupo, pct in reparto(entradas):
         print(f"    {grupo:34} {_mib(bytes_grupo):>7} MiB ({pct:.0f} %)")
 
+    # Lo más grande, para que el número esté justificado: sin esto, «pesa 110
+    # MiB» no dice si son dependencias normales o un dato colado.
+    print("  ficheros más grandes (sin comprimir):")
+    for camino, tamano in sorted(entradas, key=lambda par: par[1], reverse=True)[:5]:
+        print(f"    {_mib(tamano):>7} MiB  {camino}")
+
     fallo = revisar_contenidos(args.formato, entradas)
+
+    grandes = [(c, t) for c, t in entradas if t > TOPE_FICHERO * MiB]
+    if grandes:
+        print(
+            f"::error::hay {len(grandes)} fichero(s) de más de {TOPE_FICHERO} MiB "
+            "dentro del bundle: revisa qué se está metiendo con `datas`.",
+            file=sys.stderr,
+        )
+        for camino, tamano in grandes[:5]:
+            print(f"  {_mib(tamano):>7} MiB  {camino}", file=sys.stderr)
+        fallo = 1
 
     if args.tamano > tope * MiB:
         print(

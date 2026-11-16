@@ -206,14 +206,22 @@ aparecer, hay que reactivarlo en la pestaña Actions.
 - **El smoke mira el peso y lo que viaja dentro** (`scripts/auditar_bundle.py`,
   antes de arrancar): el fichero distribuido tiene que caber en el presupuesto
   del formato (145 MiB AppImage, 110 flatpak, 72 `.exe`; medido sobre v1.6.0 y
-  builds locales, con ~10 % de margen) y no puede llevar `tests/`, `.git`,
-  logs, `.env`, `__pycache__` ni un venv. Además imprime el reparto del peso
-  por grupos (`_internal/pyarrow`, `.so` de arrow, `numpy.libs`…), para que el
-  tamaño quede justificado en el log. Si el crecimiento es legítimo, se sube
+  los builds locales, con ~10 % de margen), y desde entonces también falla si un
+  fichero suelto pasa de 60 MiB (`TOPE_FICHERO`) o si se cuelan `.so.debug`,
+  `.map`, `.pdb` o `node_modules`. Imprime los cinco ficheros más grandes y, en
+  Actions, deja la tabla entera en el resumen del run (`$GITHUB_STEP_SUMMARY`),
+  así que se lee en el PR sin abrir logs. Tampoco puede llevar `tests/`, `.git`,
+  logs, `.env`, `__pycache__` ni un venv, e imprime el reparto del peso por
+  grupos (`_internal/pyarrow`, `.so` de arrow, `numpy.libs`…) para que el
+  tamaño quede justificado. Si el crecimiento es legítimo, se sube
   `PRESUPUESTO` en el mismo commit que lo explica. Los `.spec` filtran `tests`,
   `__pycache__`, `*.pyc` y `premium.key` de los `datas`: el primero que
   apareció fue `pyarrow/tests/`, que PyInstaller arrastraba por ser datos del
   paquete.
+- **Peso relativo**: `verificar-release` compara cada paquete con el de la
+  release publicada anterior (`scripts/comparar_tamanos.py`, umbral 15 %,
+  `CRECIMIENTO_PCT` para ajustarlo) y falla si alguno crece de más: el tope
+  absoluto deja engordar mientras quepa, este dice cuánto ha engordado.
 - **El smoke arranca el bundle con una licencia premium de prueba**
   (`CATFLIP_PREMIUM_KEY=smoke`, misma idea que el job `axe` con `ci`). Sin
   licencia `/premium/status` sale vacío y los ficheros de `premium/themes` no
