@@ -50,8 +50,18 @@ on:
   schedule:
     - cron: "15 4 * * 1" # lunes 04:15 UTC
 
+# El workflow solo LEE: los jobs que escriben (la release, la limpieza de
+# borradores) declaran `contents: write` o `issues: write` para sí mismos. Un
+# `contents: write` global le da permiso de escritura a builds que solo
+# necesitan descargar dependencias.
 permissions:
-  contents: write
+  contents: read
+
+# Dos tags a la vez no deben pelearse por el mismo borrador ni un dispatch de
+# verificación cancelar un tag en curso.
+concurrency:
+  group: packaging-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   appimage:
@@ -291,6 +301,8 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     needs: [appimage, flatpak, windows]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       # Publicar desde una rama sería publicar código que no está en main: el
       # repo no diría de dónde salió el binario. `compare` responde si el commit
@@ -595,7 +607,7 @@ jobs:
   avisar-fallo:
     name: Avisa del fallo del cron
     if: failure() && github.event_name == 'schedule'
-    needs: [appimage, flatpak, windows]
+    needs: [appimage, flatpak, windows, auditar-dependencias, avisar-caducidad]
     runs-on: ubuntu-latest
     # Si GitHub no responde, el aviso no debe quedarse colgado 25 minutos.
     timeout-minutes: 5
@@ -613,7 +625,9 @@ jobs:
           RESULTADOS: >-
             appimage=${{ needs.appimage.result }},
             flatpak=${{ needs.flatpak.result }},
-            windows=${{ needs.windows.result }}
+            windows=${{ needs.windows.result }},
+            dependencias=${{ needs.auditar-dependencias.result }},
+            caducidad=${{ needs.avisar-caducidad.result }}
         run: python3 scripts/avisar_cron.py
 
   # El reverso: cuando la corrida programada vuelve a salir bien, el issue que
@@ -623,7 +637,7 @@ jobs:
   cerrar-aviso:
     name: Cierra el aviso del cron
     if: success() && github.event_name == 'schedule'
-    needs: [appimage, flatpak, windows]
+    needs: [appimage, flatpak, windows, auditar-dependencias, avisar-caducidad]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -638,8 +652,45 @@ jobs:
           RESULTADOS: >-
             appimage=${{ needs.appimage.result }},
             flatpak=${{ needs.flatpak.result }},
-            windows=${{ needs.windows.result }}
+            windows=${{ needs.windows.result }},
+            dependencias=${{ needs.auditar-dependencias.result }},
+            caducidad=${{ needs.avisar-caducidad.result }}
         run: python3 scripts/avisar_cron.py --ok
+
+  # El cron también vigila dos cosas que no construyen nada:
+  # dependencias empaquetadas con vulnerabilidades conocidas y la fecha de
+  # caducidad de la clave de firma. Las dos se descubrían el día del tag.
+  auditar-dependencias:
+    name: Audita dependencias
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.14"
+
+      - name: pip-audit sobre lo que se empaqueta
+        run: |
+          python -m pip install --upgrade pip pip-audit
+          pip-audit -r requirements.txt --progress-spinner off
+
+  avisar-caducidad:
+    name: Vigila la caducidad de la clave
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Fecha de caducidad de packaging/gpg/FINGERPRINT
+        run: python3 scripts/revisar_caducidad_clave.py
 
   # Un tag en rojo deja el tag creado, la release sin publicar (o en borrador,
   # que no la ve nadie) y, hasta ahora, ni un aviso: lo único que quedaba era

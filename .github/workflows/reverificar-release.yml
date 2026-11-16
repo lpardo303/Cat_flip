@@ -1,0 +1,87 @@
+name: reverificar-release
+
+# Una release publicada hace meses sigue siendo lo que descarga la gente, y
+# hasta ahora nadie la volvía a mirar: los assets viven en el alojamiento de
+# GitHub y el workflow de packaging solo verifica en el momento de publicar.
+# Esta corrida mensual baja la release «latest» y repite el chequeo del usuario
+# (12 assets, firmas, checksums, atestación y smoke del AppImage). Detecta que
+# un asset cambió en el alojamiento, que la clave con la que se firmó ya no
+# está, o que el binario dejó de arrancar por lo que sea del entorno.
+on:
+  schedule:
+    - cron: "0 5 1 * *" # día 1 de cada mes, 05:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reverificar:
+    name: Reverifica la última release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # El aviso final escribe un issue; el resto solo lee.
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Averigua la última release publicada
+        id: ultima
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag="$(gh release view --json tagName --jq .tagName)"
+          if [ -z "$tag" ]; then
+            echo "::error::no hay ninguna release publicada" >&2
+            exit 1
+          fi
+          echo "→ última release: $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Descarga los assets publicados
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.ultima.outputs.tag }}
+        run: gh release download "$TAG" --dir release
+
+      - name: Firmas, checksums y juego exacto de assets
+        env:
+          TAG: ${{ steps.ultima.outputs.tag }}
+        run: |
+          GITHUB_REF="refs/tags/$TAG" GITHUB_REF_NAME="$TAG" \
+            scripts/verificar_release.sh release
+
+      - name: Smoke del AppImage publicado
+        run: |
+          mkdir -p dist/appimage
+          cp release/*.AppImage dist/appimage/
+          scripts/smoke_package.sh appimage
+
+      # Esta corrida avisa por su cuenta: no es el cron de packaging, así que
+      # usa el mismo script con título propio. Abre, comenta o reabre el issue
+      # y no duplica.
+      - name: Deja constancia si falla
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          TITULO_PERSONALIZADO: La reverificación de la última release ha fallado
+          RESULTADOS: tag=${{ steps.ultima.outputs.tag }}
+        run: python3 scripts/avisar_cron.py

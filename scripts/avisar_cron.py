@@ -31,6 +31,9 @@ Variables de entorno:
     GITHUB_RUN_ID        id de la corrida (opcional: sin él no hay enlace)
     GITHUB_SHA           commit de la corrida (opcional)
     RESULTADOS           resumen de jobs, p. ej. "appimage=failure, …"
+    TITULO_PERSONALIZADO título del aviso, para orígenes que no son cron ni tag
+                         (lo usa la reverificación mensual); manda sobre los
+                         demás y se busca igual por título exacto
 """
 import json
 import os
@@ -207,7 +210,12 @@ def main():
             print("::error::--tag necesita GITHUB_REF_NAME", file=sys.stderr)
             return 1
 
-    titulo = TITULO_TAG.format(tag=tag) if tag else TITULO_CRON
+    # Un tercer origen (la reverificación mensual) trae su propio título por
+    # variable: abrir/comentar/cerrar es idéntico, solo cambia el asunto.
+    titulo = (
+        os.environ.get("TITULO_PERSONALIZADO", "").strip()
+        or (TITULO_TAG.format(tag=tag) if tag else TITULO_CRON)
+    )
     if "--ok" in args:
         return cerrar_aviso(repo, titulo, tag)
     return avisar_fallo(repo, titulo, tag)
