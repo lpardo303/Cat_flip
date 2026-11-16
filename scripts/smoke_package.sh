@@ -55,6 +55,7 @@ for arg in "$@"; do
   case "$arg" in
     --version-check-una-llamada) MODO_VERSION="--una-llamada" ;;
     --exigir-firma-ostree) EXIGIR_FIRMA_OSTREE=1 ;;
+    --solo-firma-ostree) SOLO_FIRMA_OSTREE=1 ;;
     *)
       echo "Opción desconocida: $arg" >&2
       echo "Uso: scripts/smoke_package.sh appimage|flatpak|windows" \
@@ -67,6 +68,14 @@ done
 if [ -n "${EXIGIR_FIRMA_OSTREE:-}" ] && [ "$FORMATO" != "flatpak" ]; then
   echo "::error::--exigir-firma-ostree solo aplica al Flatpak (formato: ${FORMATO:-ninguno})" >&2
   exit 2
+fi
+
+if [ -n "${SOLO_FIRMA_OSTREE:-}" ]; then
+  if [ "$FORMATO" != "flatpak" ]; then
+    echo "::error::--solo-firma-ostree solo aplica al Flatpak (formato: ${FORMATO:-ninguno})" >&2
+    exit 2
+  fi
+  EXIGIR_FIRMA_OSTREE=1
 fi
 
 case "$FORMATO" in
@@ -183,6 +192,16 @@ if [ "${#BUNDLES[@]}" -ne 1 ]; then
   exit 1
 fi
 BUNDLE="${BUNDLES[0]}"
+
+# Modo de una sola comprobación: la firma ostree interna del bundle, sobre el
+# fichero que se acaba de descargar de la release. Lo usa `verificar-release`:
+# hasta ahora esa firma se comprobaba en el build, no en el asset publicado.
+# Se sale antes de arrancar nada, así que no hace falta runtime ni instalar.
+if [ -n "${SOLO_FIRMA_OSTREE:-}" ]; then
+  verificar_firma_ostree "$BUNDLE"
+  echo "✅ firma ostree interna del bundle publicado: OK"
+  exit 0
+fi
 
 LOG="$(mktemp)"
 SCRATCH=""

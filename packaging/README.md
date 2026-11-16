@@ -280,7 +280,15 @@ aparecer, hay que reactivarlo en la pestaña Actions.
   scripts packaging/gpg`), no del tag: un tag antiguo puede no traerlos —v1.6.0
   no tiene `scripts/verificar_release.sh`— y el verificador que manda es el de
   hoy. `package.json` y los fixtures sí son los del tag.
-- **publicar** (solo en tag, después de `verificar-release`): quita el
+- **verificar-release** además instala `flatpak` y comprueba la **firma ostree
+  del bundle publicado** (`scripts/smoke_package.sh flatpak
+  --solo-firma-ostree`): importa el `.flatpak` descargado a un repo temporal con
+  una jaula que solo tiene la clave versionada y exige `Good signature`. Antes
+  esa firma solo se miraba en el build, no en el fichero que se descarga.
+- **verificar-release-windows**: el `.exe` era el único asset publicado que no se
+  ejecutaba nunca. Este job lo descarga de la release y corre el smoke completo
+  en `windows-latest`, con `GITHUB_REF`/`GITHUB_REF_NAME` del tag verificado.
+- **publicar** (solo en tag, después de las dos verificaciones): quita el
   borrador con `gh release edit --draft=false --latest`. Atado a
   `refs/tags/`, así que una verificación manual nunca publica nada.
 - **Atestación de build (provenance)**: cada job de build atestigua el paquete
