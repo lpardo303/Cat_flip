@@ -9,8 +9,11 @@
 # descargado, no sobre el build.
 #
 # Qué comprueba:
-#   1. el juego EXACTO de 12 assets (3 paquetes, sus `.asc`, los `SHA256SUMS.*`
-#      y sus `.asc`): sobra o falta uno → falla, que es como se ve que el
+#   1. el juego EXACTO de assets: los 12 de siempre (3 paquetes, sus `.asc`, los
+#      `SHA256SUMS.*` y sus `.asc`) más el manifiesto firmado, el verificador,
+#      el comprobador del manifiesto y la clave pública. Las releases
+#      anteriores al manifiesto se aceptan con sus 12 y un aviso, porque no se
+#      reescriben. Cualquier otro conjunto → falla, que es como se ve que el
 #      renombrado por formato dejó de funcionar;
 #   2. las 3 firmas detached y los 3 `SHA256SUMS.*.asc` en una jaula de claves
 #      VACÍA que solo importa `packaging/gpg/catflip-release.asc`, exigiendo
@@ -59,28 +62,46 @@ ESPERADOS=(
   "$FLATPAK" "$FLATPAK.asc" "SHA256SUMS.flatpak" "SHA256SUMS.flatpak.asc"
   "$EXE" "$EXE.asc" "SHA256SUMS.windows" "SHA256SUMS.windows.asc"
 )
+# Lo que el manifiesto añade: la lista firmada, lo necesario para repetir esta
+# comprobación en otra máquina (verificador y comprobador) y la clave pública.
+COMPANEROS=(manifest.json manifest.json.asc verificar_release.sh comprobar_manifest.py catflip-release.asc)
 
 # 1) Juego exacto: los assets de una release son planos, y el job `release`
 #    renombra los SHA256SUMS por formato porque los tres se llaman igual.
-faltan=()
-sobran=()
-for nombre in "${ESPERADOS[@]}"; do
-  [ -f "$DIR/$nombre" ] || faltan+=("$nombre")
-done
-while IFS= read -r ruta; do
-  base="${ruta##*/}"
-  printf '%s\n' "${ESPERADOS[@]}" | grep -qxF "$base" || sobran+=("$base")
-done < <(find "$DIR" -maxdepth 1 -type f)
+#    Dos conjuntos válidos; comparar listas ordenadas evita el lío de contar.
+ordenar() { printf '%s\n' "$@" | sort | tr '\n' ' ' | sed 's/ $//'; }
+presentes=()
+while IFS= read -r ruta; do presentes+=("${ruta##*/}"); done \
+  < <(find "$DIR" -maxdepth 1 -type f)
 
-# Un `[ ... ] && echo` colgado bajo `set -e` cortaría el script cuando el
-# primer conjunto está vacío y se perdería el segundo mensaje.
-if [ "${#faltan[@]}" -gt 0 ]; then
-  echo "::error::faltan assets de la release: ${faltan[*]}" >&2
-fi
-if [ "${#sobran[@]}" -gt 0 ]; then
-  echo "::error::assets inesperados en la release: ${sobran[*]}" >&2
-fi
-if [ "${#faltan[@]}" -gt 0 ] || [ "${#sobran[@]}" -gt 0 ]; then
+# ¿Release con manifiesto o anterior a él? Las antiguas se verifican igual —
+# firmas y checksums de los paquetes — pero sin inventarles ficheros.
+if [ "$(ordenar "${presentes[@]}")" = "$(ordenar "${ESPERADOS[@]}" "${COMPANEROS[@]}")" ]; then
+  MODO="manifiesto"
+elif [ "$(ordenar "${presentes[@]}")" = "$(ordenar "${ESPERADOS[@]}")" ]; then
+  MODO="legacy"
+  echo "⚠ release anterior al manifiesto firmado: se verifican sus 12 assets,"
+  echo "  pero no lleva manifest.json, el verificador ni la clave pública."
+else
+  faltan=()
+  sobran=()
+  for nombre in "${ESPERADOS[@]}" "${COMPANEROS[@]}"; do
+    [ -f "$DIR/$nombre" ] || faltan+=("$nombre")
+  done
+  for nombre in "${presentes[@]}"; do
+    if ! printf '%s\n' "${ESPERADOS[@]}" "${COMPANEROS[@]}" | grep -qxF "$nombre"; then
+      sobran+=("$nombre")
+    fi
+  done
+  # Un `[ ... ] && echo` colgado bajo `set -e` cortaría el script cuando el
+  # primer conjunto está vacío y se perdería el segundo mensaje.
+  if [ "${#faltan[@]}" -gt 0 ]; then
+    echo "::error::faltan assets de la release: ${faltan[*]}" >&2
+  fi
+  if [ "${#sobran[@]}" -gt 0 ]; then
+    echo "::error::assets inesperados en la release: ${sobran[*]}" >&2
+  fi
+  echo "::error::el juego de assets no es ni el completo (17) ni el histórico de 12." >&2
   exit 1
 fi
 
@@ -143,4 +164,11 @@ verificar_formato "AppImage" "$APPIMAGE" "SHA256SUMS.appimage"
 verificar_formato "Flatpak" "$FLATPAK" "SHA256SUMS.flatpak"
 verificar_formato ".exe" "$EXE" "SHA256SUMS.windows"
 
-echo "✅ release $VERSION: 12 assets, firmas y checksums verificados con $FPR"
+# 4) El manifiesto, si la release lo trae: que su firma verifique y que su
+#    contenido coincida con lo descargado, fichero a fichero.
+if [ "$MODO" = "manifiesto" ]; then
+  gpg --homedir "$JAULA" --verify "$DIR/manifest.json.asc" "$DIR/manifest.json"
+  "$PYBIN" scripts/comprobar_manifest.py "$DIR"
+fi
+
+echo "✅ release $VERSION: ${#presentes[@]} assets, firmas y checksums verificados con $FPR"

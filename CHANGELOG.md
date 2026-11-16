@@ -11,6 +11,14 @@ siguiente corte.
 
 ### Añadido
 
+- **La release lleva un manifiesto firmado** (`manifest.json` + `.asc`, 17
+  assets en total). Una sola lista con tag, versión, commit, huella de la clave
+  y el `sha256` y tamaño de cada asset, firmada con la misma clave que los
+  paquetes. La release incluye además `verificar_release.sh`,
+  `comprobar_manifest.py` y `catflip-release.asc`, así que se puede repetir la
+  verificación sin clonar el repo. `scripts/verificar_release.sh` verifica el
+  manifiesto y acepta las releases anteriores con sus 12 assets y un aviso:
+  las publicadas no se reescriben.
 - **El cron vigila dos cosas más.** `pip-audit` sobre `requirements.txt` (lo que
   se empaqueta) y `scripts/revisar_caducidad_clave.py`, que avisa 30 días antes
   de que caduque la clave de firma. Antes, una dependencia con CVE o una clave

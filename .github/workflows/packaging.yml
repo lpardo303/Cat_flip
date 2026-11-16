@@ -326,6 +326,44 @@ jobs:
         with:
           path: artifacts
 
+      # El manifiesto necesita el repo (versión, huella, commit) y la clave para
+      # firmarse. Es el único job de escritura que la importa además de los
+      # builds, y con eso el borrador sale con la lista firmada de lo que lleva.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Copia el verificador y la clave pública
+        run: |
+          cp scripts/verificar_release.sh verificar_release.sh
+          cp scripts/comprobar_manifest.py comprobar_manifest.py
+          cp packaging/gpg/catflip-release.asc catflip-release.asc
+
+      - name: Importa la clave de firma
+        env:
+          GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
+        run: |
+          if [ -z "$GPG_SIGNING_KEY" ]; then
+            echo "::error::Falta el secreto GPG_SIGNING_KEY (clave privada armored de packaging/gpg/FINGERPRINT)"
+            exit 1
+          fi
+          echo "$GPG_SIGNING_KEY" | gpg --batch --import
+
+      - name: Manifiesto de la release y su firma
+        run: |
+          python3 scripts/generar_manifest.py --salida manifest.json \
+            artifacts/appimage/*.AppImage \
+            artifacts/appimage/*.AppImage.asc \
+            artifacts/appimage/SHA256SUMS.appimage \
+            artifacts/appimage/SHA256SUMS.appimage.asc \
+            artifacts/flatpak/*.flatpak \
+            artifacts/flatpak/*.flatpak.asc \
+            artifacts/windows/*.exe \
+            artifacts/windows/*.exe.asc \
+            artifacts/windows/SHA256SUMS.windows \
+            artifacts/windows/SHA256SUMS.windows.asc \
+            verificar_release.sh comprobar_manifest.py catflip-release.asc
+          gpg --batch --yes --armor --detach-sign --output manifest.json.asc manifest.json
+          gpg --verify manifest.json.asc manifest.json
+
       - name: Prepara el borrador (si no existe) y sube los artefactos
         env:
           GH_TOKEN: ${{ github.token }}
@@ -370,6 +408,26 @@ jobs:
             artifacts/windows/*.exe.asc
             artifacts/windows/SHA256SUMS.windows
             artifacts/windows/SHA256SUMS.windows.asc
+            manifest.json
+            manifest.json.asc
+            verificar_release.sh
+            comprobar_manifest.py
+            catflip-release.asc
+          )
+          # Los paquetes son lo que se compara en un rerun. El manifiesto y sus
+          # acompañantes no: llevan la fecha de firma y no se reescriben si la
+          # release ya está publicada.
+          COMPARABLES=(
+            artifacts/appimage/*.AppImage
+            artifacts/appimage/*.AppImage.asc
+            artifacts/appimage/SHA256SUMS.appimage
+            artifacts/appimage/SHA256SUMS.appimage.asc
+            artifacts/flatpak/*.flatpak
+            artifacts/flatpak/*.flatpak.asc
+            artifacts/windows/*.exe
+            artifacts/windows/*.exe.asc
+            artifacts/windows/SHA256SUMS.windows
+            artifacts/windows/SHA256SUMS.windows.asc
           )
           if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
             if [ "$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft)" != "true" ]; then
@@ -379,13 +437,25 @@ jobs:
               rm -rf publicado && mkdir publicado
               (cd publicado && gh release download "$GITHUB_REF_NAME" --dir . > /dev/null)
               diferentes=0
-              for f in "${FICHEROS[@]}"; do
+              for f in "${COMPARABLES[@]}"; do
                 if ! cmp -s "$f" "publicado/$(basename "$f")"; then
                   echo "  ✗ difiere: $(basename "$f")"
                   diferentes=1
                 fi
               done
               if [ "$diferentes" = 0 ]; then
+                # Mismos paquetes: solo vale si la release ya lleva el
+                # manifiesto. Si es anterior, no se le añade nada a una
+                # release publicada: se publica una versión nueva.
+                for nombre in manifest.json manifest.json.asc verificar_release.sh \
+                  comprobar_manifest.py catflip-release.asc; do
+                  if [ ! -f "publicado/$nombre" ]; then
+                    echo "::error::La release $GITHUB_REF_NAME está publicada, sus paquetes" \
+                      "coinciden, pero le falta $nombre. No se añade a una release ya" \
+                      "publicada: publica una versión nueva." >&2
+                    exit 1
+                  fi
+                done
                 echo "✓ $GITHUB_REF_NAME ya está publicada con exactamente estos assets:" \
                   "no se toca nada"
                 exit 0

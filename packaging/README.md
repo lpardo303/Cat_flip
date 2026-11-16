@@ -294,7 +294,10 @@ aparecer, hay que reactivarlo en la pestaña Actions.
   que nadie comprobaba. Todo lo anterior verifica sobre `dist/`, así que un
   asset subido truncado o un renombrado roto dejaba una release mal publicada
   con la CI en verde. Este job **descarga los assets publicados** y ejecuta
-  `scripts/verificar_release.sh release`: juego exacto de 12 assets, las 3
+  `scripts/verificar_release.sh release`: juego exacto de assets (17 desde el
+  manifiesto: los 12 de siempre más `manifest.json`, su firma, el verificador,
+  el comprobador y la clave pública; las releases anteriores se aceptan con
+  sus 12 y un aviso, porque no se reescriben), las 3
   firmas y los 3 `SHA256SUMS.*.asc` en una jaula vacía que solo importa
   `packaging/gpg/catflip-release.asc` (exigiendo además la huella de
   `FINGERPRINT`), y `sha256sum -c` de cada `SHA256SUMS.*`. Después arranca el
@@ -320,6 +323,17 @@ aparecer, hay que reactivarlo en la pestaña Actions.
 - **publicar** (solo en tag, después de las dos verificaciones): quita el
   borrador con `gh release edit --draft=false --latest`. Atado a
   `refs/tags/`, así que una verificación manual nunca publica nada.
+- **El manifiesto firmado** (`manifest.json` + `.asc`): los `SHA256SUMS.*`
+  están repartidos por formato y no dicen nada del conjunto. El manifiesto es
+  una sola lista —tag, versión, commit, huella de la clave, cada asset con su
+  `sha256` y su tamaño— firmada con la misma clave que los paquetes, y en la
+  release viajan también `verificar_release.sh`, `comprobar_manifest.py` y
+  `catflip-release.asc`: con eso cualquiera puede repetir la verificación sin
+  clonar el repo. Lo genera el job `release` (`scripts/generar_manifest.py`) y
+  lo comprueba `scripts/comprobar_manifest.py`, que exige que las hashes
+  coincidan, que la lista sea exactamente lo descargado y que la huella sea la
+  versionada. Es determinista (usa la fecha del commit, no el reloj), así que un
+  rerun del mismo tag produce el mismo fichero.
 - **Atestación de build (provenance)**: cada job de build atestigua el paquete
   final con `actions/attest-build-provenance` (`id-token: write` +
   `attestations: write`; no hay clave que guardar) y `verificar-release` lo
