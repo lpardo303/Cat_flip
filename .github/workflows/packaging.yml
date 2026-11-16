@@ -147,7 +147,11 @@ jobs:
       contents: read
       id-token: write
       attestations: write
-    timeout-minutes: 25
+    # El smoke de este job depende de Flathub: 19 s en el dispatch de
+    # 43926902589 y 17,0 min en el tag de v1.6.1 (job entero: 21,6 min). Con el
+    # tope de 25 min quedaban 3,4 min de margen y una descarga lenta habría
+    # matado un tag bueno. 40 min sigue cortando un cuelgue real.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
