@@ -414,7 +414,9 @@ jobs:
   # dice si el problema sigue vivo. Ver scripts/avisar_cron.py.
   #
   # Solo `schedule`: un `workflow_dispatch` lo lanza alguien que ya está
-  # mirando, y en un tag el fallo se ve en la release que no aparece.
+  # mirando. Un tag que falla tiene sus propios jobs (`avisar-fallo-tag` y
+  # `cerrar-aviso-tag`), porque un tag rojo deja el tag creado y la release sin
+  # publicar, y eso tampoco lo mira nadie.
   avisar-fallo:
     name: Avisa del fallo del cron
     if: failure() && github.event_name == 'schedule'
@@ -463,3 +465,79 @@ jobs:
             flatpak=${{ needs.flatpak.result }},
             windows=${{ needs.windows.result }}
         run: python3 scripts/avisar_cron.py --ok
+
+  # Un tag en rojo deja el tag creado, la release sin publicar (o en borrador,
+  # que no la ve nadie) y, hasta ahora, ni un aviso: lo único que quedaba era
+  # un run en Actions. Mismo mecanismo que el cron, con título propio para no
+  # mezclar dos fallos distintos. `needs` incluye `release`, `verificar-release`
+  # y `publicar`: un fallo al subir assets o al verificar también es un fallo de
+  # publicación.
+  avisar-fallo-tag:
+    name: Avisa del fallo del tag
+    if: failure() && startsWith(github.ref, 'refs/tags/')
+    needs: [appimage, flatpak, windows, release, verificar-release, publicar]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Abre o actualiza el issue del tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULTADOS: >-
+            appimage=${{ needs.appimage.result }},
+            flatpak=${{ needs.flatpak.result }},
+            windows=${{ needs.windows.result }},
+            release=${{ needs.release.result }},
+            verificar=${{ needs.verificar-release.result }},
+            publicar=${{ needs.publicar.result }}
+        run: python3 scripts/avisar_cron.py --tag
+
+  # Y el reverso: si un tag vuelve a salir bien de punta a punta, su issue se
+  # cierra. `success()` exige que los seis jobs hayan ido bien, así que un tag
+  # que publicó pero falló al verificar no cierra nada.
+  cerrar-aviso-tag:
+    name: Cierra el aviso del tag
+    if: success() && startsWith(github.ref, 'refs/tags/')
+    needs: [appimage, flatpak, windows, release, verificar-release, publicar]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Cierra el issue del tag si estaba abierto
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULTADOS: >-
+            appimage=${{ needs.appimage.result }},
+            flatpak=${{ needs.flatpak.result }},
+            windows=${{ needs.windows.result }},
+            release=${{ needs.release.result }},
+            verificar=${{ needs.verificar-release.result }},
+            publicar=${{ needs.publicar.result }}
+        run: python3 scripts/avisar_cron.py --ok --tag
+
+  # Desde que la release nace en borrador, un tag que no pasa la verificación
+  # deja un borrador invisible que nadie borra a mano. El cron limpia los que
+  # llevan más de una semana: un borrador no tiene descargas y sus assets se
+  # reconstruyen desde el tag, así que borrarlo no pierde nada del repo.
+  limpiar-borradores:
+    name: Limpia borradores abandonados
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Borra los borradores de más de 7 días
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/limpiar_borradores.py
