@@ -260,6 +260,34 @@ aparecer, hay que reactivarlo en la pestaña Actions.
 - **publicar** (solo en tag, después de `verificar-release`): quita el
   borrador con `gh release edit --draft=false --latest`. Atado a
   `refs/tags/`, así que una verificación manual nunca publica nada.
+
+### El camino de fallo, probado de verdad
+
+Que una release que no pasa `verificar-release` **se queda en borrador y nunca
+se publica** no es una suposición: se comprobó con un tag desechable, un
+`v0.0.0-test` que se borró después junto con su release y su rama.
+
+Cómo se provocó: el build ya compara tag y `package.json` (un tag con otra
+versión ni llega a `release`: los tres jobs mueren con `tag X ≠ package.json
+Y`), así que el fallo tenía que ser del tramo de la release. En una rama que
+no se mergeó, `package.json` a `0.0.0-test` para que el tag casara, y una línea
+menos en el `gh release upload` (`SHA256SUMS.windows.asc`), que es justo el
+«renombrado roto» contra el que existe el juego exacto de assets.
+
+Resultado del run (43920349002):
+
+| Job | Resultado |
+| --- | --- |
+| AppImage / Flatpak / `.exe` firmados | success |
+| Prepara el borrador con los paquetes | success — release con **`draft: true`**, `published_at: null`, **11 assets** |
+| Verifica la release | **failure** — `##[error]faltan assets de la release: SHA256SUMS.windows.asc` |
+| Publica la release verificada | **skipped** |
+
+Y lo que importa: `releases/latest` siguió siendo la release anterior durante y
+después del experimento, y `GET /releases/tags/v0.0.0-test` daba **404**
+mientras era borrador (por eso la verificación baja del listado y no de ese
+endpoint). Si la verificación falla, no hay release visible que arreglar: se
+borra el borrador o se corta otra versión.
 - **Firma ostree del Flatpak**: el smoke del job `flatpak` usa
   `--exigir-firma-ostree`, que importa el bundle a un repo temporal con una
   jaula que solo tiene la pública versionada y exige `Good signature`. Sin
