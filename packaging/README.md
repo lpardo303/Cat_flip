@@ -238,6 +238,19 @@ aparecer, hay que reactivarlo en la pestaña Actions.
   últimos 100: así sigue encontrándolo con el repo crecido. Un
   `workflow_dispatch` no dispara ni el aviso ni el cierre: quien lo lanza ya
   está mirando.
+- **avisar-fallo-tag** / **cerrar-aviso-tag** (solo en tag): un tag en rojo
+  dejaba el tag creado, la release sin publicar y **ningún aviso**; lo único
+  que quedaba era un run en Actions. Mismo `scripts/avisar_cron.py` con `--tag`,
+  título propio (`Fallo al publicar el tag vX.Y.Z`, para no mezclar dos tags) y
+  `needs` con los seis jobs: un fallo al subir assets, al verificar o al
+  publicar también cuenta. `cerrar-aviso-tag` exige `success()` de esos seis,
+  así que un tag que publicó pero falló al verificar no cierra nada.
+- **limpiar-borradores** (solo en cron): desde que la release nace en borrador,
+  un tag que no pasa la verificación deja un borrador invisible que nadie borra
+  a mano. `scripts/limpiar_borradores.py` lista las releases, se queda con los
+  borradores de 7 días o más y los borra (`DIAS_BORRADOR` para cambiarlo,
+  `--dry-run` para listar sin tocar). Un borrador no tiene descargas y sus
+  assets se reconstruyen desde el tag.
 - **verificar-release** (solo en tag, después de `release`): el último tramo
   que nadie comprobaba. Todo lo anterior verifica sobre `dist/`, así que un
   asset subido truncado o un renombrado roto dejaba una release mal publicada

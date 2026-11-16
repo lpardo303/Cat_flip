@@ -9,7 +9,20 @@ siguiente corte.
 
 ## [Sin publicar]
 
-_(nada todavía)_
+### Añadido
+
+- **Un tag en rojo ya no falla en silencio.** El aviso por issue existía solo
+  para el cron semanal: si un tag no publicaba (build roto, verificación en
+  rojo), quedaba el tag creado, la release sin publicar y ningún aviso. Ahora
+  `avisar-fallo-tag` abre o comenta un issue con el tag en el título
+  (`Fallo al publicar el tag vX.Y.Z`) y `cerrar-aviso-tag` lo cierra cuando ese
+  tag vuelve a salir bien de punta a punta. Ambos usan el mismo
+  `scripts/avisar_cron.py`, ahora con `--tag`.
+- **Los borradores abandonados se limpian solos.** Con el flujo en borrador, un
+  tag que no pasa la verificación deja una release en borrador invisible que
+  nadie borra a mano. El job `limpiar-borradores` (solo cron) borra los que
+  llevan 7 días o más: un borrador no tiene descargas y sus assets se
+  reconstruyen desde el tag.
 
 ## [1.6.1] — 2026-11-16
 
