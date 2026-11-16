@@ -292,6 +292,24 @@ jobs:
     needs: [appimage, flatpak, windows]
     runs-on: ubuntu-latest
     steps:
+      # Publicar desde una rama sería publicar código que no está en main: el
+      # repo no diría de dónde salió el binario. `compare` responde si el commit
+      # del tag es ancestro de main (`behind`/`identical`) o no.
+      - name: Comprueba que el tag sale de main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          estado="$(gh api "repos/$GITHUB_REPOSITORY/compare/main...$GITHUB_REF_NAME" --jq .status)"
+          case "$estado" in
+            behind | identical) echo "✓ $GITHUB_REF_NAME está en main ($estado)" ;;
+            *)
+              echo "::error::El tag $GITHUB_REF_NAME no está en main (compare: $estado):" \
+                "no se publica lo que no está en main." >&2
+              exit 1
+              ;;
+          esac
+
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           path: artifacts
@@ -315,40 +333,60 @@ jobs:
           # La release nace en BORRADOR: los assets no son visibles hasta que
           # `publicar` los da por buenos. Un asset truncado no llega a quien
           # descarga porque antes lo verifica `verificar-release`.
-          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
-            # Un rerun no debe reescribir una release ya publicada: `--clobber`
-            # cambiaría ficheros que alguien ya descargó y verificó.
-            if [ "$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft)" != "true" ]; then
-              echo "::error::La release $GITHUB_REF_NAME ya está publicada; no se" \
-                "tocan sus assets. Publica una versión nueva." >&2
-              exit 1
-            fi
-            echo "→ el borrador $GITHUB_REF_NAME ya existe: se reemplazan sus assets"
-          else
-            gh release create "$GITHUB_REF_NAME" --draft --generate-notes
-          fi
+          # Una sola lista para subir y para comparar: si divergen, la
+          # comprobación de idempotencia diría que todo coincide sin haberlo
+          # mirado.
           # Solo ficheros y sin duplicados: artifacts/flatpak/ también trae el
           # directorio repo/ (el ostree firmado, que sí queda en el artifact del
           # run) y los assets de una release solo aceptan ficheros con nombre
           # único. `*.flatpak` ya cubre SHA256SUMS.flatpak y `*.flatpak.asc`
           # cubre SHA256SUMS.flatpak.asc: añadirlos aparte duplicaría. En
           # windows NO hay esa casualidad (SHA256SUMS.windows no acaba en
-          # .exe), así que sus checksums se suben aparte: sin estas dos
-          # líneas la release sale sin SHA256SUMS.windows(.asc). En appimage
-          # los ficheros se listan uno a uno a propósito: con `*` también
-          # entraba cualquier carpeta que dejara el smoke y gh moría al
-          # intentar subirla (el squashfs-root de 1.5.1).
-          gh release upload "$GITHUB_REF_NAME" --clobber \
-            artifacts/appimage/*.AppImage \
-            artifacts/appimage/*.AppImage.asc \
-            artifacts/appimage/SHA256SUMS.appimage \
-            artifacts/appimage/SHA256SUMS.appimage.asc \
-            artifacts/flatpak/*.flatpak \
-            artifacts/flatpak/*.flatpak.asc \
-            artifacts/windows/*.exe \
-            artifacts/windows/*.exe.asc \
-            artifacts/windows/SHA256SUMS.windows \
+          # .exe), así que sus checksums van aparte en la lista: sin ellos la
+          # release sale sin SHA256SUMS.windows(.asc). En appimage los ficheros
+          # se listan uno a uno a propósito: con `*` también entraba cualquier
+          # carpeta que dejara el smoke y gh moría al intentar subirla (el
+          # squashfs-root de 1.5.1).
+          FICHEROS=(
+            artifacts/appimage/*.AppImage
+            artifacts/appimage/*.AppImage.asc
+            artifacts/appimage/SHA256SUMS.appimage
+            artifacts/appimage/SHA256SUMS.appimage.asc
+            artifacts/flatpak/*.flatpak
+            artifacts/flatpak/*.flatpak.asc
+            artifacts/windows/*.exe
+            artifacts/windows/*.exe.asc
+            artifacts/windows/SHA256SUMS.windows
             artifacts/windows/SHA256SUMS.windows.asc
+          )
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            if [ "$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft)" != "true" ]; then
+              # Ya publicada: un rerun solo vale si este build produce los
+              # MISMOS bytes. Reintentar tras un fallo de red deja de fallar;
+              # reescribir lo que alguien ya descargó y verificó, no.
+              rm -rf publicado && mkdir publicado
+              (cd publicado && gh release download "$GITHUB_REF_NAME" --dir . > /dev/null)
+              diferentes=0
+              for f in "${FICHEROS[@]}"; do
+                if ! cmp -s "$f" "publicado/$(basename "$f")"; then
+                  echo "  ✗ difiere: $(basename "$f")"
+                  diferentes=1
+                fi
+              done
+              if [ "$diferentes" = 0 ]; then
+                echo "✓ $GITHUB_REF_NAME ya está publicada con exactamente estos assets:" \
+                  "no se toca nada"
+                exit 0
+              fi
+              echo "::error::La release $GITHUB_REF_NAME está publicada y este build produce" \
+                "assets distintos. No se reescribe: publica una versión nueva." >&2
+              exit 1
+            fi
+            echo "→ el borrador $GITHUB_REF_NAME ya existe: se reemplazan sus assets"
+          else
+            gh release create "$GITHUB_REF_NAME" --draft --generate-notes
+          fi
+          gh release upload "$GITHUB_REF_NAME" --clobber "${FICHEROS[@]}"
 
   # Lo único que nadie comprobaba era la release YA PUBLICADA. Todo lo anterior
   # verifica sobre `dist/`: si un asset se sube truncado, si el renombrado del

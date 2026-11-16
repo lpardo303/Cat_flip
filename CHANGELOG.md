@@ -11,6 +11,14 @@ siguiente corte.
 
 ### Añadido
 
+- **El tag tiene que salir de `main`.** `release` comprueba con la API de
+  `compare` que el commit del tag es ancestro de `main` (`behind`/`identical`)
+  antes de subir nada: publicar desde una rama sería publicar código que el
+  repo no dice de dónde salió.
+- **Un rerun sobre una release publicada ya no falla en seco.** Si los assets
+  del build coinciden byte a byte con los publicados, el job sale verde sin
+  tocar nada (el caso del reintento tras un fallo de red); si difieren, falla
+  diciendo qué fichero cambia. Sigue sin reescribirse una release publicada.
 - **Se ejecuta lo que se descarga, no solo lo que se construye.** El `.exe`
   publicado solo pasaba firmas y checksums, y la firma ostree del Flatpak se
   comprobaba en el build. Ahora `verificar-release-windows` baja el `.exe` de la
