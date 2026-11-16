@@ -115,6 +115,16 @@ gpg --verify dist/flatpak/CatFlip-1.0.0.flatpak.asc dist/flatpak/CatFlip-1.0.0.f
 flatpak install --user --bundle dist/flatpak/CatFlip-1.0.0.flatpak
 ```
 
+Desde la release 1.6.2 los paquetes llevan además **atestación de build**, que
+se comprueba sin tocar la clave GPG y prueba qué workflow y qué commit los
+produjo:
+
+```bash
+gh attestation verify CatFlip-1.6.2-x86_64.AppImage \
+  --repo lpardo303/Cat_flip \
+  --signer-workflow lpardo303/Cat_flip/.github/workflows/packaging.yml
+```
+
 Al arrancar cualquiera de los tres formatos, el binario levanta el
 servidor y **abre la URL en tu navegador por defecto** en cuanto el
 puerto responde (hasta 30 s de espera). Lo hace `openbrowser.py`, junto
@@ -273,6 +283,15 @@ aparecer, hay que reactivarlo en la pestaña Actions.
 - **publicar** (solo en tag, después de `verificar-release`): quita el
   borrador con `gh release edit --draft=false --latest`. Atado a
   `refs/tags/`, así que una verificación manual nunca publica nada.
+- **Atestación de build (provenance)**: cada job de build atestigua el paquete
+  final con `actions/attest-build-provenance` (`id-token: write` +
+  `attestations: write`; no hay clave que guardar) y `verificar-release` lo
+  comprueba con `gh attestation verify --signer-workflow packaging.yml`. La
+  firma GPG dice «lo firmé yo»; la atestación dice «salió de este repositorio,
+  este workflow y este commit», que es lo que distingue un asset sustituido por
+  alguien con la clave de uno legítimo. Las releases anteriores a 1.6.2 no
+  tienen atestaciones: para reverificarlas, el dispatch acepta
+  `exigir_atestacion: false` (y lo dice en el log).
 
 ### El aviso del cron, comprobado
 
