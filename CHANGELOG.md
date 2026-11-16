@@ -9,6 +9,18 @@ siguiente corte.
 
 ## [Sin publicar]
 
+### Conocido
+
+- **La release v1.6.0 lleva 17 ficheros de `pyarrow/tests/` dentro del
+  AppImage.** Se construyó antes del filtro `_sobra` (PR #92), y la verificación
+  manual de ese tag (`workflow_dispatch` con `tag: v1.6.0`) lo destapó: las
+  firmas y los `SHA256SUMS` de la release son correctos, pero el bundle trae
+  fixtures de test que no se distribuyen. **Los assets de una release publicada
+  no se reescriben** —quien ya descargó y verificó tendría otros bytes con la
+  misma firma, otro `SHA256SUMS` y un tag que ya no corresponde a un build de su
+  propio código—: el filtro sale en la próxima versión y el aviso queda en las
+  notas de v1.6.0.
+
 ### Añadido
 
 - **Se publica solo lo que ya se verificó.** El job `release` creaba la

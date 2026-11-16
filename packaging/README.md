@@ -289,6 +289,27 @@ El binario se enlaza contra el glibc del runner (`ubuntu-latest`), igual que en
 local contra el del host (2.44). Bajar el suelo de compatibilidad (p. ej.
 Ubuntu 22.04) exigiría construir en un contenedor antiguo.
 
+## Releases publicadas: no se reescriben
+
+Una release publicada es **inmutable para el proyecto**. `release` falla si el
+tag ya está publicado, y los assets no se reemplazan aunque tengan un defecto
+conocido: quien ya descargó y verificó un fichero tendría otros bytes con la
+misma firma y otro `SHA256SUMS`, y el tag dejaría de corresponder a un build de
+su propio código (los filtros del `.spec` viven en `main`, no en el tag).
+
+Por eso el criterio es: el defecto se arregla en la **siguiente** versión y la
+release afectada se queda con un aviso en sus notas. Caso real: v1.6.0 lleva 17
+ficheros de `pyarrow/tests/` dentro del AppImage (el filtro llegó en el PR #92,
+después del tag); las firmas y checksums de ese corte son válidos y no se
+tocaron.
+
+Sólo un problema de seguridad justificaría tocar una release publicada, y
+entonces se hace explícito y completo: reconstruir con el mismo código + el
+arreglo, re-firmar (`packaging/sign.sh`), regenerar `SHA256SUMS.*` y sus `.asc`,
+subir con `gh release upload --clobber`, y dejar en las notas los SHA-256
+anteriores y nuevos más la entrada del CHANGELOG. Nada de reemplazos
+silenciosos.
+
 ## Límites de esta iteración
 
 - **No publicado**: ni Flathub ni AppImageHub (la release de GitHub en tags
