@@ -284,6 +284,14 @@ aparecer, hay que reactivarlo en la pestaña Actions.
   publicar. Si falla, abre su propio issue con `scripts/avisar_cron.py` y
   `TITULO_PERSONALIZADO`. Detecta que un asset cambió en el alojamiento o que
   el binario dejó de arrancar.
+- **Cuánto tarda el smoke del Flatpak**: medido con la API sobre dos corridas
+  idénticas en pasos. En el tag de v1.6.1 (run 43910429952) el smoke tardó
+  **17,0 min** y el job **21,6 min**; en el dispatch de verificación
+  (43926902589) el mismo paso tardó **19 s** y el job **4,1 min**. La diferencia
+  está fuera del workflow (Flathub / red del runner), no en el bundle, así que
+  no se optimizó nada: se subió el tope del job de 25 a 40 min, porque con
+  21,6 min de máximo medido y 25 de tope una corrida lenta habría matado un tag
+  bueno. Si vuelve a acercarse al tope, el siguiente paso es cachear el runtime.
 - **limpiar-borradores** (solo en cron): desde que la release nace en borrador,
   un tag que no pasa la verificación deja un borrador invisible que nadie borra
   a mano. `scripts/limpiar_borradores.py` lista las releases, se queda con los

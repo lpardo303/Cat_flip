@@ -9,6 +9,13 @@ siguiente corte.
 
 ## [Sin publicar]
 
+### Cambiado
+
+- **El job del Flatpak tiene 40 min de tope en vez de 25.** El smoke medido en
+  el tag de v1.6.1 tardó 17,0 min (job: 21,6) y en un dispatch el mismo paso
+  19 s: la variación es de la red del runner, no del bundle. Con 25 min una
+  corrida lenta habría matado un tag bueno.
+
 ### Añadido
 
 - **La release lleva un manifiesto firmado** (`manifest.json` + `.asc`, 17
