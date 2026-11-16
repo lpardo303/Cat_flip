@@ -261,6 +261,31 @@ aparecer, hay que reactivarlo en la pestaña Actions.
   borrador con `gh release edit --draft=false --latest`. Atado a
   `refs/tags/`, así que una verificación manual nunca publica nada.
 
+### El aviso del cron, comprobado
+
+El cambio a release en borrador tocaba este workflow entero, así que el cron se
+comprobó en vez de suponerse:
+
+- **Corrida programada real** (run 43868690230, `event: schedule`, `main` en
+  `1e38412`, que ya trae el borrador): los tres builds en verde, **`cerrar-aviso`
+  en `success`**, y `release` / `verificar-release` / `publicar` en **`skipped`**.
+  Un cron no crea ni toca ninguna release, y el cierre del aviso sí se ejecuta.
+- **Ni tag ni dispatch disparan los avisos**: en el run del tag `v1.6.1` y en el
+  `workflow_dispatch` con `tag=v1.6.0`, `avisar-fallo` y `cerrar-aviso` salen
+  los dos en **`skipped`** — sus `if` exigen `event_name == 'schedule'`.
+- **El issue funciona en sus tres caminos**: simulando el fallo con
+  `scripts/avisar_cron.py` contra el repo real (`RESULTADOS=appimage=failure,
+  flatpak=success, windows=success`) se **reabrió** el issue cerrado y comentó
+  la corrida; una segunda simulación **comentó sin duplicar** (sigue habiendo un
+  solo issue con ese título, gracias a la búsqueda por título exacto); y `--ok`
+  con resultados verdes **comentó y cerró**. Otro `--ok` ya no hace nada
+  («el issue ya estaba cerrado»).
+
+Lo único que no se ha visto en vivo es `avisar-fallo` ejecutándose con un cron
+en rojo: haría falta romper un build en una corrida programada. Su `if` es la
+misma estructura que la de `cerrar-aviso` (probado hoy en verde) y el script
+tiene los tres caminos ejercitados.
+
 ### El camino de fallo, probado de verdad
 
 Que una release que no pasa `verificar-release` **se queda en borrador y nunca
