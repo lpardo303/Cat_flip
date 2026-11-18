@@ -87,6 +87,18 @@ jobs:
           cp release/*.AppImage dist/appimage/
           scripts/smoke_package.sh appimage
 
+      # Al revés que el cron, esta corrida solo corre una vez al mes: un issue
+      # de fallo sin cerrar no dice si sigue roto o se arregló. Con la corrida
+      # en verde se comenta y se cierra (si no hay issue, no hace nada).
+      - name: Cierra el aviso si vuelve a ir bien
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          TITULO_PERSONALIZADO: La reverificación de la última release ha fallado
+          RESULTADOS: tag=${{ steps.ultima.outputs.tag }}
+        run: python3 scripts/avisar_cron.py --ok
+
       # Esta corrida avisa por su cuenta: no es el cron de packaging, así que
       # usa el mismo script con título propio. Abre, comenta o reabre el issue
       # y no duplica.
