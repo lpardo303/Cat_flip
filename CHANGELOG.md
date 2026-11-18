@@ -9,6 +9,13 @@ siguiente corte.
 
 ## [Sin publicar]
 
+### Solucionado
+
+- **La reverificación mensual se habría puesto roja sola.** Verificaba con el
+  `package.json` de `main`; en cuanto `main` va por delante de la última release
+  (versión subida antes del tag) la comprobación «tag == package.json» falla sin
+  nada roto. Ahora los scripts salen de `main` y la versión, del tag.
+
 ### Cambiado
 
 - **El job del Flatpak tiene 40 min de tope en vez de 25.** El smoke medido en

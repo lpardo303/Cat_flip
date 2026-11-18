@@ -283,7 +283,22 @@ aparecer, hay que reactivarlo en la pestaña Actions.
   —12 assets, firmas, checksums y smoke del AppImage— semanas después de
   publicar. Si falla, abre su propio issue con `scripts/avisar_cron.py` y
   `TITULO_PERSONALIZADO`. Detecta que un asset cambió en el alojamiento o que
-  el binario dejó de arrancar.
+  el binario dejó de arrancar. **Probado a mano** contra `v1.6.1` real
+  (`workflow_dispatch` → run 44304274291, verde): bajó los 12 assets,
+  `⚠ release anterior al manifiesto firmado` y `✅ release 1.6.1: 12 assets`,
+  y el AppImage descargado pasó el smoke completo (13 comprobaciones,
+  `current=1.6.1`). El smoke tardó 308 s porque el runner llegó con la cuota
+  anónima agotada y el backoff esperó 305 s al TTL de la caché de error: es el
+  comportamiento diseñado, no un cuelgue.
+  **Fallo latente que destapó esa prueba**: el workflow verificaba con el
+  `package.json` de `main`, así que en cuanto `main` va por delante de la
+  última release (versión subida antes del tag) la comprobación «tag ==
+  package.json» habría fallado cada mes sin nada roto. Ahora los scripts siguen
+  saliendo de `main` pero la versión se trae del tag (`git fetch --depth=1
+  origin refs/tags/$TAG` + `git checkout FETCH_HEAD -- package.json`). Probado
+  en el escenario exacto: rama desechable con `package.json` en `1.6.2` y
+  release `v1.6.1` → run 44305405945 verde, `→ package.json del tag v1.6.1:
+  "version": "1.6.1"` y `✅ release 1.6.1: 12 assets` (rama borrada después).
 - **Cuánto tarda el smoke del Flatpak**: medido con la API sobre dos corridas
   idénticas en pasos. En el tag de v1.6.1 (run 43910429952) el smoke tardó
   **17,0 min** y el job **21,6 min**; en el dispatch de verificación

@@ -61,6 +61,19 @@ jobs:
           TAG: ${{ steps.ultima.outputs.tag }}
         run: gh release download "$TAG" --dir release
 
+      # Los scripts salen de `main` a propósito (son los de hoy), pero la
+      # versión tiene que ser la DEL TAG: si `main` ya va por 1.6.2 y la última
+      # release es 1.6.1, `package.json` de `main` hace que la comprobación
+      # «tag == package.json» falle un mes sí y otro también sin nada roto, y
+      # los nombres esperados de los assets dejarían de cuadrar.
+      - name: Versión del tag que se verifica
+        env:
+          TAG: ${{ steps.ultima.outputs.tag }}
+        run: |
+          git fetch --depth=1 origin "refs/tags/$TAG"
+          git checkout FETCH_HEAD -- package.json
+          echo "→ package.json del tag $TAG: $(grep '"version"' package.json)"
+
       - name: Firmas, checksums y juego exacto de assets
         env:
           TAG: ${{ steps.ultima.outputs.tag }}
