@@ -11,6 +11,14 @@ siguiente corte.
 
 ### Solucionado
 
+- **La columna «Archivo de origen» ya no se trata como dato.** Un archivo
+  llamado `juan@x.com.csv` hacía que la consolidación ofreciera enmascarar esa
+  columna como email, `612345678.csv` como teléfono y `SN-001.csv` como
+  identificador: el nombre del archivo no es PII del dataset. Ahora las
+  sugerencias de PII y de tipo se calculan sobre el consolidado sin esa
+  columna; las columnas reales se siguen escaneando igual. Las reglas de
+  esquema no aplicaban (la consolidación las deja vacías), así que ahí no
+  había nada que excluir.
 - **«3 columnas comúnes» en el resumen de «Fusionar varios archivos».** El
   plural de «común» pierde la tilde: ahora dice «comunes» (y «1 columna
   común» en singular). `scripts/axe_check.mjs` falla si el resumen deja de

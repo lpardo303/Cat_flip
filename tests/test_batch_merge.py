@@ -298,6 +298,53 @@ def test_merge_template_exact_schema(client):
     assert df["Observaciones"].isna().all()      # sin datos → toda nula
 
 
+def test_source_column_never_offers_pii_suggestions(client):
+    """El nombre del archivo no es PII del dataset: «juan@x.com.csv» hacía
+    que se ofreciera enmascarar la columna de procedencia como email, y un
+    nombre telefónico la marcaba como teléfono. Las columnas reales del
+    archivo se siguen escaneando."""
+    emails = "juan@x.com.csv"
+    resp = merge(
+        client,
+        (emails, "Contacto\nana@x.com\nluis@x.com\n"),
+        ("ana@x.com.csv", "Contacto\nana@x.com\neva@x.com\n"),
+    )
+    assert resp.status_code == 200, resp.get_json()
+    j = resp.get_json()
+    sugeridas = [s["column"] for s in j["pii_suggestions"]]
+    assert COLUMNA_ORIGEN not in sugeridas
+    # la columna real con emails sí se marca (el escaneo no se apaga entero)
+    assert sugeridas == ["Contacto"]
+    assert j["pii_suggestions"][0]["kind"] == "email"
+
+
+@pytest.mark.parametrize(
+    "nombres",
+    [
+        ("612345678.csv", "699887766.csv"),
+        ("SN-001.csv", "SN-002.csv"),
+        ("2026-01-01_5.csv", "2026-02-02_7.csv"),
+    ],
+    ids=["phone", "id", "date_as_phone"],
+)
+def test_source_column_not_flagged_as_pii(client, nombres):
+    """Nombres que los detectores leerían como teléfono o identificador: sin la
+    exclusión, «Archivo de origen» salía en pii_suggestions."""
+    resp = merge(client, *((n, "X\n1\n2\n") for n in nombres))
+    assert resp.status_code == 200, resp.get_json()
+    assert resp.get_json()["pii_suggestions"] == []
+
+
+def test_source_column_never_offers_type_suggestions(client):
+    """Tampoco entra en el auto-mapeo de tipos, ni siquiera con nombres que
+    parecen números."""
+    resp = merge(client, ("123.csv", "X\n1\n2\n"), ("456.csv", "X\n3\n4\n"))
+    assert resp.status_code == 200, resp.get_json()
+    j = resp.get_json()
+    assert all(s["column"] != COLUMNA_ORIGEN for s in j["type_suggestions"])
+    assert j["type_suggestions"] == []
+
+
 def test_merge_without_source_column(client):
     """`add_source=0` apaga la procedencia: el consolidado queda igual que antes."""
     resp = merge(client, ("a.csv", A_CSV), ("b.csv", B_CSV), add_source="0")
