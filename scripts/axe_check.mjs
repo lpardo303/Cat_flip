@@ -165,6 +165,18 @@ try {
     await page.waitForSelector('#batchmerge-overlay.open');
     await page.waitForSelector('#bm-preview .bm-matrix', { timeout: 10000 });
     await runAxe(page, `modal fusionar-archivos (${theme})`);
+
+    // El resumen concuerda en número: aquí hay 2 columnas comunes (Fecha y
+    // Unidades). El plural de «común» no lleva tilde y el texto se colaba
+    // porque nadie lo miraba; con esto una regresión rompe la CI.
+    const resumen = await page.evaluate(
+      () => document.querySelector('#bm-preview .bm-stats').innerText,
+    );
+    if (!resumen.includes('2 columnas comunes de 3 en total')) {
+      console.log(`resumen fusionar: FALLO — "${resumen}"`);
+      results.push({ label: 'resumen-fusionar-plural', violations: [], error: resumen });
+      failures += 1;
+    }
     await page.evaluate(() => closeBatchMerge());
 
     // Modal de conectores demo (conectores mock: BigQuery/Snowflake/Webhook)

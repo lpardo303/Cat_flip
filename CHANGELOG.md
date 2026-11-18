@@ -11,6 +11,10 @@ siguiente corte.
 
 ### Solucionado
 
+- **«3 columnas comúnes» en el resumen de «Fusionar varios archivos».** El
+  plural de «común» pierde la tilde: ahora dice «comunes» (y «1 columna
+  común» en singular). `scripts/axe_check.mjs` falla si el resumen deja de
+  concordar, así que el texto ya no depende de que alguien lo lea.
 - **El aviso podía duplicar el issue.** `GET /search/issues` va con retraso: dos
   corridas seguidas creaban dos issues con el mismo título (pasó en la propia
   prueba: #113 y #114). Ahora, si la búsqueda no encuentra nada, se mira el
