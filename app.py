@@ -37,6 +37,7 @@ from connectors import (
 from operations import (
     OPS,
     NUL_REGEX,
+    COLUMNA_ORIGEN,
     consolidate_batch,
     detect_pii_columns,
     detect_type_suggestions,
@@ -581,6 +582,13 @@ def batch_merge():
     if not isinstance(first, list):
         return jsonify({"error": "`first` debe ser una lista JSON de columnas."}), 400
 
+    # Columna de procedencia: encendida salvo que se pida lo contrario, que es
+    # la excepción (quien consolida quiere saber de qué archivo viene cada fila).
+    add_source = (
+        str(request.form.get("add_source", "1")).strip().lower()
+        not in ("0", "false", "no", "off")
+    )
+
     template_file = _batch_template_file()
     if template_file is not None and not formats.is_readable(template_file.filename):
         return jsonify({"error": f"Formato de plantilla no soportado: {template_file.filename}. Usa {formats.read_plain()}."}), 400
@@ -610,7 +618,11 @@ def batch_merge():
 
     try:
         df, order = consolidate_batch(
-            dfs, first=first, rest=rest, template_columns=template_cols
+            dfs,
+            first=first,
+            rest=rest,
+            template_columns=template_cols,
+            source_names=names if add_source else None,
         )
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
@@ -618,6 +630,13 @@ def batch_merge():
     # El código generado reproduce la consolidación completa en un script
     # portátil: N lecturas + concat outer + alineación (paridad con exec).
     reads = "\n".join(f"df_{i} = {expr}" for i, expr in enumerate(exprs, start=1))
+    if add_source:
+        # Misma asignación que hace consolidate_batch: filename como literal JSON
+        # (lleva comillas y barras sin escapar) y el nombre de columna con repr.
+        reads += "\n" + "\n".join(
+            f"df_{i}[{COLUMNA_ORIGEN!r}] = {json.dumps(n, ensure_ascii=False)}"
+            for i, n in enumerate(names, start=1)
+        )
     concat = (
         "df = pd.concat(["
         + ", ".join(f"df_{i}" for i in range(1, len(exprs) + 1))
@@ -654,6 +673,7 @@ def batch_merge():
             "columns": int(df.shape[1]),
             # en modo plantilla lo que sobre del esquema maestro se descarta
             "dropped": [c for c in union_all if c not in set(order)],
+            "source_column": COLUMNA_ORIGEN if add_source else None,
         },
         "encodings": [n for n, e in zip(names, encodings) if e],
     })

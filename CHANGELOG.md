@@ -31,6 +31,15 @@ siguiente corte.
 
 ### Añadido
 
+- **«Fusionar varios archivos» marca de qué archivo viene cada fila.** La
+  consolidación antepone la columna `Archivo de origen` (marcada por defecto en
+  el modal, desmarcable) en los dos modos, también con plantilla, porque es
+  metadato de procedencia y no una columna del maestro. Sirve para ver una
+  anomalía en el consolidado y buscarla en el original: el grid la muestra y el
+  buscador filtra por ella. Si algún archivo ya trae una columna con ese nombre
+  la consolidación se detiene con un error que pide renombrarla, en vez de
+  pisarla. El script exportado la reproduce (`df_N['Archivo de origen'] = …`
+  antes del `concat`), así que la paridad con el código generado se mantiene.
 - **La release lleva un manifiesto firmado** (`manifest.json` + `.asc`, 17
   assets en total). Una sola lista con tag, versión, commit, huella de la clave
   y el `sha256` y tamaño de cada asset, firmada con la misma clave que los

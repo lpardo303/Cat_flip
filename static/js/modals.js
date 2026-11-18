@@ -729,6 +729,7 @@ function openBatchMerge(files) {
   document.getElementById('bm-template-summary').innerHTML = '';
   document.getElementById('bm-mode').value = 'dynamic';
   document.getElementById('bm-rest').value = 'append';
+  document.getElementById('bm-add-source').checked = true;  // procedencia por defecto
   toggleBatchMode();
   document.getElementById('bm-confirm').disabled = true;
   document.getElementById('batchmerge-overlay').classList.add('open');
@@ -865,6 +866,7 @@ async function confirmBatchMerge() {
   fd.append('rest', document.getElementById('bm-rest').value);
   const first = [...document.querySelectorAll('#bm-check input:checked')].map(i => i.value);
   fd.append('first', JSON.stringify(first));
+  fd.append('add_source', document.getElementById('bm-add-source').checked ? '1' : '0');
   const name = batchFiles[0].name + (batchFiles.length > 2 ? ' + ' + (batchFiles.length - 1) + ' archivos' : ' + ' + batchFiles[1].name);
   const done = await uploadBatchMerge(fd, name);
   if (done) closeBatchMerge();
