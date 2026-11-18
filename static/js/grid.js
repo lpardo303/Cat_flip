@@ -71,6 +71,20 @@ function closeColMenu() {
   activeColMenuCol = null;
 }
 
+function colMenuFilterValueItem(col) {
+  const valor = selectedCellValue(col);
+  if (valor === null) {
+    return `
+      <div class="col-menu-item disabled" aria-disabled="true" title="Haz clic en una celda de esta columna primero">
+        ${icon('filter')}<span>Filtrar por este valor</span>
+      </div>`;
+  }
+  return `
+    <div class="col-menu-item" onclick="handleColMenuAction('filter_value')" title="Filtrar por «${escapeHtml(valor)}»">
+      ${icon('filter')}<span>Filtrar por este valor</span>
+    </div>`;
+}
+
 function buildColMenuHtml(col, dtype) {
   const isText = (dtype === 'STR' || !['INT', 'FLOAT', 'DATE', 'BOOL'].includes(dtype));
   let html = `
@@ -85,6 +99,7 @@ function buildColMenuHtml(col, dtype) {
     <div class="col-menu-item" onclick="handleColMenuAction('filter')">
       ${icon('filter')}<span>Filtrar filas</span>
     </div>
+    ${colMenuFilterValueItem(col)}
   `;
 
   if (isText) {
@@ -201,8 +216,22 @@ function openColMenu(event, col) {
 
 function handleColMenuAction(action) {
   const targetCol = activeColMenuCol;
+  const valorCelda = action === 'filter_value' ? selectedCellValue(targetCol) : null;
   closeColMenu();
   if (!targetCol) return;
+
+  if (action === 'filter_value') {
+    // Sin valor no se inventa filtro: la celda nula o de otra columna no sirve.
+    if (valorCelda === null) {
+      toast('Selecciona una celda de esa columna para filtrar por su valor', 'info');
+      return;
+    }
+    const input = document.getElementById('ribbon-search');
+    if (input) input.value = valorCelda;
+    onSearchInput(valorCelda);
+    toast('Filtrando por «' + valorCelda + '»');
+    return;
+  }
 
   if (action === 'hide_column') {
     hiddenColumns.add(targetCol);
@@ -263,6 +292,32 @@ function armGridFontRecalib() {
   });
 }
 
+// ── CELDA SELECCIONADA — «Filtrar por este valor» del menú de columna ──
+// Un clic en una celda la marca y guarda su valor; el menú de ESA columna
+// ofrece filtrar por él sin pasar por el buscador. La selección sobrevive al
+// render (el builder la repinta) y se descarta cuando el dataset cambia.
+let selectedGridCell = null;  // {row: índice en data.data, col: nombre}
+
+function selectGridCell(td, row, col) {
+  selectedGridCell = { row, col };
+  document.querySelectorAll('#grid-tbody td.cell-selected')
+    .forEach(x => x.classList.remove('cell-selected'));
+  if (td) td.classList.add('cell-selected');
+}
+
+function selectedCellValue(col) {
+  const sel = selectedGridCell;
+  if (!sel || !col || sel.col !== col) return null;
+  const data = currentRawData;
+  if (!data || !Array.isArray(data.data) || !data.data[sel.row]) return null;
+  const idx = currentColumns.indexOf(col);
+  if (idx < 0) return null;
+  const v = data.data[sel.row][idx];
+  if (v === null || v === undefined) return null;
+  const texto = String(v);
+  return texto.trim() === '' ? null : texto;
+}
+
 // Celda de cabecera de una columna: nombre + badge de tipo + menú +
 // quality bar (idéntico al markup histórico; solo se añade title al
 // nombre para cuando el ancho calibrado lo recorte con ellipsis).
@@ -309,15 +364,20 @@ function makeRowBuilder(g) {
       const violRule = currentViolations.get(item.i + '\u0000' + currentColumns[idx]);
       const violTitle = violRule ? ' — incumple: ' + SV_RULE_LABELS[violRule] : '';
       // Bug 4: el backend envía JSON null para nulos reales de pandas (NaN)
+      const colName = currentColumns[idx];
+      const selCls = (selectedGridCell && selectedGridCell.row === item.i
+        && selectedGridCell.col === colName) ? ' cell-selected' : '';
+      const attrs = ` data-row="${item.i}" data-col="${escapeHtml(colName)}"`
+        + ` onclick="selectGridCell(this,${item.i},'${escapeColArg(colName)}')"`;
       if (cellVal === null || cellVal === undefined) {
         const nullCls = violRule ? 'cell-null-td cell-viol' : 'cell-null-td';
-        h += '<td class="' + nullCls + '"><span class="cell-null" title="Nulo real de pandas (NaN)' + violTitle + '">null</span></td>';
+        h += '<td class="' + nullCls + selCls + '"' + attrs + '><span class="cell-null" title="Nulo real de pandas (NaN)' + violTitle + '">null</span></td>';
         continue;
       }
       const escaped = escapeHtml(String(cellVal));
       const highlighted = g.query ? highlightEscaped(escaped, g.query) : escaped;
-      const violCls = violRule ? ' class="cell-viol"' : '';
-      h += '<td' + violCls + ' title="' + escaped + violTitle + '">' + highlighted + '</td>';
+      const violCls = violRule ? ' cell-viol' : '';
+      h += '<td class="' + violCls + selCls + '"' + attrs + ' title="' + escaped + violTitle + '">' + highlighted + '</td>';
     }
     if (R > 0) h += '<td class="col-spacer" colspan="' + R + '"></td>';
     return h + '</tr>';
@@ -521,6 +581,11 @@ function renderTable(data) {
   closeColMenu();
   currentRawData = data;
   currentColumns = data.columns || [];
+  // La selección apunta a una fila/columna del dataset anterior: si ya no
+  // existen, se descarta en vez de marcar una celda cualquiera.
+  if (selectedGridCell && !currentColumns.includes(selectedGridCell.col)) {
+    selectedGridCell = null;
+  }
   currentDtypes  = data.dtypes || {};
   const nulls     = data.nulls || {};
   const totalRows = data.total_rows || (data.shape ? data.shape[0] : 0) || (data.data ? data.data.length : 0);
