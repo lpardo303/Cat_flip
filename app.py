@@ -661,12 +661,20 @@ def batch_merge():
         for c in d.columns:
             if c not in union_all:
                 union_all.append(c)
+    # La procedencia es metadato, no un dato del usuario: un archivo llamado
+    # «juan@x.com.csv» ofrecería enmascarar la columna entera como email y
+    # «612345678.csv» se leería como teléfono (el sufijo de la extensión no
+    # frena al detector). Se sugiere sobre el df sin esa columna; las columnas
+    # reales del archivo se siguen mirando igual.
+    df_sugerencias = (
+        current_df.drop(columns=[COLUMNA_ORIGEN]) if add_source else current_df
+    )
     return jsonify({
         "success": True,
         "data": df_to_json(current_df),
         "code": code_log[-1],
-        "type_suggestions": detect_type_suggestions(current_df),
-        "pii_suggestions": detect_pii_columns(current_df),
+        "type_suggestions": detect_type_suggestions(df_sugerencias),
+        "pii_suggestions": detect_pii_columns(df_sugerencias),
         "merged": {
             "files": names,
             "rows": int(df.shape[0]),
