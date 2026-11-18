@@ -33,7 +33,10 @@ Variables de entorno:
     RESULTADOS           resumen de jobs, p. ej. "appimage=failure, …"
     TITULO_PERSONALIZADO título del aviso, para orígenes que no son cron ni tag
                          (lo usa la reverificación mensual); manda sobre los
-                         demás y se busca igual por título exacto
+                         demás y se busca igual por título exacto. Su presencia
+                         cambia también el texto del issue: este origen no tiene
+                         tag ni release que arreglar, sino un asset que dejó de
+                         verificar
 """
 import json
 import os
@@ -84,6 +87,22 @@ def buscar_issue(repo, titulo):
     for issue in api("GET", ruta).get("items", []):
         if issue.get("title") == titulo:
             return issue
+
+    # La búsqueda va con retraso: el issue que acaba de abrir otra corrida
+    # todavía no está indexado y esta abriría un duplicado. Pasó de verdad —dos
+    # simulaciones seguidas dejaron #113 y #114—, así que antes de crear nada se
+    # mira el listado REST, que sí es inmediato. Cinco páginas cubren los 500
+    # issues más recientes, donde vive el aviso; la búsqueda sigue siendo la
+    # primera porque no se corta a 500.
+    for pagina in range(1, 6):
+        items = api("GET", f"/repos/{repo}/issues?state=all&per_page=100&page={pagina}")
+        if not items:
+            break
+        for issue in items:
+            if "pull_request" in issue:
+                continue
+            if issue.get("title") == titulo:
+                return issue
     return None
 
 
@@ -101,7 +120,17 @@ def datos_corrida(repo):
     return detalle
 
 
-def texto_apertura(tag):
+def texto_apertura(tag, propio=False):
+    if propio:
+        # Reverificación mensual: no hay nada que publicar ni un tag a medias.
+        return [
+            "La corrida de reverificación de la última release ha fallado.",
+            "",
+            "Significa que lo que se descarga hoy ya no verifica: la firma, los",
+            "checksums, el juego de assets o el binario que no arranca. No hay",
+            "release que arreglar, hay que mirar el asset que cambió en el",
+            "alojamiento o la clave con la que se firmó.",
+        ]
     if tag:
         return [
             f"La publicación del tag `{tag}` no ha terminado: el tag existe, pero",
@@ -122,32 +151,37 @@ def texto_apertura(tag):
     ]
 
 
-def texto_cierre(tag):
+def texto_cierre(tag, propio=False):
+    if propio:
+        return "La reverificación de la última release ha vuelto a salir bien; se cierra."
     if tag:
         return f"El tag `{tag}` ya ha publicado su release; se cierra."
     return "La corrida programada ha vuelto a salir bien; se cierra."
 
 
-def texto_se_cierra(tag):
+def texto_se_cierra(tag, propio=False):
+    if propio:
+        return "Se cerrará solo cuando una reverificación vuelva a salir bien."
     if tag:
         return "Se cerrará solo cuando ese tag vuelva a salir bien."
     return "Se cerrará solo cuando una corrida programada vuelva a salir bien."
 
 
-def avisar_fallo(repo, titulo, tag):
+def avisar_fallo(repo, titulo, tag, propio=False):
     previo = buscar_issue(repo, titulo)
     detalle = datos_corrida(repo)
+    workflow = "reverificar-release" if propio else "packaging"
 
     if previo is None:
         cuerpo = "\n".join(
             [
-                *texto_apertura(tag),
+                *texto_apertura(tag, propio),
                 "",
                 *detalle,
                 "",
-                texto_se_cierra(tag),
+                texto_se_cierra(tag, propio),
                 "",
-                "_Abierto automáticamente por el workflow «packaging»._",
+                f"_Abierto automáticamente por el workflow «{workflow}»._",
             ]
         )
         api("POST", f"/repos/{repo}/issues", {"title": titulo, "body": cuerpo})
@@ -168,7 +202,7 @@ def avisar_fallo(repo, titulo, tag):
     return 0
 
 
-def cerrar_aviso(repo, titulo, tag):
+def cerrar_aviso(repo, titulo, tag, propio=False):
     previo = buscar_issue(repo, titulo)
     if previo is None:
         print("no hay issue de packaging: no hay nada que cerrar")
@@ -184,7 +218,7 @@ def cerrar_aviso(repo, titulo, tag):
         {
             "body": "\n".join(
                 [
-                    texto_cierre(tag),
+                    texto_cierre(tag, propio),
                     "",
                     *datos_corrida(repo),
                 ]
@@ -212,13 +246,11 @@ def main():
 
     # Un tercer origen (la reverificación mensual) trae su propio título por
     # variable: abrir/comentar/cerrar es idéntico, solo cambia el asunto.
-    titulo = (
-        os.environ.get("TITULO_PERSONALIZADO", "").strip()
-        or (TITULO_TAG.format(tag=tag) if tag else TITULO_CRON)
-    )
+    propio = os.environ.get("TITULO_PERSONALIZADO", "").strip()
+    titulo = propio or (TITULO_TAG.format(tag=tag) if tag else TITULO_CRON)
     if "--ok" in args:
-        return cerrar_aviso(repo, titulo, tag)
-    return avisar_fallo(repo, titulo, tag)
+        return cerrar_aviso(repo, titulo, tag, bool(propio))
+    return avisar_fallo(repo, titulo, tag, bool(propio))
 
 
 if __name__ == "__main__":

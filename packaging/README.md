@@ -387,6 +387,40 @@ comprobó en vez de suponerse:
   con resultados verdes **comentó y cerró**. Otro `--ok` ya no hace nada
   («el issue ya estaba cerrado»).
 
+### El aviso de la reverificación, probado contra el repo real
+
+`reverificar-release` es el tercer origen del aviso y usa el mismo script con
+`TITULO_PERSONALIZADO`. Se probó simulando el fallo contra el repo real
+(`GH_TOKEN`, `GITHUB_REPOSITORY`, `GITHUB_RUN_ID=44304274291`,
+`RESULTADOS=reverificar=failure (simulación: el run real fue verde)`), con el
+título `La reverificación de la última release ha fallado`:
+
+- **Primera pasada**: abrió el issue **#113** con el texto de este origen (no el
+  del cron: «lo que se descarga hoy ya no verifica…») y el pie «Abierto
+  automáticamente por el workflow «reverificar-release»».
+- **Segunda pasada: abrió un duplicado (#114).** Fallo real, no del test:
+  `GET /search/issues` va con retraso y no tenía indexado el issue que la
+  pasada anterior acababa de crear, así que `buscar_issue()` devolvía `None` y
+  se creaba otro. **Arreglado**: si la búsqueda no encuentra nada, se mira el
+  listado REST (`GET /repos/{repo}/issues?state=all`, 5 páginas = 500 issues
+  recientes), que sí es inmediato; la búsqueda sigue siendo lo primero porque
+  no se corta a 500. #114 se renombró a «Duplicado de #113 — prueba del aviso
+  de reverificar-release» y se cerró con un comentario explicándolo (un issue
+  no se puede borrar por API).
+- **Tercera y cuarta pasada**: `comentado en el issue #113` las dos veces, sin
+  crear nada nuevo. Un solo issue de ese origen.
+- **Reapertura**: cerrado #113 a mano (como si alguien lo cerrara sin
+  arreglarlo) → `issue #113 reabierto` y comentario.
+- **Cierre**: `--ok` comentó «La reverificación de la última release ha vuelto
+  a salir bien; se cierra» y cerró; otro `--ok` respondió «el issue #113 ya
+  estaba cerrado» sin tocar nada. Por eso el workflow gana el paso «Cierra el
+  aviso si vuelve a ir bien» (`if: success()`): sin él, el issue del mes en
+  rojo se quedaría abierto para siempre aunque el mes siguiente fuera verde.
+
+Estado del repo tras la prueba: #113 **cerrado** (con los 4 comentarios de la
+simulación) y #114 **cerrado** como duplicado. Ninguno de los dos es un fallo
+real: el run 44304274291 fue verde.
+
 Lo único que no se ha visto en vivo es `avisar-fallo` ejecutándose con un cron
 en rojo: haría falta romper un build en una corrida programada. Su `if` es la
 misma estructura que la de `cerrar-aviso` (probado hoy en verde) y el script

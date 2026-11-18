@@ -11,6 +11,12 @@ siguiente corte.
 
 ### Solucionado
 
+- **El aviso podía duplicar el issue.** `GET /search/issues` va con retraso: dos
+  corridas seguidas creaban dos issues con el mismo título (pasó en la propia
+  prueba: #113 y #114). Ahora, si la búsqueda no encuentra nada, se mira el
+  listado REST, que es inmediato. Además el texto del aviso de la
+  reverificación ya no habla del cron, y esa corrida cierra su issue cuando
+  vuelve a salir bien (`--ok`), que antes se quedaba abierto para siempre.
 - **La reverificación mensual se habría puesto roja sola.** Verificaba con el
   `package.json` de `main`; en cuanto `main` va por delante de la última release
   (versión subida antes del tag) la comprobación «tag == package.json» falla sin
