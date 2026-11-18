@@ -808,8 +808,10 @@ function renderBatchMatrix() {
   const p = batchPreview;
   const shortName = n => n.length > 14 ? n.slice(0, 12) + '…' : n;
   let html = '<p class="bm-stats"><strong>' + p.files.length + ' archivos</strong> · '
-    + p.total_rows + ' filas · ' + p.common.length + ' columna' + (p.common.length === 1 ? '' : 's')
-    + ' común' + (p.common.length === 1 ? '' : 'es') + ' de ' + p.union.length + ' en total</p>';
+    + p.total_rows + ' filas · ' + p.common.length     + ' columna' + (p.common.length === 1 ? '' : 's')
+    // El plural de «común» pierde la tilde: «comunes», no «comúnes».
+    + (p.common.length === 1 ? ' común' : ' comunes')
+    + ' de ' + p.union.length + ' en total</p>';
   html += '<div class="bm-matrix-wrap"><table class="bm-matrix"><caption class="lin-sr-only">Matriz de encabezados por archivo</caption><thead><tr><th scope="col">Columna</th>'
     + p.files.map(f => '<th scope="col" title="' + escapeHtml(f.name) + '">' + escapeHtml(shortName(f.name)) + '</th>').join('')
     + '</tr></thead><tbody>'
