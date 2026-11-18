@@ -14,7 +14,7 @@ import pandas as pd
 import pytest
 
 import app as app_module
-from operations import consolidate_batch, validate_template_columns
+from operations import COLUMNA_ORIGEN, consolidate_batch, validate_template_columns
 
 A_CSV = "Fecha,Region,Unidades\n2026-01-01,Norte,5\n2026-01-02,Sur,7\n"
 B_CSV = "Fecha,Region,Unidades,Extra\n2026-01-03,Este,2,x\n"
@@ -90,6 +90,43 @@ def test_alpha_rest_is_case_insensitive():
     assert order == ["alpha", "Beta", "monto", "Zeta"]
 
 
+def test_source_column_first_and_inputs_untouched():
+    """La columna de procedencia va la primera, incluso con bloque fijo, y no
+    muta los frames de entrada (el caller conserva los suyos)."""
+    a = pd.read_csv(io.StringIO(A_CSV))
+    b = pd.read_csv(io.StringIO(B_CSV))
+    df, order = consolidate_batch(
+        [a, b], first=["Region"], source_names=["a.csv", "b.csv"]
+    )
+    assert order == [COLUMNA_ORIGEN, "Region", "Fecha", "Unidades", "Extra"]
+    assert list(df[COLUMNA_ORIGEN]) == ["a.csv", "a.csv", "b.csv"]
+    assert COLUMNA_ORIGEN not in a.columns and COLUMNA_ORIGEN not in b.columns
+
+
+def test_source_column_with_template_goes_before_the_master_schema():
+    """En modo plantilla la columna de procedencia se antepone: es metadato de
+    origen, no una columna del maestro."""
+    dfs = [pd.read_csv(io.StringIO(A_CSV)), pd.read_csv(io.StringIO(B_CSV))]
+    tpl = ["Region", "Fecha"]
+    df, order = consolidate_batch(
+        dfs, template_columns=tpl, source_names=["a.csv", "b.csv"]
+    )
+    assert order == [COLUMNA_ORIGEN, "Region", "Fecha"]
+    assert list(df[COLUMNA_ORIGEN]) == ["a.csv", "a.csv", "b.csv"]
+
+
+def test_source_column_existing_in_a_file_is_error():
+    """No se pisa una columna que ya se llama así: el valor dejaría de ser el
+    nombre del archivo y la anomalía sería indistinguible."""
+    dfs = [
+        pd.DataFrame({"Fecha": [1], COLUMNA_ORIGEN: ["viejo"]}),
+        pd.DataFrame({"Fecha": [2]}),
+    ]
+    with pytest.raises(ValueError) as exc:
+        consolidate_batch(dfs, source_names=["a.csv", "b.csv"])
+    assert "ya existe en: a.csv" in str(exc.value)
+
+
 def test_template_exact_order_drops_and_fills():
     dfs = [
         pd.read_csv(io.StringIO(A_CSV)),
@@ -117,11 +154,20 @@ def test_template_exact_order_drops_and_fills():
         ({"template_columns": ["a", "a"]}, "repite columnas"),
         ({"template_columns": ["a", " "]}, "plantilla"),
         ({"template_columns": ["a"], "first": ["Fecha"]}, "bloque fijo"),
+        ({"source_names": ["a.csv"]}, "un nombre de archivo por DataFrame"),
+        ({"source_names": ["a.csv", "  "]}, "nombre para"),
+        ({"source_names": "a.csv"}, "un nombre de archivo por DataFrame"),
+        (
+            {"source_names": ["a.csv", "b.csv"],
+             "template_columns": [COLUMNA_ORIGEN, "Fecha"]},
+            "maestro ya define",
+        ),
     ],
     ids=[
         "empty", "not_a_list", "bad_rest", "first_missing",
         "first_duplicated", "tpl_empty", "tpl_duplicated", "tpl_blank",
-        "tpl_plus_first",
+        "tpl_plus_first", "src_short", "src_blank", "src_not_list",
+        "src_in_template",
     ],
 )
 def test_consolidate_batch_errors(kwargs, fragment):
@@ -182,9 +228,12 @@ def test_merge_dynamic_default_keeps_everything(client):
     j = resp.get_json()
     assert j["merged"] == {
         "files": ["a.csv", "b.csv", "c.csv"],
-        "rows": 4, "columns": 4, "dropped": [],
+        "rows": 4, "columns": 5, "dropped": [],
+        "source_column": COLUMNA_ORIGEN,
     }
-    assert j["data"]["columns"] == ["Fecha", "Region", "Unidades", "Extra"]
+    assert j["data"]["columns"] == [
+        COLUMNA_ORIGEN, "Fecha", "Region", "Unidades", "Extra"
+    ]
     df = df_of(resp)
     assert len(df) == 4
     # las filas de c.csv quedan vacías en lo que no traían
@@ -203,7 +252,7 @@ def test_merge_pinned_block_first(client):
     )
     assert resp.status_code == 200, resp.get_json()
     assert resp.get_json()["data"]["columns"] == [
-        "Unidades", "Fecha", "Region", "Extra"
+        COLUMNA_ORIGEN, "Unidades", "Fecha", "Region", "Extra"
     ]
 
 
@@ -211,7 +260,7 @@ def test_merge_rest_alpha(client):
     resp = merge(client, ("a.csv", A_CSV), ("b.csv", B_CSV), rest="alpha")
     assert resp.status_code == 200, resp.get_json()
     assert resp.get_json()["data"]["columns"] == [
-        "Extra", "Fecha", "Region", "Unidades"
+        COLUMNA_ORIGEN, "Extra", "Fecha", "Region", "Unidades"
     ]
 
 
@@ -242,11 +291,21 @@ def test_merge_template_exact_schema(client):
     assert resp.status_code == 200, resp.get_json()
     j = resp.get_json()
     assert j["data"]["columns"] == [
-        "Region", "Unidades", "Fecha", "Observaciones"
+        COLUMNA_ORIGEN, "Region", "Unidades", "Fecha", "Observaciones"
     ]
     assert j["merged"]["dropped"] == ["Extra"]  # fuera del maestro
     df = df_of(resp)
     assert df["Observaciones"].isna().all()      # sin datos → toda nula
+
+
+def test_merge_without_source_column(client):
+    """`add_source=0` apaga la procedencia: el consolidado queda igual que antes."""
+    resp = merge(client, ("a.csv", A_CSV), ("b.csv", B_CSV), add_source="0")
+    assert resp.status_code == 200, resp.get_json()
+    j = resp.get_json()
+    assert j["merged"]["source_column"] is None
+    assert j["data"]["columns"] == ["Fecha", "Region", "Unidades", "Extra"]
+    assert COLUMNA_ORIGEN not in j["data"]["columns"]
 
 
 def test_merge_xlsx_file(client):
@@ -262,7 +321,7 @@ def test_merge_xlsx_file(client):
     }, content_type="multipart/form-data")
     assert resp.status_code == 200, resp.get_json()
     j = resp.get_json()
-    assert j["merged"]["rows"] == 3 and j["merged"]["columns"] == 2
+    assert j["merged"]["rows"] == 3 and j["merged"]["columns"] == 3
 
 
 # ── Paridad del código generado ────────────────────────────────────────
@@ -282,6 +341,8 @@ def test_generated_code_reproduces_the_merge(client, tmp_path, monkeypatch):
     ns = {"pd": pd}
     exec(code, ns)  # noqa: S102 — el script exportado hace exactamente esto
     pd.testing.assert_frame_equal(ns["df"], app_module.current_df)
+    # la procedencia también viaja: cada fila conserva su archivo en el script
+    assert list(ns["df"][COLUMNA_ORIGEN]) == ["a.csv", "a.csv", "b.csv", "c.csv"]
 
 
 # ── Errores (400 de contrato, 500 de lectura) ──────────────────────────
@@ -302,10 +363,17 @@ def test_generated_code_reproduces_the_merge(client, tmp_path, monkeypatch):
          "modo es Dinámico"),
         (lambda: files(("a.csv", A_CSV), ("b.csv", B_CSV), first="{nope"),
          "lista JSON"),
+        (lambda: files(("a.csv", "Fecha,Archivo de origen\n1,x\n"), ("b.csv", B_CSV)),
+         "ya existe en"),
+        (lambda: files(("a.csv", A_CSV), ("b.csv", B_CSV),
+                       template=("tpl.csv", "Archivo de origen,Region\n"),
+                       mode="template"),
+         "maestro ya define"),
     ],
     ids=[
         "one_file", "bad_ext", "first_missing", "bad_rest", "bad_mode",
         "template_without_file", "template_in_dynamic", "bad_first_json",
+        "source_column_clash", "source_column_in_template",
     ],
 )
 def test_merge_param_errors_are_400(client, build, fragment):

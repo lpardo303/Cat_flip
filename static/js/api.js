@@ -125,8 +125,11 @@ async function uploadBatchMerge(fd, displayName) {
     if (data.error) { toast(data.error, 'error'); return false; }
     handleUploadSuccess(data, displayName);
     if (data.merged) {
+      const origen = data.merged.source_column
+        ? ' · columna «' + data.merged.source_column + '»'
+        : '';
       toast('Consolidados ' + data.merged.files.length + ' archivos → '
-        + data.merged.rows + ' filas × ' + data.merged.columns + ' columnas');
+        + data.merged.rows + ' filas × ' + data.merged.columns + ' columnas' + origen);
       if (data.merged.dropped && data.merged.dropped.length) {
         toast('Columnas fuera de la plantilla descartadas: ' + data.merged.dropped.join(', '), 'info');
       }

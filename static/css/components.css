@@ -1472,6 +1472,12 @@
   .bm-template-row { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.4rem; }
   .bm-template-info { font-size: 0.75rem; color: var(--text2); }
   .bm-block { max-height: 120px; overflow: auto; }
+  /* Checkbox de procedencia: aplica a los dos modos (dinámico y plantilla) */
+  .bm-source {
+    display: flex; align-items: flex-start; gap: 0.4rem;
+    font-size: 0.75rem; color: var(--text); margin: 0.35rem 0 0.5rem;
+  }
+  .bm-source input { margin-top: 0.15rem; }
 
   /* ── BARRA DE SUGERENCIA DE TIPOS (auto-mapeo de esquema al cargar) ── */
   .type-suggest-bar {

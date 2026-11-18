@@ -1264,6 +1264,11 @@ def validate_schema(df, rules, max_violations=_SCHEMA_MAX_VIOLATIONS):
 # `alpha` ordena A→Z ignorando mayúsculas, igual que reorder_columns.
 _BATCH_REST_ORDERS = ("append", "alpha")
 
+# Columna de procedencia que añade la consolidación cuando se pide. El nombre
+# se ve en el grid, en el código exportado y en el destino, así que dice lo que
+# es: un prefijo `_origen` habría parecido interno en los tres sitios.
+COLUMNA_ORIGEN = "Archivo de origen"
+
 
 def validate_template_columns(columns):
     """Contrato de la plantilla maestra: lista no vacía, nombres únicos, sin blancos."""
@@ -1277,7 +1282,9 @@ def validate_template_columns(columns):
         raise ValueError("La plantilla repite columnas; usa nombres únicos.")
 
 
-def consolidate_batch(dfs, first=None, rest="append", template_columns=None):
+def consolidate_batch(
+    dfs, first=None, rest="append", template_columns=None, source_names=None
+):
     """Apila N DataFrames en uno solo alineando sus esquemas (unión outer).
 
     Es una carga, no una op del pipeline: el resultado es el dataset
@@ -1291,13 +1298,39 @@ def consolidate_batch(dfs, first=None, rest="append", template_columns=None):
       orden dado, como reorder_columns); el resto va por `rest`:
       "append" (orden de aparición, default) o "alpha" (casefold).
     * Modo plantilla: `template_columns` manda exacto (orden + conjunto).
+    * `source_names`, si llega, añade `COLUMNA_ORIGEN` al principio con el
+      nombre del archivo de cada fila: sirve para cazar una anomalía en el
+      consolidado y volver al original. Los frames de entrada no se mutan.
 
     Devuelve ``(df, orden_final)``. ValueError: menos de 2 frames, `rest`
     desconocido, columna de `first` inexistente o plantilla vacía,
-    con blancos o con duplicados.
+    con blancos o con duplicados; `source_names` incompleto o con blancos; o
+    `COLUMNA_ORIGEN` ya presente en un archivo o en el maestro (no se pisa:
+    el valor dejaría de ser el nombre del archivo).
     """
     if not isinstance(dfs, list) or len(dfs) < 2:
         raise ValueError("Se consolidan al menos 2 DataFrames.")
+
+    if source_names is not None:
+        if not isinstance(source_names, list) or len(source_names) != len(dfs):
+            raise ValueError(
+                "`source_names` debe traer un nombre de archivo por DataFrame."
+            )
+        if any(not isinstance(n, str) or not n.strip() for n in source_names):
+            raise ValueError(
+                f"Cada archivo necesita un nombre para «{COLUMNA_ORIGEN}»."
+            )
+        if template_columns is not None and COLUMNA_ORIGEN in template_columns:
+            raise ValueError(
+                f"El maestro ya define «{COLUMNA_ORIGEN}»: esa columna la añade "
+                "la consolidación, quítala de la plantilla."
+            )
+        clash = [n for n, d in zip(source_names, dfs) if COLUMNA_ORIGEN in d.columns]
+        if clash:
+            raise ValueError(
+                f"«{COLUMNA_ORIGEN}» ya existe en: {', '.join(clash)}. "
+                "Renómbrala antes de consolidar."
+            )
 
     if template_columns is not None:
         if first:
@@ -1331,6 +1364,13 @@ def consolidate_batch(dfs, first=None, rest="append", template_columns=None):
         if rest == "alpha":
             rest_cols = sorted(rest_cols, key=str.casefold)
         order = pinned + rest_cols
+
+    if source_names is not None:
+        # Copia por frame: el caller conserva los suyos sin la columna nueva.
+        dfs = [d.copy() for d in dfs]
+        for d, nombre in zip(dfs, source_names):
+            d[COLUMNA_ORIGEN] = nombre
+        order = [COLUMNA_ORIGEN] + order
 
     df = pd.concat(dfs, axis=0, join="outer", ignore_index=True)
     df = df.reindex(columns=order)
