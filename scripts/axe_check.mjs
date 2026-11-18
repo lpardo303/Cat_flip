@@ -118,6 +118,35 @@ try {
     if (!data.error) handleOpResponse('change_case', { column: 'Nombre', case: 'upper' }, data, false);
   });
 
+  // «Filtrar por este valor» del menú de columna: marca la celda «Madrid» de
+  // Ciudad y filtra por ella sin escribir en el buscador. Con el CSV de arriba
+  // quedan 2 filas (las dos con Madrid).
+  const filtroCelda = await page.evaluate(() => {
+    const td = [...document.querySelectorAll('#grid-tbody td[data-col="Ciudad"]')]
+      .find(x => x.textContent.trim() === 'Madrid');
+    if (!td) return { error: 'sin celda Madrid' };
+    td.click();
+    const btn = document.querySelector('.th-menu-btn[data-col="Ciudad"]');
+    openColMenu({ stopPropagation() {}, currentTarget: btn }, 'Ciudad');
+    const item = [...document.querySelectorAll('#col-menu-dropdown .col-menu-item')]
+      .find(x => x.textContent.includes('Filtrar por este valor'));
+    if (!item) return { error: 'sin acción en el menú' };
+    const habilitada = !item.classList.contains('disabled');
+    item.click();
+    return { habilitada, buscador: document.getElementById('ribbon-search').value };
+  });
+  await page.waitForTimeout(250);  // debounce del buscador (120 ms)
+  const filasFiltradas = await page.evaluate(
+    () => document.querySelectorAll('#grid-tbody tr:not(.vs-spacer)').length,
+  );
+  if (!filtroCelda.habilitada || filtroCelda.buscador !== 'Madrid' || filasFiltradas !== 2) {
+    const detalle = JSON.stringify({ ...filtroCelda, filasFiltradas });
+    console.log(`filtrar por valor: FALLO — ${detalle}`);
+    results.push({ label: 'filtrar-por-valor', violations: [], error: detalle });
+    failures += 1;
+  }
+  await page.evaluate(() => clearSearch());
+
   // Superficie extra: la página ya con datos en Automático + sistema oscuro
   if (autoDark) await runAxe(page, 'página (automático · sistema oscuro)');
 

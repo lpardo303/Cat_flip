@@ -43,6 +43,14 @@ siguiente corte.
 
 ### Añadido
 
+- **«Filtrar por este valor» en el menú de columna del grid.** Un clic en una
+  celda la marca; el menú de esa columna ofrece filtrar por su contenido, así
+  que una fila del consolidado lleva a las de su archivo original sin escribir
+  en el buscador. En otra columna, o con una celda nula marcada, la acción sale
+  deshabilitada en vez de filtrar por algo que el usuario no eligió. La
+  selección sobrevive al re-render y se descarta cuando cambia el dataset.
+  `scripts/axe_check.mjs` lo comprueba: marca una celda, abre el menú, filtra y
+  exige 2 filas y el valor en el buscador.
 - **«Fusionar varios archivos» marca de qué archivo viene cada fila.** La
   consolidación antepone la columna `Archivo de origen` (marcada por defecto en
   el modal, desmarcable) en los dos modos, también con plantilla, porque es
